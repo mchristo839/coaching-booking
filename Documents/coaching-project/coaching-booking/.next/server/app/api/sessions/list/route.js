@@ -1,0 +1,136 @@
+"use strict";
+/*
+ * ATTENTION: An "eval-source-map" devtool has been used.
+ * This devtool is neither made for production nor for readable output files.
+ * It uses "eval()" calls to create a separate source file with attached SourceMaps in the browser devtools.
+ * If you are trying to read the output file, select a different devtool (https://webpack.js.org/configuration/devtool/)
+ * or disable the default devtool with "devtool: false".
+ * If you are looking for production-ready output files, see mode: "production" (https://webpack.js.org/configuration/mode/).
+ */
+(() => {
+var exports = {};
+exports.id = "app/api/sessions/list/route";
+exports.ids = ["app/api/sessions/list/route"];
+exports.modules = {
+
+/***/ "next/dist/compiled/next-server/app-page.runtime.dev.js":
+/*!*************************************************************************!*\
+  !*** external "next/dist/compiled/next-server/app-page.runtime.dev.js" ***!
+  \*************************************************************************/
+/***/ ((module) => {
+
+module.exports = require("next/dist/compiled/next-server/app-page.runtime.dev.js");
+
+/***/ }),
+
+/***/ "next/dist/compiled/next-server/app-route.runtime.dev.js":
+/*!**************************************************************************!*\
+  !*** external "next/dist/compiled/next-server/app-route.runtime.dev.js" ***!
+  \**************************************************************************/
+/***/ ((module) => {
+
+module.exports = require("next/dist/compiled/next-server/app-route.runtime.dev.js");
+
+/***/ }),
+
+/***/ "http":
+/*!***********************!*\
+  !*** external "http" ***!
+  \***********************/
+/***/ ((module) => {
+
+module.exports = require("http");
+
+/***/ }),
+
+/***/ "https":
+/*!************************!*\
+  !*** external "https" ***!
+  \************************/
+/***/ ((module) => {
+
+module.exports = require("https");
+
+/***/ }),
+
+/***/ "punycode":
+/*!***************************!*\
+  !*** external "punycode" ***!
+  \***************************/
+/***/ ((module) => {
+
+module.exports = require("punycode");
+
+/***/ }),
+
+/***/ "stream":
+/*!*************************!*\
+  !*** external "stream" ***!
+  \*************************/
+/***/ ((module) => {
+
+module.exports = require("stream");
+
+/***/ }),
+
+/***/ "url":
+/*!**********************!*\
+  !*** external "url" ***!
+  \**********************/
+/***/ ((module) => {
+
+module.exports = require("url");
+
+/***/ }),
+
+/***/ "zlib":
+/*!***********************!*\
+  !*** external "zlib" ***!
+  \***********************/
+/***/ ((module) => {
+
+module.exports = require("zlib");
+
+/***/ }),
+
+/***/ "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fsessions%2Flist%2Froute&page=%2Fapi%2Fsessions%2Flist%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fsessions%2Flist%2Froute.ts&appDir=%2Fhome%2Fmario%2FDocuments%2Fcoaching-project%2Fcoaching-booking%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2Fhome%2Fmario%2FDocuments%2Fcoaching-project%2Fcoaching-booking&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!":
+/*!***********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** ./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fsessions%2Flist%2Froute&page=%2Fapi%2Fsessions%2Flist%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fsessions%2Flist%2Froute.ts&appDir=%2Fhome%2Fmario%2FDocuments%2Fcoaching-project%2Fcoaching-booking%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2Fhome%2Fmario%2FDocuments%2Fcoaching-project%2Fcoaching-booking&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D! ***!
+  \***********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export */ __webpack_require__.d(__webpack_exports__, {\n/* harmony export */   originalPathname: () => (/* binding */ originalPathname),\n/* harmony export */   patchFetch: () => (/* binding */ patchFetch),\n/* harmony export */   requestAsyncStorage: () => (/* binding */ requestAsyncStorage),\n/* harmony export */   routeModule: () => (/* binding */ routeModule),\n/* harmony export */   serverHooks: () => (/* binding */ serverHooks),\n/* harmony export */   staticGenerationAsyncStorage: () => (/* binding */ staticGenerationAsyncStorage)\n/* harmony export */ });\n/* harmony import */ var next_dist_server_future_route_modules_app_route_module_compiled__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! next/dist/server/future/route-modules/app-route/module.compiled */ \"(rsc)/./node_modules/next/dist/server/future/route-modules/app-route/module.compiled.js\");\n/* harmony import */ var next_dist_server_future_route_modules_app_route_module_compiled__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(next_dist_server_future_route_modules_app_route_module_compiled__WEBPACK_IMPORTED_MODULE_0__);\n/* harmony import */ var next_dist_server_future_route_kind__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! next/dist/server/future/route-kind */ \"(rsc)/./node_modules/next/dist/server/future/route-kind.js\");\n/* harmony import */ var next_dist_server_lib_patch_fetch__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! next/dist/server/lib/patch-fetch */ \"(rsc)/./node_modules/next/dist/server/lib/patch-fetch.js\");\n/* harmony import */ var next_dist_server_lib_patch_fetch__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(next_dist_server_lib_patch_fetch__WEBPACK_IMPORTED_MODULE_2__);\n/* harmony import */ var _home_mario_Documents_coaching_project_coaching_booking_app_api_sessions_list_route_ts__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./app/api/sessions/list/route.ts */ \"(rsc)/./app/api/sessions/list/route.ts\");\n\n\n\n\n// We inject the nextConfigOutput here so that we can use them in the route\n// module.\nconst nextConfigOutput = \"\"\nconst routeModule = new next_dist_server_future_route_modules_app_route_module_compiled__WEBPACK_IMPORTED_MODULE_0__.AppRouteRouteModule({\n    definition: {\n        kind: next_dist_server_future_route_kind__WEBPACK_IMPORTED_MODULE_1__.RouteKind.APP_ROUTE,\n        page: \"/api/sessions/list/route\",\n        pathname: \"/api/sessions/list\",\n        filename: \"route\",\n        bundlePath: \"app/api/sessions/list/route\"\n    },\n    resolvedPagePath: \"/home/mario/Documents/coaching-project/coaching-booking/app/api/sessions/list/route.ts\",\n    nextConfigOutput,\n    userland: _home_mario_Documents_coaching_project_coaching_booking_app_api_sessions_list_route_ts__WEBPACK_IMPORTED_MODULE_3__\n});\n// Pull out the exports that we need to expose from the module. This should\n// be eliminated when we've moved the other routes to the new format. These\n// are used to hook into the route.\nconst { requestAsyncStorage, staticGenerationAsyncStorage, serverHooks } = routeModule;\nconst originalPathname = \"/api/sessions/list/route\";\nfunction patchFetch() {\n    return (0,next_dist_server_lib_patch_fetch__WEBPACK_IMPORTED_MODULE_2__.patchFetch)({\n        serverHooks,\n        staticGenerationAsyncStorage\n    });\n}\n\n\n//# sourceMappingURL=app-route.js.map//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKHJzYykvLi9ub2RlX21vZHVsZXMvbmV4dC9kaXN0L2J1aWxkL3dlYnBhY2svbG9hZGVycy9uZXh0LWFwcC1sb2FkZXIuanM/bmFtZT1hcHAlMkZhcGklMkZzZXNzaW9ucyUyRmxpc3QlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnNlc3Npb25zJTJGbGlzdCUyRnJvdXRlJmFwcFBhdGhzPSZwYWdlUGF0aD1wcml2YXRlLW5leHQtYXBwLWRpciUyRmFwaSUyRnNlc3Npb25zJTJGbGlzdCUyRnJvdXRlLnRzJmFwcERpcj0lMkZob21lJTJGbWFyaW8lMkZEb2N1bWVudHMlMkZjb2FjaGluZy1wcm9qZWN0JTJGY29hY2hpbmctYm9va2luZyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGaG9tZSUyRm1hcmlvJTJGRG9jdW1lbnRzJTJGY29hY2hpbmctcHJvamVjdCUyRmNvYWNoaW5nLWJvb2tpbmcmaXNEZXY9dHJ1ZSZ0c2NvbmZpZ1BhdGg9dHNjb25maWcuanNvbiZiYXNlUGF0aD0mYXNzZXRQcmVmaXg9Jm5leHRDb25maWdPdXRwdXQ9JnByZWZlcnJlZFJlZ2lvbj0mbWlkZGxld2FyZUNvbmZpZz1lMzAlM0QhIiwibWFwcGluZ3MiOiI7Ozs7Ozs7Ozs7Ozs7OztBQUFzRztBQUN2QztBQUNjO0FBQ3NDO0FBQ25IO0FBQ0E7QUFDQTtBQUNBLHdCQUF3QixnSEFBbUI7QUFDM0M7QUFDQSxjQUFjLHlFQUFTO0FBQ3ZCO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsS0FBSztBQUNMO0FBQ0E7QUFDQSxZQUFZO0FBQ1osQ0FBQztBQUNEO0FBQ0E7QUFDQTtBQUNBLFFBQVEsaUVBQWlFO0FBQ3pFO0FBQ0E7QUFDQSxXQUFXLDRFQUFXO0FBQ3RCO0FBQ0E7QUFDQSxLQUFLO0FBQ0w7QUFDdUg7O0FBRXZIIiwic291cmNlcyI6WyJ3ZWJwYWNrOi8vY29hY2hpbmctYm9va2luZy8/YjM0YiJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgeyBBcHBSb3V0ZVJvdXRlTW9kdWxlIH0gZnJvbSBcIm5leHQvZGlzdC9zZXJ2ZXIvZnV0dXJlL3JvdXRlLW1vZHVsZXMvYXBwLXJvdXRlL21vZHVsZS5jb21waWxlZFwiO1xuaW1wb3J0IHsgUm91dGVLaW5kIH0gZnJvbSBcIm5leHQvZGlzdC9zZXJ2ZXIvZnV0dXJlL3JvdXRlLWtpbmRcIjtcbmltcG9ydCB7IHBhdGNoRmV0Y2ggYXMgX3BhdGNoRmV0Y2ggfSBmcm9tIFwibmV4dC9kaXN0L3NlcnZlci9saWIvcGF0Y2gtZmV0Y2hcIjtcbmltcG9ydCAqIGFzIHVzZXJsYW5kIGZyb20gXCIvaG9tZS9tYXJpby9Eb2N1bWVudHMvY29hY2hpbmctcHJvamVjdC9jb2FjaGluZy1ib29raW5nL2FwcC9hcGkvc2Vzc2lvbnMvbGlzdC9yb3V0ZS50c1wiO1xuLy8gV2UgaW5qZWN0IHRoZSBuZXh0Q29uZmlnT3V0cHV0IGhlcmUgc28gdGhhdCB3ZSBjYW4gdXNlIHRoZW0gaW4gdGhlIHJvdXRlXG4vLyBtb2R1bGUuXG5jb25zdCBuZXh0Q29uZmlnT3V0cHV0ID0gXCJcIlxuY29uc3Qgcm91dGVNb2R1bGUgPSBuZXcgQXBwUm91dGVSb3V0ZU1vZHVsZSh7XG4gICAgZGVmaW5pdGlvbjoge1xuICAgICAgICBraW5kOiBSb3V0ZUtpbmQuQVBQX1JPVVRFLFxuICAgICAgICBwYWdlOiBcIi9hcGkvc2Vzc2lvbnMvbGlzdC9yb3V0ZVwiLFxuICAgICAgICBwYXRobmFtZTogXCIvYXBpL3Nlc3Npb25zL2xpc3RcIixcbiAgICAgICAgZmlsZW5hbWU6IFwicm91dGVcIixcbiAgICAgICAgYnVuZGxlUGF0aDogXCJhcHAvYXBpL3Nlc3Npb25zL2xpc3Qvcm91dGVcIlxuICAgIH0sXG4gICAgcmVzb2x2ZWRQYWdlUGF0aDogXCIvaG9tZS9tYXJpby9Eb2N1bWVudHMvY29hY2hpbmctcHJvamVjdC9jb2FjaGluZy1ib29raW5nL2FwcC9hcGkvc2Vzc2lvbnMvbGlzdC9yb3V0ZS50c1wiLFxuICAgIG5leHRDb25maWdPdXRwdXQsXG4gICAgdXNlcmxhbmRcbn0pO1xuLy8gUHVsbCBvdXQgdGhlIGV4cG9ydHMgdGhhdCB3ZSBuZWVkIHRvIGV4cG9zZSBmcm9tIHRoZSBtb2R1bGUuIFRoaXMgc2hvdWxkXG4vLyBiZSBlbGltaW5hdGVkIHdoZW4gd2UndmUgbW92ZWQgdGhlIG90aGVyIHJvdXRlcyB0byB0aGUgbmV3IGZvcm1hdC4gVGhlc2Vcbi8vIGFyZSB1c2VkIHRvIGhvb2sgaW50byB0aGUgcm91dGUuXG5jb25zdCB7IHJlcXVlc3RBc3luY1N0b3JhZ2UsIHN0YXRpY0dlbmVyYXRpb25Bc3luY1N0b3JhZ2UsIHNlcnZlckhvb2tzIH0gPSByb3V0ZU1vZHVsZTtcbmNvbnN0IG9yaWdpbmFsUGF0aG5hbWUgPSBcIi9hcGkvc2Vzc2lvbnMvbGlzdC9yb3V0ZVwiO1xuZnVuY3Rpb24gcGF0Y2hGZXRjaCgpIHtcbiAgICByZXR1cm4gX3BhdGNoRmV0Y2goe1xuICAgICAgICBzZXJ2ZXJIb29rcyxcbiAgICAgICAgc3RhdGljR2VuZXJhdGlvbkFzeW5jU3RvcmFnZVxuICAgIH0pO1xufVxuZXhwb3J0IHsgcm91dGVNb2R1bGUsIHJlcXVlc3RBc3luY1N0b3JhZ2UsIHN0YXRpY0dlbmVyYXRpb25Bc3luY1N0b3JhZ2UsIHNlcnZlckhvb2tzLCBvcmlnaW5hbFBhdGhuYW1lLCBwYXRjaEZldGNoLCAgfTtcblxuLy8jIHNvdXJjZU1hcHBpbmdVUkw9YXBwLXJvdXRlLmpzLm1hcCJdLCJuYW1lcyI6W10sInNvdXJjZVJvb3QiOiIifQ==\n//# sourceURL=webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fsessions%2Flist%2Froute&page=%2Fapi%2Fsessions%2Flist%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fsessions%2Flist%2Froute.ts&appDir=%2Fhome%2Fmario%2FDocuments%2Fcoaching-project%2Fcoaching-booking%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2Fhome%2Fmario%2FDocuments%2Fcoaching-project%2Fcoaching-booking&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!\n");
+
+/***/ }),
+
+/***/ "(rsc)/./app/api/sessions/list/route.ts":
+/*!****************************************!*\
+  !*** ./app/api/sessions/list/route.ts ***!
+  \****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export */ __webpack_require__.d(__webpack_exports__, {\n/* harmony export */   GET: () => (/* binding */ GET)\n/* harmony export */ });\n/* harmony import */ var next_server__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! next/server */ \"(rsc)/./node_modules/next/dist/api/server.js\");\n/* harmony import */ var _app_lib_airtable__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @/app/lib/airtable */ \"(rsc)/./app/lib/airtable.ts\");\n// app/api/sessions/list/route.ts\n\n\nasync function GET(request) {\n    try {\n        const { searchParams } = new URL(request.url);\n        const coachId = searchParams.get(\"coachId\");\n        if (!coachId) {\n            return next_server__WEBPACK_IMPORTED_MODULE_0__.NextResponse.json({\n                error: \"coachId is required\"\n            }, {\n                status: 400\n            });\n        }\n        console.log(\"[API sessions/list] Fetching sessions for coachId:\", coachId);\n        // Strategy: fetch all sessions, then filter in JS.\n        // This avoids Airtable filterByFormula issues with linked records,\n        // which is the most common cause of \"0 sessions returned\" bugs.\n        // For MVP scale (under 1000 sessions) this is fast and reliable.\n        const allRecords = await _app_lib_airtable__WEBPACK_IMPORTED_MODULE_1__.sessionsTable.select({\n            sort: [\n                {\n                    field: \"date_time\",\n                    direction: \"asc\"\n                }\n            ]\n        }).firstPage();\n        console.log(\"[API sessions/list] Total sessions in table:\", allRecords.length);\n        // Filter for this coach. Linked record fields return as arrays of record IDs.\n        const sessions = allRecords.filter((record)=>{\n            const linkedCoachIds = record.get(\"coach_id\");\n            console.log(\"[API sessions/list] Record\", record.id, \"coach_id field:\", JSON.stringify(linkedCoachIds));\n            // Handle different formats Airtable returns for linked records\n            if (Array.isArray(linkedCoachIds)) {\n                return linkedCoachIds.includes(coachId);\n            }\n            if (typeof linkedCoachIds === \"string\") {\n                return linkedCoachIds === coachId;\n            }\n            return false;\n        }).map((record)=>({\n                id: record.id,\n                sessionName: record.get(\"session_name\") || \"\",\n                sessionType: record.get(\"session_type\"),\n                dateTime: record.get(\"date_time\"),\n                durationMinutes: record.get(\"duration_minutes\"),\n                capacity: record.get(\"capacity\"),\n                bookedCount: record.get(\"booked_count\") || 0,\n                ageGroup: record.get(\"age_group\"),\n                skillLevel: record.get(\"skill_level\"),\n                priceCents: record.get(\"price_cents\"),\n                injuryNotes: record.get(\"injury_notes\"),\n                recurrenceRule: record.get(\"recurrence_rule\") || \"None\"\n            }));\n        console.log(\"[API sessions/list] Filtered sessions for coach:\", sessions.length);\n        return next_server__WEBPACK_IMPORTED_MODULE_0__.NextResponse.json({\n            sessions\n        });\n    } catch (error) {\n        console.error(\"[API sessions/list] Error:\", error);\n        return next_server__WEBPACK_IMPORTED_MODULE_0__.NextResponse.json({\n            error: \"Failed to fetch sessions\"\n        }, {\n            status: 500\n        });\n    }\n}\n//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKHJzYykvLi9hcHAvYXBpL3Nlc3Npb25zL2xpc3Qvcm91dGUudHMiLCJtYXBwaW5ncyI6Ijs7Ozs7O0FBQUEsaUNBQWlDO0FBQ3NCO0FBQ0w7QUFFM0MsZUFBZUUsSUFBSUMsT0FBb0I7SUFDNUMsSUFBSTtRQUNGLE1BQU0sRUFBRUMsWUFBWSxFQUFFLEdBQUcsSUFBSUMsSUFBSUYsUUFBUUcsR0FBRztRQUM1QyxNQUFNQyxVQUFVSCxhQUFhSSxHQUFHLENBQUM7UUFFakMsSUFBSSxDQUFDRCxTQUFTO1lBQ1osT0FBT1AscURBQVlBLENBQUNTLElBQUksQ0FDdEI7Z0JBQUVDLE9BQU87WUFBc0IsR0FDL0I7Z0JBQUVDLFFBQVE7WUFBSTtRQUVsQjtRQUVBQyxRQUFRQyxHQUFHLENBQUMsc0RBQXNETjtRQUVsRSxtREFBbUQ7UUFDbkQsbUVBQW1FO1FBQ25FLGdFQUFnRTtRQUNoRSxpRUFBaUU7UUFDakUsTUFBTU8sYUFBYSxNQUFNYiw0REFBYUEsQ0FDbkNjLE1BQU0sQ0FBQztZQUNOQyxNQUFNO2dCQUFDO29CQUFFQyxPQUFPO29CQUFhQyxXQUFXO2dCQUFNO2FBQUU7UUFDbEQsR0FDQ0MsU0FBUztRQUVaUCxRQUFRQyxHQUFHLENBQUMsZ0RBQWdEQyxXQUFXTSxNQUFNO1FBRTdFLDhFQUE4RTtRQUM5RSxNQUFNQyxXQUFXUCxXQUNkUSxNQUFNLENBQUMsQ0FBQ0M7WUFDUCxNQUFNQyxpQkFBaUJELE9BQU9mLEdBQUcsQ0FBQztZQUNsQ0ksUUFBUUMsR0FBRyxDQUFDLDhCQUE4QlUsT0FBT0UsRUFBRSxFQUFFLG1CQUFtQkMsS0FBS0MsU0FBUyxDQUFDSDtZQUV2RiwrREFBK0Q7WUFDL0QsSUFBSUksTUFBTUMsT0FBTyxDQUFDTCxpQkFBaUI7Z0JBQ2pDLE9BQU9BLGVBQWVNLFFBQVEsQ0FBQ3ZCO1lBQ2pDO1lBQ0EsSUFBSSxPQUFPaUIsbUJBQW1CLFVBQVU7Z0JBQ3RDLE9BQU9BLG1CQUFtQmpCO1lBQzVCO1lBQ0EsT0FBTztRQUNULEdBQ0N3QixHQUFHLENBQUMsQ0FBQ1IsU0FBWTtnQkFDaEJFLElBQUlGLE9BQU9FLEVBQUU7Z0JBQ2JPLGFBQWFULE9BQU9mLEdBQUcsQ0FBQyxtQkFBbUI7Z0JBQzNDeUIsYUFBYVYsT0FBT2YsR0FBRyxDQUFDO2dCQUN4QjBCLFVBQVVYLE9BQU9mLEdBQUcsQ0FBQztnQkFDckIyQixpQkFBaUJaLE9BQU9mLEdBQUcsQ0FBQztnQkFDNUI0QixVQUFVYixPQUFPZixHQUFHLENBQUM7Z0JBQ3JCNkIsYUFBYWQsT0FBT2YsR0FBRyxDQUFDLG1CQUFtQjtnQkFDM0M4QixVQUFVZixPQUFPZixHQUFHLENBQUM7Z0JBQ3JCK0IsWUFBWWhCLE9BQU9mLEdBQUcsQ0FBQztnQkFDdkJnQyxZQUFZakIsT0FBT2YsR0FBRyxDQUFDO2dCQUN2QmlDLGFBQWFsQixPQUFPZixHQUFHLENBQUM7Z0JBQ3hCa0MsZ0JBQWdCbkIsT0FBT2YsR0FBRyxDQUFDLHNCQUFzQjtZQUNuRDtRQUVGSSxRQUFRQyxHQUFHLENBQUMsb0RBQW9EUSxTQUFTRCxNQUFNO1FBRS9FLE9BQU9wQixxREFBWUEsQ0FBQ1MsSUFBSSxDQUFDO1lBQUVZO1FBQVM7SUFDdEMsRUFBRSxPQUFPWCxPQUFPO1FBQ2RFLFFBQVFGLEtBQUssQ0FBQyw4QkFBOEJBO1FBQzVDLE9BQU9WLHFEQUFZQSxDQUFDUyxJQUFJLENBQ3RCO1lBQUVDLE9BQU87UUFBMkIsR0FDcEM7WUFBRUMsUUFBUTtRQUFJO0lBRWxCO0FBQ0YiLCJzb3VyY2VzIjpbIndlYnBhY2s6Ly9jb2FjaGluZy1ib29raW5nLy4vYXBwL2FwaS9zZXNzaW9ucy9saXN0L3JvdXRlLnRzP2JjMGQiXSwic291cmNlc0NvbnRlbnQiOlsiLy8gYXBwL2FwaS9zZXNzaW9ucy9saXN0L3JvdXRlLnRzXG5pbXBvcnQgeyBOZXh0UmVxdWVzdCwgTmV4dFJlc3BvbnNlIH0gZnJvbSAnbmV4dC9zZXJ2ZXInXG5pbXBvcnQgeyBzZXNzaW9uc1RhYmxlIH0gZnJvbSAnQC9hcHAvbGliL2FpcnRhYmxlJ1xuXG5leHBvcnQgYXN5bmMgZnVuY3Rpb24gR0VUKHJlcXVlc3Q6IE5leHRSZXF1ZXN0KSB7XG4gIHRyeSB7XG4gICAgY29uc3QgeyBzZWFyY2hQYXJhbXMgfSA9IG5ldyBVUkwocmVxdWVzdC51cmwpXG4gICAgY29uc3QgY29hY2hJZCA9IHNlYXJjaFBhcmFtcy5nZXQoJ2NvYWNoSWQnKVxuXG4gICAgaWYgKCFjb2FjaElkKSB7XG4gICAgICByZXR1cm4gTmV4dFJlc3BvbnNlLmpzb24oXG4gICAgICAgIHsgZXJyb3I6ICdjb2FjaElkIGlzIHJlcXVpcmVkJyB9LFxuICAgICAgICB7IHN0YXR1czogNDAwIH1cbiAgICAgIClcbiAgICB9XG5cbiAgICBjb25zb2xlLmxvZygnW0FQSSBzZXNzaW9ucy9saXN0XSBGZXRjaGluZyBzZXNzaW9ucyBmb3IgY29hY2hJZDonLCBjb2FjaElkKVxuXG4gICAgLy8gU3RyYXRlZ3k6IGZldGNoIGFsbCBzZXNzaW9ucywgdGhlbiBmaWx0ZXIgaW4gSlMuXG4gICAgLy8gVGhpcyBhdm9pZHMgQWlydGFibGUgZmlsdGVyQnlGb3JtdWxhIGlzc3VlcyB3aXRoIGxpbmtlZCByZWNvcmRzLFxuICAgIC8vIHdoaWNoIGlzIHRoZSBtb3N0IGNvbW1vbiBjYXVzZSBvZiBcIjAgc2Vzc2lvbnMgcmV0dXJuZWRcIiBidWdzLlxuICAgIC8vIEZvciBNVlAgc2NhbGUgKHVuZGVyIDEwMDAgc2Vzc2lvbnMpIHRoaXMgaXMgZmFzdCBhbmQgcmVsaWFibGUuXG4gICAgY29uc3QgYWxsUmVjb3JkcyA9IGF3YWl0IHNlc3Npb25zVGFibGVcbiAgICAgIC5zZWxlY3Qoe1xuICAgICAgICBzb3J0OiBbeyBmaWVsZDogJ2RhdGVfdGltZScsIGRpcmVjdGlvbjogJ2FzYycgfV0sXG4gICAgICB9KVxuICAgICAgLmZpcnN0UGFnZSgpXG5cbiAgICBjb25zb2xlLmxvZygnW0FQSSBzZXNzaW9ucy9saXN0XSBUb3RhbCBzZXNzaW9ucyBpbiB0YWJsZTonLCBhbGxSZWNvcmRzLmxlbmd0aClcblxuICAgIC8vIEZpbHRlciBmb3IgdGhpcyBjb2FjaC4gTGlua2VkIHJlY29yZCBmaWVsZHMgcmV0dXJuIGFzIGFycmF5cyBvZiByZWNvcmQgSURzLlxuICAgIGNvbnN0IHNlc3Npb25zID0gYWxsUmVjb3Jkc1xuICAgICAgLmZpbHRlcigocmVjb3JkKSA9PiB7XG4gICAgICAgIGNvbnN0IGxpbmtlZENvYWNoSWRzID0gcmVjb3JkLmdldCgnY29hY2hfaWQnKVxuICAgICAgICBjb25zb2xlLmxvZygnW0FQSSBzZXNzaW9ucy9saXN0XSBSZWNvcmQnLCByZWNvcmQuaWQsICdjb2FjaF9pZCBmaWVsZDonLCBKU09OLnN0cmluZ2lmeShsaW5rZWRDb2FjaElkcykpXG5cbiAgICAgICAgLy8gSGFuZGxlIGRpZmZlcmVudCBmb3JtYXRzIEFpcnRhYmxlIHJldHVybnMgZm9yIGxpbmtlZCByZWNvcmRzXG4gICAgICAgIGlmIChBcnJheS5pc0FycmF5KGxpbmtlZENvYWNoSWRzKSkge1xuICAgICAgICAgIHJldHVybiBsaW5rZWRDb2FjaElkcy5pbmNsdWRlcyhjb2FjaElkKVxuICAgICAgICB9XG4gICAgICAgIGlmICh0eXBlb2YgbGlua2VkQ29hY2hJZHMgPT09ICdzdHJpbmcnKSB7XG4gICAgICAgICAgcmV0dXJuIGxpbmtlZENvYWNoSWRzID09PSBjb2FjaElkXG4gICAgICAgIH1cbiAgICAgICAgcmV0dXJuIGZhbHNlXG4gICAgICB9KVxuICAgICAgLm1hcCgocmVjb3JkKSA9PiAoe1xuICAgICAgICBpZDogcmVjb3JkLmlkLFxuICAgICAgICBzZXNzaW9uTmFtZTogcmVjb3JkLmdldCgnc2Vzc2lvbl9uYW1lJykgfHwgJycsXG4gICAgICAgIHNlc3Npb25UeXBlOiByZWNvcmQuZ2V0KCdzZXNzaW9uX3R5cGUnKSxcbiAgICAgICAgZGF0ZVRpbWU6IHJlY29yZC5nZXQoJ2RhdGVfdGltZScpLFxuICAgICAgICBkdXJhdGlvbk1pbnV0ZXM6IHJlY29yZC5nZXQoJ2R1cmF0aW9uX21pbnV0ZXMnKSxcbiAgICAgICAgY2FwYWNpdHk6IHJlY29yZC5nZXQoJ2NhcGFjaXR5JyksXG4gICAgICAgIGJvb2tlZENvdW50OiByZWNvcmQuZ2V0KCdib29rZWRfY291bnQnKSB8fCAwLFxuICAgICAgICBhZ2VHcm91cDogcmVjb3JkLmdldCgnYWdlX2dyb3VwJyksXG4gICAgICAgIHNraWxsTGV2ZWw6IHJlY29yZC5nZXQoJ3NraWxsX2xldmVsJyksXG4gICAgICAgIHByaWNlQ2VudHM6IHJlY29yZC5nZXQoJ3ByaWNlX2NlbnRzJyksXG4gICAgICAgIGluanVyeU5vdGVzOiByZWNvcmQuZ2V0KCdpbmp1cnlfbm90ZXMnKSxcbiAgICAgICAgcmVjdXJyZW5jZVJ1bGU6IHJlY29yZC5nZXQoJ3JlY3VycmVuY2VfcnVsZScpIHx8ICdOb25lJyxcbiAgICAgIH0pKVxuXG4gICAgY29uc29sZS5sb2coJ1tBUEkgc2Vzc2lvbnMvbGlzdF0gRmlsdGVyZWQgc2Vzc2lvbnMgZm9yIGNvYWNoOicsIHNlc3Npb25zLmxlbmd0aClcblxuICAgIHJldHVybiBOZXh0UmVzcG9uc2UuanNvbih7IHNlc3Npb25zIH0pXG4gIH0gY2F0Y2ggKGVycm9yKSB7XG4gICAgY29uc29sZS5lcnJvcignW0FQSSBzZXNzaW9ucy9saXN0XSBFcnJvcjonLCBlcnJvcilcbiAgICByZXR1cm4gTmV4dFJlc3BvbnNlLmpzb24oXG4gICAgICB7IGVycm9yOiAnRmFpbGVkIHRvIGZldGNoIHNlc3Npb25zJyB9LFxuICAgICAgeyBzdGF0dXM6IDUwMCB9XG4gICAgKVxuICB9XG59XG4iXSwibmFtZXMiOlsiTmV4dFJlc3BvbnNlIiwic2Vzc2lvbnNUYWJsZSIsIkdFVCIsInJlcXVlc3QiLCJzZWFyY2hQYXJhbXMiLCJVUkwiLCJ1cmwiLCJjb2FjaElkIiwiZ2V0IiwianNvbiIsImVycm9yIiwic3RhdHVzIiwiY29uc29sZSIsImxvZyIsImFsbFJlY29yZHMiLCJzZWxlY3QiLCJzb3J0IiwiZmllbGQiLCJkaXJlY3Rpb24iLCJmaXJzdFBhZ2UiLCJsZW5ndGgiLCJzZXNzaW9ucyIsImZpbHRlciIsInJlY29yZCIsImxpbmtlZENvYWNoSWRzIiwiaWQiLCJKU09OIiwic3RyaW5naWZ5IiwiQXJyYXkiLCJpc0FycmF5IiwiaW5jbHVkZXMiLCJtYXAiLCJzZXNzaW9uTmFtZSIsInNlc3Npb25UeXBlIiwiZGF0ZVRpbWUiLCJkdXJhdGlvbk1pbnV0ZXMiLCJjYXBhY2l0eSIsImJvb2tlZENvdW50IiwiYWdlR3JvdXAiLCJza2lsbExldmVsIiwicHJpY2VDZW50cyIsImluanVyeU5vdGVzIiwicmVjdXJyZW5jZVJ1bGUiXSwic291cmNlUm9vdCI6IiJ9\n//# sourceURL=webpack-internal:///(rsc)/./app/api/sessions/list/route.ts\n");
+
+/***/ }),
+
+/***/ "(rsc)/./app/lib/airtable.ts":
+/*!*****************************!*\
+  !*** ./app/lib/airtable.ts ***!
+  \*****************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export */ __webpack_require__.d(__webpack_exports__, {\n/* harmony export */   bookingsTable: () => (/* binding */ bookingsTable),\n/* harmony export */   coachesTable: () => (/* binding */ coachesTable),\n/* harmony export */   \"default\": () => (__WEBPACK_DEFAULT_EXPORT__),\n/* harmony export */   sessionsTable: () => (/* binding */ sessionsTable)\n/* harmony export */ });\n/* harmony import */ var airtable__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! airtable */ \"(rsc)/./node_modules/airtable/lib/airtable.js\");\n/* harmony import */ var airtable__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(airtable__WEBPACK_IMPORTED_MODULE_0__);\n// app/lib/airtable.ts\n// SERVER-SIDE ONLY: Never import this in client components (pages).\n// All client components call fetch('/api/...') instead.\n\nconst base = new (airtable__WEBPACK_IMPORTED_MODULE_0___default())({\n    apiKey: process.env.AIRTABLE_API_TOKEN\n}).base(\"app0TNasJdiqvLQAJ\");\nconst coachesTable = base(\"Coaches\");\nconst sessionsTable = base(\"Sessions\");\nconst bookingsTable = base(\"Bookings\");\n/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (base);\n//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKHJzYykvLi9hcHAvbGliL2FpcnRhYmxlLnRzIiwibWFwcGluZ3MiOiI7Ozs7Ozs7OztBQUFBLHNCQUFzQjtBQUN0QixvRUFBb0U7QUFDcEUsd0RBQXdEO0FBRXpCO0FBRS9CLE1BQU1DLE9BQU8sSUFBSUQsaURBQVFBLENBQUM7SUFDeEJFLFFBQVFDLFFBQVFDLEdBQUcsQ0FBQ0Msa0JBQWtCO0FBQ3hDLEdBQUdKLElBQUksQ0FBQ0UsbUJBQXdDO0FBRXpDLE1BQU1JLGVBQWVOLEtBQUssV0FBVTtBQUNwQyxNQUFNTyxnQkFBZ0JQLEtBQUssWUFBVztBQUN0QyxNQUFNUSxnQkFBZ0JSLEtBQUssWUFBVztBQUU3QyxpRUFBZUEsSUFBSUEsRUFBQSIsInNvdXJjZXMiOlsid2VicGFjazovL2NvYWNoaW5nLWJvb2tpbmcvLi9hcHAvbGliL2FpcnRhYmxlLnRzPzFjNmYiXSwic291cmNlc0NvbnRlbnQiOlsiLy8gYXBwL2xpYi9haXJ0YWJsZS50c1xuLy8gU0VSVkVSLVNJREUgT05MWTogTmV2ZXIgaW1wb3J0IHRoaXMgaW4gY2xpZW50IGNvbXBvbmVudHMgKHBhZ2VzKS5cbi8vIEFsbCBjbGllbnQgY29tcG9uZW50cyBjYWxsIGZldGNoKCcvYXBpLy4uLicpIGluc3RlYWQuXG5cbmltcG9ydCBBaXJ0YWJsZSBmcm9tICdhaXJ0YWJsZSdcblxuY29uc3QgYmFzZSA9IG5ldyBBaXJ0YWJsZSh7XG4gIGFwaUtleTogcHJvY2Vzcy5lbnYuQUlSVEFCTEVfQVBJX1RPS0VOLFxufSkuYmFzZShwcm9jZXNzLmVudi5ORVhUX1BVQkxJQ19BSVJUQUJMRV9CQVNFX0lEISlcblxuZXhwb3J0IGNvbnN0IGNvYWNoZXNUYWJsZSA9IGJhc2UoJ0NvYWNoZXMnKVxuZXhwb3J0IGNvbnN0IHNlc3Npb25zVGFibGUgPSBiYXNlKCdTZXNzaW9ucycpXG5leHBvcnQgY29uc3QgYm9va2luZ3NUYWJsZSA9IGJhc2UoJ0Jvb2tpbmdzJylcblxuZXhwb3J0IGRlZmF1bHQgYmFzZVxuIl0sIm5hbWVzIjpbIkFpcnRhYmxlIiwiYmFzZSIsImFwaUtleSIsInByb2Nlc3MiLCJlbnYiLCJBSVJUQUJMRV9BUElfVE9LRU4iLCJORVhUX1BVQkxJQ19BSVJUQUJMRV9CQVNFX0lEIiwiY29hY2hlc1RhYmxlIiwic2Vzc2lvbnNUYWJsZSIsImJvb2tpbmdzVGFibGUiXSwic291cmNlUm9vdCI6IiJ9\n//# sourceURL=webpack-internal:///(rsc)/./app/lib/airtable.ts\n");
+
+/***/ })
+
+};
+;
+
+// load runtime
+var __webpack_require__ = require("../../../../webpack-runtime.js");
+__webpack_require__.C(exports);
+var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
+var __webpack_exports__ = __webpack_require__.X(0, ["vendor-chunks/next","vendor-chunks/tr46","vendor-chunks/airtable","vendor-chunks/lodash","vendor-chunks/node-fetch","vendor-chunks/whatwg-url","vendor-chunks/event-target-shim","vendor-chunks/abortcontroller-polyfill","vendor-chunks/webidl-conversions","vendor-chunks/abort-controller"], () => (__webpack_exec__("(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fsessions%2Flist%2Froute&page=%2Fapi%2Fsessions%2Flist%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fsessions%2Flist%2Froute.ts&appDir=%2Fhome%2Fmario%2FDocuments%2Fcoaching-project%2Fcoaching-booking%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2Fhome%2Fmario%2FDocuments%2Fcoaching-project%2Fcoaching-booking&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!")));
+module.exports = __webpack_exports__;
+
+})();
