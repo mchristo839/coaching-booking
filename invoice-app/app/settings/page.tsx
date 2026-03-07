@@ -15,6 +15,82 @@ const CURRENCY_LABELS: Record<Currency, string> = {
 
 type Tab = 'company' | 'personal' | 'preferences'
 
+interface ProfileFormProps {
+  type: 'company' | 'personal'
+  profile: SenderProfile
+  onUpdate: (updates: Partial<SenderProfile>) => void
+}
+
+function ProfileForm({ type, profile, onUpdate }: ProfileFormProps) {
+  return (
+    <div className="space-y-5">
+      <LogoUpload
+        logoBase64={profile.logoBase64}
+        onChange={(base64) => onUpdate({ logoBase64: base64 })}
+        label={type === 'company' ? 'Company Logo' : 'Personal Logo / Photo'}
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {type === 'company' ? 'Company Name' : 'Your Name'} *
+          </label>
+          <input
+            type="text"
+            value={profile.name}
+            onChange={(e) => onUpdate({ name: e.target.value })}
+            placeholder={type === 'company' ? 'Acme Pty Ltd' : 'Jane Smith'}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input
+            type="email"
+            value={profile.email}
+            onChange={(e) => onUpdate({ email: e.target.value })}
+            placeholder="hello@example.com"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+          <input
+            type="tel"
+            value={profile.phone}
+            onChange={(e) => onUpdate({ phone: e.target.value })}
+            placeholder="+61 400 000 000"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {type === 'company' ? 'ABN / Tax Number' : 'Tax Number (optional)'}
+          </label>
+          <input
+            type="text"
+            value={profile.abn}
+            onChange={(e) => onUpdate({ abn: e.target.value })}
+            placeholder="12 345 678 901"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+        <textarea
+          value={profile.address}
+          onChange={(e) => onUpdate({ address: e.target.value })}
+          rows={3}
+          placeholder={`123 Main Street\nSydney NSW 2000\nAustralia`}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+        />
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const [settings, setSettings] = useSettings()
   const [activeTab, setActiveTab] = useState<Tab>('company')
@@ -36,7 +112,6 @@ export default function SettingsPage() {
   }
 
   function handleSave() {
-    // Settings are auto-saved to localStorage on every change, but show feedback
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -57,77 +132,6 @@ export default function SettingsPage() {
     { id: 'personal', label: 'Personal Profile' },
     { id: 'preferences', label: 'Preferences' },
   ]
-
-  const ProfileForm = ({ type }: { type: 'company' | 'personal' }) => {
-    const profile = settings.senderProfiles[type]
-    return (
-      <div className="space-y-5">
-        <LogoUpload
-          logoBase64={profile.logoBase64}
-          onChange={(base64) => updateProfile(type, { logoBase64: base64 })}
-          label={type === 'company' ? 'Company Logo' : 'Personal Logo / Photo'}
-        />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {type === 'company' ? 'Company Name' : 'Your Name'} *
-            </label>
-            <input
-              type="text"
-              value={profile.name}
-              onChange={(e) => updateProfile(type, { name: e.target.value })}
-              placeholder={type === 'company' ? 'Acme Pty Ltd' : 'Jane Smith'}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input
-              type="email"
-              value={profile.email}
-              onChange={(e) => updateProfile(type, { email: e.target.value })}
-              placeholder="hello@example.com"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-            <input
-              type="tel"
-              value={profile.phone}
-              onChange={(e) => updateProfile(type, { phone: e.target.value })}
-              placeholder="+61 400 000 000"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {type === 'company' ? 'ABN / Tax Number' : 'Tax Number (optional)'}
-            </label>
-            <input
-              type="text"
-              value={profile.abn}
-              onChange={(e) => updateProfile(type, { abn: e.target.value })}
-              placeholder="12 345 678 901"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-          <textarea
-            value={profile.address}
-            onChange={(e) => updateProfile(type, { address: e.target.value })}
-            rows={3}
-            placeholder={`123 Main Street\nSydney NSW 2000\nAustralia`}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-          />
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="p-6 md:p-8 max-w-3xl">
@@ -156,8 +160,20 @@ export default function SettingsPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm p-6">
-        {activeTab === 'company' && <ProfileForm type="company" />}
-        {activeTab === 'personal' && <ProfileForm type="personal" />}
+        {activeTab === 'company' && (
+          <ProfileForm
+            type="company"
+            profile={settings.senderProfiles.company}
+            onUpdate={(updates) => updateProfile('company', updates)}
+          />
+        )}
+        {activeTab === 'personal' && (
+          <ProfileForm
+            type="personal"
+            profile={settings.senderProfiles.personal}
+            onUpdate={(updates) => updateProfile('personal', updates)}
+          />
+        )}
         {activeTab === 'preferences' && (
           <div className="space-y-6">
             {/* Tax rates */}
