@@ -51,11 +51,14 @@ export async function POST(request: NextRequest) {
       email: coach.get('email'),
       name: coach.get('name'),
     })
-  } catch (error) {
-    console.error('Signup error:', error)
-    return NextResponse.json(
-      { error: 'Failed to create account. Please try again.' },
-      { status: 500 }
-    )
-  }
+  } catch (error: any) {
+  console.error('Signup error full details:', {
+    message: error?.message,
+    stack: error?.stack,
+    name: error?.name,
+  })
+  return NextResponse.json(
+    { error: 'Failed to create account. Please try again.' },
+    { status: 500 }
+  )
 }
