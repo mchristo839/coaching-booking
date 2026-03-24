@@ -1,7 +1,7 @@
 // app/api/webhooks/stripe/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import stripe from '@/app/lib/stripe'
-import { bookingsTable } from '@/app/lib/airtable'
+import { updateBookingPayment } from '@/app/lib/db'
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,11 +36,11 @@ export async function POST(request: NextRequest) {
       const bookingId = session.metadata?.bookingId
 
       if (bookingId) {
-        // Update the booking payment status in Airtable
-        await bookingsTable.update(bookingId, {
-          payment_status: 'completed',
-          stripe_payment_intent_id: (session.payment_intent as string) || '',
-        })
+        await updateBookingPayment(
+          bookingId,
+          'completed',
+          (session.payment_intent as string) || ''
+        )
         console.log(`Booking ${bookingId} marked as completed`)
       }
     }
