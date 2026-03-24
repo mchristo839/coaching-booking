@@ -1,6 +1,6 @@
 // app/api/bookings/create/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { bookingsTable } from '@/app/lib/airtable'
+import { createBooking } from '@/app/lib/db'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,28 +15,23 @@ export async function POST(request: NextRequest) {
     }
 
     const method = paymentMethod || 'stripe'
-    // Cash payments are marked completed right away (no Stripe needed)
     const paymentStatus = method === 'cash' ? 'completed' : 'pending'
 
-    const records = await bookingsTable.create([
-      {
-        fields: {
-          session_id: [sessionId],
-          user_name: userName,
-          user_email: userEmail,
-          user_phone: userPhone || '',
-          medical_info: medicalInfo || '',
-          consent_given: true,
-          payment_status: paymentStatus,
-          payment_method: method,
-          attendance_status: 'registered',
-        },
-      },
-    ])
+    const booking = await createBooking({
+      session_id: sessionId,
+      user_name: userName,
+      user_email: userEmail,
+      user_phone: userPhone || '',
+      medical_info: medicalInfo || '',
+      consent_given: true,
+      payment_status: paymentStatus,
+      payment_method: method,
+      attendance_status: 'registered',
+    })
 
     return NextResponse.json({
       success: true,
-      bookingId: records[0].id,
+      bookingId: booking.id,
       paymentMethod: method,
       paymentStatus,
     })
