@@ -1,15 +1,11 @@
 // app/api/bookings/attendance/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { bookingsTable } from '@/app/lib/airtable'
+import { updateAttendance } from '@/app/lib/db'
 
-// PATCH: Update attendance for one or many bookings
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
 
-    // Support both single and bulk updates
-    // Single: { bookingId: "xxx", attendanceStatus: "attended" }
-    // Bulk: { updates: [{ bookingId: "xxx", attendanceStatus: "attended" }, ...] }
     const updates: { bookingId: string; attendanceStatus: string }[] = body.updates
       ? body.updates
       : [{ bookingId: body.bookingId, attendanceStatus: body.attendanceStatus }]
@@ -22,26 +18,15 @@ export async function PATCH(request: NextRequest) {
     }
 
     const validStatuses = ['registered', 'attended', 'no_show']
-    const results: { id: string; attendanceStatus: unknown }[] = []
+    const results: { id: string; attendanceStatus: string }[] = []
 
-    // Airtable update() supports up to 10 records at a time
-    for (let i = 0; i < updates.length; i += 10) {
-      const batch = updates.slice(i, i + 10)
-
-      const updateRecords = batch
-        .filter((u) => validStatuses.includes(u.attendanceStatus))
-        .map((u) => ({
-          id: u.bookingId,
-          fields: { attendance_status: u.attendanceStatus },
-        }))
-
-      if (updateRecords.length > 0) {
-        const updated = await bookingsTable.update(updateRecords) as { id: string; get(field: string): unknown }[]
-        updated.forEach((r) => {
-          results.push({
-            id: r.id,
-            attendanceStatus: r.get('attendance_status'),
-          })
+    for (const u of updates) {
+      if (!validStatuses.includes(u.attendanceStatus)) continue
+      const row = await updateAttendance(u.bookingId, u.attendanceStatus)
+      if (row) {
+        results.push({
+          id: row.id,
+          attendanceStatus: row.attendance_status,
         })
       }
     }
