@@ -1,6 +1,6 @@
 // app/api/sessions/detail/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { sessionsTable, bookingsTable } from '@/app/lib/airtable'
+import { findSession, listBookingsBySession } from '@/app/lib/db'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,44 +14,41 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get the session record
-    const sessionRecord = await sessionsTable.find(sessionId)
-
-    const session = {
-      id: sessionRecord.id,
-      sessionName: sessionRecord.get('session_name') || '',
-      sessionType: sessionRecord.get('session_type'),
-      dateTime: sessionRecord.get('date_time'),
-      durationMinutes: sessionRecord.get('duration_minutes'),
-      capacity: sessionRecord.get('capacity'),
-      bookedCount: sessionRecord.get('booked_count') || 0,
-      ageGroup: sessionRecord.get('age_group'),
-      skillLevel: sessionRecord.get('skill_level'),
-      priceCents: sessionRecord.get('price_cents'),
-      injuryNotes: sessionRecord.get('injury_notes'),
-      recurrenceRule: sessionRecord.get('recurrence_rule') || 'None',
+    const row = await findSession(sessionId)
+    if (!row) {
+      return NextResponse.json(
+        { error: 'Session not found' },
+        { status: 404 }
+      )
     }
 
-    // Get all bookings linked to this session (JS-side filtering)
-    const allBookings = await bookingsTable.select().firstPage()
-    const bookings = allBookings
-      .filter((record) => {
-        const linked = record.get('session_id')
-        if (Array.isArray(linked)) return linked.includes(sessionId)
-        if (typeof linked === 'string') return linked === sessionId
-        return false
-      })
-      .map((record) => ({
-        id: record.id,
-        userName: record.get('user_name'),
-        userEmail: record.get('user_email'),
-        userPhone: record.get('user_phone') || '',
-        medicalInfo: record.get('medical_info') || '',
-        paymentMethod: record.get('payment_method') || 'stripe',
-        paymentStatus: record.get('payment_status') || 'pending',
-        attendanceStatus: record.get('attendance_status') || 'registered',
-        createdAt: record.get('created_at'),
-      }))
+    const session = {
+      id: row.id,
+      sessionName: row.session_name || '',
+      sessionType: row.session_type,
+      dateTime: row.date_time,
+      durationMinutes: row.duration_minutes,
+      capacity: row.capacity,
+      bookedCount: Number(row.booked_count) || 0,
+      ageGroup: row.age_group,
+      skillLevel: row.skill_level,
+      priceCents: row.price_cents,
+      injuryNotes: row.injury_notes,
+      recurrenceRule: row.recurrence_rule || 'None',
+    }
+
+    const bookingRows = await listBookingsBySession(sessionId)
+    const bookings = bookingRows.map((r) => ({
+      id: r.id,
+      userName: r.user_name,
+      userEmail: r.user_email,
+      userPhone: r.user_phone || '',
+      medicalInfo: r.medical_info || '',
+      paymentMethod: r.payment_method || 'stripe',
+      paymentStatus: r.payment_status || 'pending',
+      attendanceStatus: r.attendance_status || 'registered',
+      createdAt: r.created_at,
+    }))
 
     return NextResponse.json({ session, bookings })
   } catch (error) {
