@@ -1,6 +1,6 @@
 // app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { coachesTable } from '@/app/lib/airtable'
+import { findCoachByEmail } from '@/app/lib/db'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
@@ -14,26 +14,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Find coach by email
-    const records = await coachesTable
-      .select({
-        filterByFormula: `{email} = '${email}'`,
-        maxRecords: 1,
-      })
-      .firstPage()
+    const coach = await findCoachByEmail(email)
 
-    if (records.length === 0) {
+    if (!coach) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
       )
     }
 
-    const coach = records[0]
-    const storedHash = coach.get('password_hash') as string
-
-    // Compare passwords
-    const passwordMatch = await bcrypt.compare(password, storedHash)
+    const passwordMatch = await bcrypt.compare(password, coach.password_hash)
 
     if (!passwordMatch) {
       return NextResponse.json(
@@ -45,8 +35,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       coachId: coach.id,
-      email: coach.get('email'),
-      name: coach.get('name'),
+      email: coach.email,
+      name: coach.name,
     })
   } catch (error) {
     console.error('Login error:', error)
