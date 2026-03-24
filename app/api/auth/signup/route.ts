@@ -14,7 +14,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if coach already exists
     const existing = await coachesTable
       .select({
         filterByFormula: `{email} = '${email}'`,
@@ -29,10 +28,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Hash the password
     const passwordHash = await bcrypt.hash(password, 10)
 
-    // Create the coach record
     const records = await coachesTable.create([
       {
         fields: {
@@ -51,14 +48,16 @@ export async function POST(request: NextRequest) {
       email: coach.get('email'),
       name: coach.get('name'),
     })
+
   } catch (error: any) {
-  console.error('Signup error full details:', {
-    message: error?.message,
-    stack: error?.stack,
-    name: error?.name,
-  })
-  return NextResponse.json(
-    { error: 'Failed to create account. Please try again.' },
-    { status: 500 }
-  )
+    console.error('Signup error full details:', {
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name,
+    })
+    return NextResponse.json(
+      { error: 'Failed to create account. Please try again.' },
+      { status: 500 }
+    )
+  }
 }
