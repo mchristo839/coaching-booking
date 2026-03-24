@@ -36,7 +36,7 @@ export async function PATCH(request: NextRequest) {
         }))
 
       if (updateRecords.length > 0) {
-        const updated = await bookingsTable.update(updateRecords)
+        const updated = await bookingsTable.update(updateRecords) as { id: string; get(field: string): unknown }[]
         updated.forEach((r) => {
           results.push({
             id: r.id,
