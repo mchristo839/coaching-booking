@@ -5,9 +5,9 @@ import { createProgram, updateProgramFormUrl } from '@/app/lib/db'
 const FORM_BASE_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSe2jW7EXI1OLCjhnKVU7Nha2a5dQMpfUCYAH39NNo2PygNViA/viewform'
 
 // Google Form entry IDs
-const ENTRY_PROGRAM_NAME = 'entry.1173956093'
-const ENTRY_PROGRAM_ID = 'entry.2051996231'
-const ENTRY_COACH_ID = 'entry.1018023075'
+const ENTRY_PROGRAM_NAME = 'entry.2051996231'
+const ENTRY_PROGRAM_ID = 'entry.1018023075'
+const ENTRY_COACH_ID = 'entry.1525338853'
 
 function buildFormUrl(programName: string, programId: string, coachId: string): string {
   const params = new URLSearchParams({
