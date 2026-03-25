@@ -166,3 +166,51 @@ export async function updateBookingPayment(bookingId: string, paymentStatus: str
   `
   return rows[0]
 }
+
+// ─── Programs ───
+
+export async function createProgram(coachId: string, programName: string) {
+  const { rows } = await sql`
+    INSERT INTO programs (coach_id, program_name)
+    VALUES (${coachId}, ${programName})
+    RETURNING *
+  `
+  return rows[0]
+}
+
+export async function listProgramsByCoach(coachId: string) {
+  const { rows } = await sql`
+    SELECT * FROM programs
+    WHERE coach_id = ${coachId}
+    ORDER BY created_at DESC
+  `
+  return rows
+}
+
+export async function updateProgramFormUrl(programId: string, formUrl: string) {
+  const { rows } = await sql`
+    UPDATE programs SET form_url = ${formUrl}
+    WHERE id = ${programId}
+    RETURNING *
+  `
+  return rows[0]
+}
+
+export async function linkWhatsAppGroup(programId: string, whatsappGroupId: string) {
+  const { rows } = await sql`
+    UPDATE programs SET whatsapp_group_id = ${whatsappGroupId}
+    WHERE id = ${programId}
+    RETURNING *
+  `
+  return rows[0]
+}
+
+export async function findProgramByWhatsAppGroup(whatsappGroupId: string) {
+  const { rows } = await sql`
+    SELECT p.*, c.name as coach_name, c.email as coach_email
+    FROM programs p
+    JOIN coaches c ON c.id = p.coach_id
+    WHERE p.whatsapp_group_id = ${whatsappGroupId} AND p.is_active = true
+  `
+  return rows[0] || null
+}
