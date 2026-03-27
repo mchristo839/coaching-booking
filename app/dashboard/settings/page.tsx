@@ -86,8 +86,9 @@ export default function SettingsPage() {
         <ol className="text-sm text-gray-600 space-y-2 mb-4">
           <li>1. Go to <Link href="/dashboard/programs" className="text-blue-600 hover:underline">Programmes</Link> and create a programme with full details</li>
           <li>2. Add the bot number (+447458164754) to your WhatsApp group</li>
-          <li>3. Paste the WhatsApp group ID into your programme settings</li>
-          <li>4. The bot will start answering questions immediately using your programme details</li>
+          <li>3. Send any message in the group — the bot will reply with its group ID</li>
+          <li>4. Copy that ID and paste it into your programme settings</li>
+          <li>5. The bot will start answering questions immediately</li>
         </ol>
 
         <div className="bg-green-50 rounded-lg p-4">

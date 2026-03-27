@@ -97,8 +97,12 @@ export async function POST(request: NextRequest) {
     const program = await findProgramByWhatsAppGroup(groupJid)
 
     if (!program) {
-      // Group not linked to any program — ignore silently
+      // Group not linked to any program — reply with the group ID so the coach can copy it
       console.log(`Unlinked group message from ${groupJid}, instance ${instance}`)
+      await sendWhatsAppMessage(
+        groupJid,
+        `👋 Hi! I'm your CoachBook bot. To activate me for this group, go to your Programmes dashboard and paste in this group ID:\n\n*${groupJid}*`
+      )
       return NextResponse.json({ ok: true })
     }
 

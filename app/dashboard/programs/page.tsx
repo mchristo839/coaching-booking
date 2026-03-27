@@ -513,9 +513,9 @@ export default function ProgramsPage() {
           <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
             <h2 className="text-lg font-semibold text-gray-900">WhatsApp Group</h2>
             <p className="text-sm text-gray-500">
-              Add the bot (+447458164754) to your WhatsApp group, then paste the group ID here.
-              The group ID looks like <code className="bg-gray-100 px-1 rounded text-xs">120363422695360945@g.us</code>.
-              You can find it in the Evolution Manager or by sending a test message.
+              Add the bot number <strong>+447458164754</strong> to your WhatsApp group, then send any message in the group.
+              The bot will reply with its group ID — copy and paste it here.
+              It looks like <code className="bg-gray-100 px-1 rounded text-xs">120363422695360945@g.us</code>.
             </p>
             <input
               type="text"
