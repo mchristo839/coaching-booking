@@ -107,8 +107,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (!program.knowledgebase) {
-      // Program exists but has no knowledgebase configured yet
+      // Program linked but knowledgebase not filled in yet
       console.log(`Program ${program.id} has no knowledgebase, skipping`)
+      await sendWhatsAppMessage(
+        groupJid,
+        `👋 I'm connected to this group but my knowledgebase isn't set up yet. ${program.coach_name}, please go to your Programmes dashboard and fill in the programme details to activate me.`
+      )
       return NextResponse.json({ ok: true })
     }
 
