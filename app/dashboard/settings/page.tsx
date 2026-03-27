@@ -1,40 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function SettingsPage() {
   const router = useRouter()
-  const [coachId, setCoachId] = useState('')
-  const [copied, setCopied] = useState(false)
-  const [whatsappCopied, setWhatsappCopied] = useState(false)
 
   useEffect(() => {
     const id = localStorage.getItem('coachId')
     if (!id) { router.push('/auth/login'); return }
-    setCoachId(id)
   }, [router])
-
-  const bookingUrl = typeof window !== 'undefined' ? `${window.location.origin}/book/${coachId}` : ''
-
-  function copyBookingLink() {
-    navigator.clipboard.writeText(bookingUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  function copyWhatsappShareLink() {
-    const text = encodeURIComponent(`Book your coaching session here: ${bookingUrl}`)
-    navigator.clipboard.writeText(`https://wa.me/?text=${text}`)
-    setWhatsappCopied(true)
-    setTimeout(() => setWhatsappCopied(false), 2000)
-  }
-
-  function openWhatsappShare() {
-    const text = encodeURIComponent(`Book your coaching session here: ${bookingUrl}`)
-    window.open(`https://wa.me/?text=${text}`, '_blank')
-  }
 
   return (
     <div className="min-h-screen px-4 py-6 md:px-8 max-w-2xl mx-auto">
@@ -44,36 +20,11 @@ export default function SettingsPage() {
 
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
 
-      {/* Booking Link */}
-      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">Your Booking Link</h2>
-        <p className="text-sm text-gray-500 mb-3">Share this link with clients so they can book sessions.</p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <input
-            type="text"
-            readOnly
-            value={bookingUrl}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-gray-50 text-sm"
-          />
-          <button onClick={copyBookingLink} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 min-h-[44px]">
-            {copied ? 'Copied!' : 'Copy Link'}
-          </button>
-        </div>
-        <div className="flex gap-3 mt-3">
-          <button onClick={openWhatsappShare} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 min-h-[44px]">
-            Share on WhatsApp
-          </button>
-          <button onClick={copyWhatsappShareLink} className="bg-white text-green-600 px-4 py-2 rounded-lg text-sm font-medium border border-green-600 hover:bg-green-50 min-h-[44px]">
-            {whatsappCopied ? 'Copied!' : 'Copy WhatsApp URL'}
-          </button>
-        </div>
-      </div>
-
       {/* WhatsApp Bot */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-1">WhatsApp Bot</h2>
         <p className="text-sm text-gray-500 mb-4">
-          Your WhatsApp bot is powered by AI. It automatically answers questions in your group chats based on the programme details you configure.
+          Your AI assistant answers parent questions automatically in your WhatsApp groups, based on the programme details you configure.
         </p>
 
         <div className="bg-blue-50 rounded-lg p-4 mb-4">
@@ -82,7 +33,7 @@ export default function SettingsPage() {
           <p className="text-xs text-blue-600 mt-1">Add this number to your WhatsApp groups to activate the bot.</p>
         </div>
 
-        <h3 className="text-sm font-semibold text-gray-900 mb-2">How it works</h3>
+        <h3 className="text-sm font-semibold text-gray-900 mb-2">How to set up</h3>
         <ol className="text-sm text-gray-600 space-y-2 mb-4">
           <li>1. Go to <Link href="/dashboard/programs" className="text-blue-600 hover:underline">Programmes</Link> and create a programme with full details</li>
           <li>2. Add the bot number (+447458164754) to your WhatsApp group</li>
@@ -92,9 +43,9 @@ export default function SettingsPage() {
         </ol>
 
         <div className="bg-green-50 rounded-lg p-4">
-          <p className="text-sm font-medium text-green-900 mb-1">Keeping the bot up to date</p>
+          <p className="text-sm font-medium text-green-900 mb-1">Always up to date</p>
           <p className="text-sm text-green-700">
-            Any time you edit your programme details (venue, schedule, price, etc.), the bot automatically uses the latest information. No extra steps needed.
+            Any time you edit your programme details, the bot uses the latest information instantly. No extra steps needed.
           </p>
         </div>
       </div>

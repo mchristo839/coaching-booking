@@ -16,7 +16,6 @@ interface Program {
 export default function DashboardPage() {
   const router = useRouter()
   const [coachName, setCoachName] = useState('')
-  const [coachId, setCoachId] = useState('')
   const [programs, setPrograms] = useState<Program[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -34,7 +33,6 @@ export default function DashboardPage() {
     const id = localStorage.getItem('coachId')
     const name = localStorage.getItem('coachName')
     if (!id) { router.push('/auth/login'); return }
-    setCoachId(id)
     setCoachName(name || 'Coach')
     fetchPrograms(id)
   }, [router, fetchPrograms])
