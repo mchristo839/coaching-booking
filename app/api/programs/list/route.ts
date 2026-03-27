@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       id: r.id,
       programName: r.program_name,
       whatsappGroupId: r.whatsapp_group_id,
-      formUrl: r.form_url,
+      knowledgebase: r.knowledgebase || null,
       isActive: r.is_active,
       createdAt: r.created_at,
     }))
