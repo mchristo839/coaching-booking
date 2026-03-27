@@ -190,6 +190,12 @@ export default function DashboardPage() {
             {copied ? 'Copied!' : 'Copy Booking Link'}
           </button>
           <Link
+            href="/dashboard/programs"
+            className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 hover:bg-gray-50 transition-colors min-h-[44px] flex items-center"
+          >
+            Programmes
+          </Link>
+          <Link
             href="/dashboard/settings"
             className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 hover:bg-gray-50 transition-colors min-h-[44px] flex items-center"
           >

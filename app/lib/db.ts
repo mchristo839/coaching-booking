@@ -169,10 +169,30 @@ export async function updateBookingPayment(bookingId: string, paymentStatus: str
 
 // ─── Programs ───
 
-export async function createProgram(coachId: string, programName: string) {
+export interface Knowledgebase {
+  sport: string
+  venue: string
+  venueAddress: string
+  ageGroup: string
+  skillLevel: string
+  schedule: string
+  priceCents: number
+  whatToBring: string
+  cancellationPolicy: string
+  medicalInfo: string
+  coachBio: string
+  customFaqs: { q: string; a: string }[]
+}
+
+export async function createProgram(
+  coachId: string,
+  programName: string,
+  knowledgebase?: Knowledgebase
+) {
+  const kb = knowledgebase ? JSON.stringify(knowledgebase) : null
   const { rows } = await sql`
-    INSERT INTO programs (coach_id, program_name)
-    VALUES (${coachId}, ${programName})
+    INSERT INTO programs (coach_id, program_name, knowledgebase)
+    VALUES (${coachId}, ${programName}, ${kb}::jsonb)
     RETURNING *
   `
   return rows[0]
@@ -185,6 +205,35 @@ export async function listProgramsByCoach(coachId: string) {
     ORDER BY created_at DESC
   `
   return rows
+}
+
+export async function findProgram(programId: string) {
+  const { rows } = await sql`
+    SELECT * FROM programs WHERE id = ${programId} LIMIT 1
+  `
+  return rows[0] || null
+}
+
+export async function updateProgram(
+  programId: string,
+  fields: {
+    programName?: string
+    knowledgebase?: Knowledgebase
+    whatsappGroupId?: string
+  }
+) {
+  if (fields.programName !== undefined) {
+    await sql`UPDATE programs SET program_name = ${fields.programName} WHERE id = ${programId}`
+  }
+  if (fields.knowledgebase !== undefined) {
+    const kb = JSON.stringify(fields.knowledgebase)
+    await sql`UPDATE programs SET knowledgebase = ${kb}::jsonb WHERE id = ${programId}`
+  }
+  if (fields.whatsappGroupId !== undefined) {
+    await sql`UPDATE programs SET whatsapp_group_id = ${fields.whatsappGroupId} WHERE id = ${programId}`
+  }
+  const { rows } = await sql`SELECT * FROM programs WHERE id = ${programId}`
+  return rows[0]
 }
 
 export async function updateProgramFormUrl(programId: string, formUrl: string) {
