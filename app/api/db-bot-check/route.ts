@@ -17,7 +17,6 @@ export async function GET() {
     `, ['120363410006764054@g.us'])
 
     const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY
-    const anthropicKeyPrefix = (process.env.ANTHROPIC_API_KEY || '').substring(0, 10)
     const hasEvolutionKey = !!process.env.EVOLUTION_API_KEY
     const evolutionUrl = process.env.EVOLUTION_API_URL || 'NOT SET'
     const evolutionInstance = process.env.EVOLUTION_INSTANCE || 'NOT SET'
@@ -25,8 +24,18 @@ export async function GET() {
     return NextResponse.json({
       programme: rows[0] || null,
       found: rows.length > 0,
-      envCheck: { hasAnthropicKey, anthropicKeyPrefix, hasEvolutionKey, evolutionUrl, evolutionInstance },
+      envCheck: { hasAnthropicKey, hasEvolutionKey, evolutionUrl, evolutionInstance },
     })
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
+}
+
+// POST: set bot status to live for all coaches
+export async function POST() {
+  try {
+    await sql.query("UPDATE coaches_v2 SET whatsapp_bot_status = 'live' WHERE whatsapp_bot_status = 'not_yet_registered'")
+    return NextResponse.json({ success: true, message: 'All coaches set to live' })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
