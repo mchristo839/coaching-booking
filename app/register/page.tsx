@@ -547,13 +547,20 @@ export default function RegisterPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
+    // Fallback: read coachId from localStorage if state lost
+    const activeCoachId = coachId || localStorage.getItem('coachId') || ''
+    if (!activeCoachId) {
+      setError('Coach ID not found. Please go back to Step 4 and save your coach details.')
+      setLoading(false)
+      return
+    }
     const filteredFaqs = faqs.filter((f) => f.question.trim() && f.answer.trim())
     try {
       const res = await fetch('/api/programmes/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          coachId,
+          coachId: activeCoachId,
           audience: progAudience,
           specificAgeGroup: progAgeGroup,
           name: progName,
