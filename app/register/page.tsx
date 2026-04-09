@@ -1116,7 +1116,7 @@ export default function RegisterPage() {
               <div>
                 <Label htmlFor="price" required>Price (GBP)</Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">£</span>
                   <Input id="price" type="number" min={0} step="0.01" required value={price} onChange={(e) => setPrice(e.target.value)} className="pl-7" />
                 </div>
               </div>
