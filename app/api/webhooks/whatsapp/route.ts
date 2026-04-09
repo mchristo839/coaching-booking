@@ -91,7 +91,15 @@ async function deleteSignupSession(sessionId: string): Promise<void> {
   await sql.query('DELETE FROM signup_sessions WHERE id = $1', [sessionId])
 }
 
+const PROGRAMME_FULL_SELECT = `
+  SELECT p.*, c.first_name as coach_first_name, c.last_name as coach_last_name,
+    c.id as coach_id, c.mobile as coach_mobile, pr.trading_name
+  FROM programmes p
+  JOIN coaches_v2 c ON c.id = p.coach_id
+  JOIN providers pr ON pr.id = c.provider_id`
+
 // Find which programme this DM user was chatting about (from their group messages)
+// Returns null if we can't confidently determine the programme (triggers picker)
 async function findProgrammeForDmUser(senderPhone: string): Promise<Record<string, unknown> | null> {
   // Check if sender is a member of any programme
   const { rows: memberRows } = await sql.query(
@@ -99,14 +107,7 @@ async function findProgrammeForDmUser(senderPhone: string): Promise<Record<strin
     [senderPhone]
   )
   if (memberRows.length > 0) {
-    const { rows } = await sql.query(`
-      SELECT p.*, c.first_name as coach_first_name, c.last_name as coach_last_name,
-        c.id as coach_id, c.mobile as coach_mobile, pr.trading_name
-      FROM programmes p
-      JOIN coaches_v2 c ON c.id = p.coach_id
-      JOIN providers pr ON pr.id = c.provider_id
-      WHERE p.id = $1 AND p.is_active = true LIMIT 1
-    `, [memberRows[0].programme_id])
+    const { rows } = await sql.query(`${PROGRAMME_FULL_SELECT} WHERE p.id = $1 AND p.is_active = true LIMIT 1`, [memberRows[0].programme_id])
     return rows[0] || null
   }
 
@@ -116,28 +117,58 @@ async function findProgrammeForDmUser(senderPhone: string): Promise<Record<strin
     [senderPhone]
   )
   if (convoRows.length > 0) {
-    const { rows } = await sql.query(`
-      SELECT p.*, c.first_name as coach_first_name, c.last_name as coach_last_name,
-        c.id as coach_id, c.mobile as coach_mobile, pr.trading_name
-      FROM programmes p
-      JOIN coaches_v2 c ON c.id = p.coach_id
-      JOIN providers pr ON pr.id = c.provider_id
-      WHERE p.id = $1 AND p.is_active = true LIMIT 1
-    `, [convoRows[0].programme_id])
+    const { rows } = await sql.query(`${PROGRAMME_FULL_SELECT} WHERE p.id = $1 AND p.is_active = true LIMIT 1`, [convoRows[0].programme_id])
     return rows[0] || null
   }
 
-  // Fallback: get any active programme (for single-coach setups)
-  const { rows } = await sql.query(`
-    SELECT p.*, c.first_name as coach_first_name, c.last_name as coach_last_name,
-      c.id as coach_id, c.mobile as coach_mobile, pr.trading_name
-    FROM programmes p
-    JOIN coaches_v2 c ON c.id = p.coach_id
-    JOIN providers pr ON pr.id = c.provider_id
-    WHERE p.is_active = true
-    ORDER BY p.created_at DESC LIMIT 1
-  `)
+  // Fallback: only auto-select if there's exactly ONE active programme
+  const { rows } = await sql.query(`${PROGRAMME_FULL_SELECT} WHERE p.is_active = true ORDER BY p.created_at DESC LIMIT 2`)
+  if (rows.length === 1) return rows[0]
+
+  // Multiple programmes or none — return null to trigger the picker
+  return null
+}
+
+// Get all active programmes (for the DM programme picker)
+async function listActiveProgrammes(): Promise<Record<string, unknown>[]> {
+  const { rows } = await sql.query(`${PROGRAMME_FULL_SELECT} WHERE p.is_active = true ORDER BY p.programme_name ASC`)
+  return rows
+}
+
+// Load a specific programme by ID
+async function getProgrammeById(programmeId: string): Promise<Record<string, unknown> | null> {
+  const { rows } = await sql.query(`${PROGRAMME_FULL_SELECT} WHERE p.id = $1 AND p.is_active = true LIMIT 1`, [programmeId])
   return rows[0] || null
+}
+
+// Send the programme picker message and store a pending selection session
+async function sendProgrammePicker(senderJid: string, programmes: Record<string, unknown>[], context: 'question' | 'signup'): Promise<void> {
+  let msg = context === 'signup'
+    ? "Which programme would you like to join?\n\n"
+    : "Hi! I help with a few programmes. Which one are you asking about?\n\n"
+
+  programmes.forEach((p, i) => {
+    const name = p.programme_name as string
+    const extra: string[] = []
+    if (p.session_days) {
+      const days = Array.isArray(p.session_days) ? (p.session_days as string[]).join(', ') : String(p.session_days)
+      extra.push(days)
+    }
+    if (p.session_start_time) extra.push(p.session_start_time as string)
+    const suffix = extra.length > 0 ? ` _(${extra.join(' · ')})_` : ''
+    msg += `*${i + 1}.* ${name}${suffix}\n`
+  })
+
+  msg += `\nJust reply with the number.`
+
+  // Store pending selection as a signup session with step 'pick_programme'
+  // We use programme_id of first one as placeholder — it'll be replaced on selection
+  await sql.query(
+    "INSERT INTO signup_sessions (whatsapp_jid, programme_id, step, data) VALUES ($1, $2, 'pick_programme', $3)",
+    [senderJid, programmes[0].id, JSON.stringify({ context, programmeIds: programmes.map(p => p.id) })]
+  )
+
+  await sendWhatsAppMessage(senderJid, msg)
 }
 
 // ─── Question Classifier ───
@@ -486,7 +517,15 @@ async function handleDmSignup(
     // Find a programme for this user
     const senderPhone = senderJid.split('@')[0]
     const programme = await findProgrammeForDmUser(senderPhone)
-    if (!programme) return false
+    if (!programme) {
+      // Multiple programmes — show picker for signup
+      const allProgs = await listActiveProgrammes()
+      if (allProgs.length > 1) {
+        await sendProgrammePicker(senderJid, allProgs, 'signup')
+        return true
+      }
+      return false // No programmes at all
+    }
 
     const progId = programme.id as string
     const progName = programme.programme_name as string
@@ -526,6 +565,56 @@ async function processSignupStep(
   }
 
   switch (session.step) {
+    case 'pick_programme': {
+      // User is selecting a programme from the numbered list
+      const num = parseInt(lower, 10)
+      const programmeIds: string[] = data.programmeIds || []
+      if (isNaN(num) || num < 1 || num > programmeIds.length) {
+        await sendWhatsAppMessage(senderJid, `Please reply with a number between 1 and ${programmeIds.length}.`)
+        return true
+      }
+
+      const selectedId = programmeIds[num - 1]
+      const context = data.context || 'question'
+
+      if (context === 'signup') {
+        // They picked a programme for signup — transition to the signup flow
+        await deleteSignupSession(session.id)
+        await createSignupSession(senderJid, selectedId)
+        const prog = await getProgrammeById(selectedId)
+        const progName = (prog?.programme_name as string) || 'this programme'
+        const joinUrl = `${APP_BASE_URL}/join/${selectedId}`
+        await sendWhatsAppMessage(
+          senderJid,
+          `Great, you'd like to join *${progName}*! 🎉\n\n` +
+          `You can sign up in two ways:\n\n` +
+          `1️⃣ *Quick online signup* (recommended):\n${joinUrl}\n\n` +
+          `2️⃣ *Sign up here on WhatsApp* — just reply with *"sign up here"* and I'll walk you through it.\n\n` +
+          `Which would you prefer?`
+        )
+        // Delete this signup session — a new one will be created if they choose option 2
+        await deleteSignupSession(session.id)
+        return true
+      }
+
+      // They picked a programme for a general question — store the selection and ask their question
+      await deleteSignupSession(session.id)
+      // Store the programme association in conversations so next time we remember
+      await logConvo({
+        programmeId: selectedId, senderName, senderIdentifier: senderJid.split('@')[0],
+        senderType: 'unknown', channel: 'whatsapp_private',
+        messageText: `[Selected programme ${num}]`, category: 'programme',
+        botMode: 'live', escalated: false,
+      })
+
+      const prog = await getProgrammeById(selectedId)
+      if (prog) {
+        const progName = prog.programme_name as string
+        await sendWhatsAppMessage(senderJid, `No problem — I'll answer questions about *${progName}*. Go ahead, what would you like to know?`)
+      }
+      return true
+    }
+
     case 'parent_name': {
       data.parentName = text
       await updateSignupSession(session.id, 'child_name', data)
@@ -656,7 +745,13 @@ async function handleStartWhatsAppSignup(
 ): Promise<boolean> {
   const programme = await findProgrammeForDmUser(senderPhone)
   if (!programme) {
-    await sendWhatsAppMessage(senderJid, "I couldn't find a programme to sign you up for. Please contact the coach directly.")
+    // Multiple programmes — show picker
+    const allProgs = await listActiveProgrammes()
+    if (allProgs.length === 0) {
+      await sendWhatsAppMessage(senderJid, "Sorry, there are no programmes available right now. Please contact the coach directly.")
+      return true
+    }
+    await sendProgrammePicker(senderJid, allProgs, 'signup')
     return true
   }
 
@@ -764,7 +859,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
-      // No programme found for DM user
+      // No programme determined — show picker if there are multiple, or helpful message if none
+      const allProgs = await listActiveProgrammes()
+      if (allProgs.length > 1) {
+        await sendProgrammePicker(senderJid, allProgs, 'question')
+        return NextResponse.json({ ok: true })
+      } else if (allProgs.length === 0) {
+        await sendWhatsAppMessage(senderJid, "Hi! I'm a coaching assistant but there are no active programmes set up yet. Please contact the coach directly.")
+        return NextResponse.json({ ok: true })
+      }
+      // Shouldn't reach here (single programme would have been found above), but handle it
       await sendWhatsAppMessage(senderJid, "Hi! I'm a coaching assistant. If you'd like to join a programme, please ask in the group chat or contact your coach for the signup link.")
       return NextResponse.json({ ok: true })
     }
