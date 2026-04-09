@@ -344,48 +344,58 @@ function ProgrammesPageInner() {
   }
 
   function openEdit(prog: Programme) {
+    // Support both camelCase (from API) and snake_case (legacy) field names
+    const p = prog as Record<string, unknown>
+    const get = (camel: string, snake: string) => (p[camel] || p[snake] || '') as string
+    const getArr = (camel: string, snake: string) => (p[camel] || p[snake] || []) as string[]
+    const getBool = (camel: string, snake: string, fallback: boolean) => {
+      if (p[camel] !== undefined) return p[camel] as boolean
+      if (p[snake] !== undefined) return p[snake] as boolean
+      return fallback
+    }
+
     setForm({
-      programmeName: prog.programme_name || '',
-      shortDescription: prog.short_description || '',
-      targetAudience: prog.target_audience || '',
-      specificAgeGroup: prog.specific_age_group || '',
-      skillLevel: prog.skill_level || '',
-      programmeType: prog.programme_type || '',
-      sessionDays: prog.session_days || [],
-      sessionStartTime: prog.session_start_time || '',
-      sessionDuration: prog.session_duration || '',
-      sessionFrequency: prog.session_frequency || '',
-      holidaySchedule: prog.holiday_schedule || '',
-      cancellationNotice: prog.cancellation_notice || '',
-      venueName: prog.venue_name || '',
-      venueAddress: prog.venue_address || '',
-      parking: prog.parking || '',
-      nearestTransport: prog.nearest_transport || '',
-      indoorOutdoor: prog.indoor_outdoor || '',
-      badWeatherPolicy: prog.bad_weather_policy || '',
-      maxCapacity: prog.max_capacity ? String(prog.max_capacity) : '',
-      fullThreshold: prog.full_threshold || 'at_100',
-      waitlistEnabled: prog.waitlist_enabled ?? true,
-      referralTrigger: prog.referral_trigger || '',
-      referralIncentive: prog.referral_incentive || '',
-      programmeStatus: prog.programme_status || 'open',
-      trialAvailable: prog.trial_available || '',
-      trialInstructions: prog.trial_instructions || '',
-      whatToBring: prog.what_to_bring || '',
-      equipmentProvided: prog.equipment_provided || '',
-      kitRequired: prog.kit_required || '',
-      kitDetails: prog.kit_details || '',
-      paidOrFree: prog.paid_or_free || 'paid',
-      paymentModel: prog.payment_model || '',
-      priceGbp: prog.price_gbp ? String(prog.price_gbp) : '',
-      priceIncludes: prog.price_includes || '',
-      siblingDiscount: prog.sibling_discount || '',
-      refundPolicy: prog.refund_policy || '',
-      refundDetails: prog.refund_details || '',
-      paymentMethods: prog.payment_methods || [],
-      paymentReminderSchedule: prog.payment_reminder_schedule || '',
-      botNotes: prog.bot_notes || '',
-      whatsappGroupId: prog.whatsapp_group_id || '',
+      programmeName: get('programmeName', 'programme_name') || get('programName', 'program_name'),
+      shortDescription: get('shortDescription', 'short_description'),
+      targetAudience: get('targetAudience', 'target_audience'),
+      specificAgeGroup: get('specificAgeGroup', 'specific_age_group'),
+      skillLevel: get('skillLevel', 'skill_level'),
+      programmeType: get('programmeType', 'programme_type'),
+      sessionDays: getArr('sessionDays', 'session_days'),
+      sessionStartTime: get('sessionStartTime', 'session_start_time'),
+      sessionDuration: get('sessionDuration', 'session_duration'),
+      sessionFrequency: get('sessionFrequency', 'session_frequency'),
+      holidaySchedule: get('holidaySchedule', 'holiday_schedule'),
+      cancellationNotice: get('cancellationNotice', 'cancellation_notice'),
+      venueName: get('venueName', 'venue_name'),
+      venueAddress: get('venueAddress', 'venue_address'),
+      parking: get('parking', 'parking'),
+      nearestTransport: get('nearestTransport', 'nearest_transport'),
+      indoorOutdoor: get('indoorOutdoor', 'indoor_outdoor'),
+      badWeatherPolicy: get('badWeatherPolicy', 'bad_weather_policy'),
+      maxCapacity: (p.maxCapacity || p.max_capacity) ? String(p.maxCapacity || p.max_capacity) : '',
+      fullThreshold: get('fullThreshold', 'full_threshold') || 'at_100',
+      waitlistEnabled: getBool('waitlistEnabled', 'waitlist_enabled', true),
+      referralTrigger: get('referralTrigger', 'referral_trigger'),
+      referralIncentive: get('referralIncentive', 'referral_incentive'),
+      programmeStatus: get('programmeStatus', 'programme_status') || 'open',
+      trialAvailable: get('trialAvailable', 'trial_available'),
+      trialInstructions: get('trialInstructions', 'trial_instructions'),
+      whatToBring: get('whatToBring', 'what_to_bring'),
+      equipmentProvided: get('equipmentProvided', 'equipment_provided'),
+      kitRequired: get('kitRequired', 'kit_required'),
+      kitDetails: get('kitDetails', 'kit_details'),
+      paidOrFree: get('paidOrFree', 'paid_or_free') || 'paid',
+      paymentModel: get('paymentModel', 'payment_model'),
+      priceGbp: (p.priceGbp || p.price_gbp) ? String(p.priceGbp || p.price_gbp) : '',
+      priceIncludes: get('priceIncludes', 'price_includes'),
+      siblingDiscount: get('siblingDiscount', 'sibling_discount'),
+      refundPolicy: get('refundPolicy', 'refund_policy'),
+      refundDetails: get('refundDetails', 'refund_details'),
+      paymentMethods: getArr('paymentMethods', 'payment_methods'),
+      paymentReminderSchedule: get('paymentReminderSchedule', 'payment_reminder_schedule'),
+      botNotes: get('botNotes', 'bot_notes'),
+      whatsappGroupId: get('whatsappGroupId', 'whatsapp_group_id'),
     })
     setFaqs(prog.faqs || [])
     setLocalFaqs([])
@@ -697,20 +707,23 @@ function ProgrammesPageInner() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {programmes.map((prog) => {
-              const current = Number(prog.member_count ?? prog.current_members ?? 0)
-              const max = Number(prog.max_capacity ?? 0)
+              const p = prog as Record<string, unknown>
+              const current = Number(p.memberCount ?? p.member_count ?? p.currentMembers ?? p.current_members ?? 0)
+              const max = Number(p.maxCapacity ?? p.max_capacity ?? 0)
               const pct = capacityPercent(current, max)
-              const badge = statusBadgeStyle(prog.programme_status)
-              const hasGroup = !!prog.whatsapp_group_id
+              const badge = statusBadgeStyle((p.programmeStatus || p.programme_status || '') as string)
+              const hasGroup = !!(p.whatsappGroupId || p.whatsapp_group_id)
+              const name = (p.programmeName || p.programme_name || p.programName || 'Untitled') as string
+              const desc = (p.shortDescription || p.short_description || '') as string
 
               return (
                 <div key={prog.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col">
                   {/* Top row */}
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <h3 className="font-semibold text-gray-900">{prog.programme_name}</h3>
-                      {prog.short_description && (
-                        <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{prog.short_description}</p>
+                      <h3 className="font-semibold text-gray-900">{name}</h3>
+                      {desc && (
+                        <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{desc}</p>
                       )}
                     </div>
                     <button
@@ -723,12 +736,12 @@ function ProgrammesPageInner() {
 
                   {/* Sport / age badges */}
                   <div className="flex flex-wrap gap-1.5 mb-3">
-                    {prog.skill_level && (
-                      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{prog.skill_level}</span>
+                    {(p.skillLevel || p.skill_level) && (
+                      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{(p.skillLevel || p.skill_level) as string}</span>
                     )}
-                    {(prog.target_audience || prog.specific_age_group) && (
+                    {(p.targetAudience || p.target_audience || p.specificAgeGroup || p.specific_age_group) && (
                       <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
-                        {prog.specific_age_group || prog.target_audience}
+                        {(p.specificAgeGroup || p.specific_age_group || p.targetAudience || p.target_audience) as string}
                       </span>
                     )}
                   </div>
