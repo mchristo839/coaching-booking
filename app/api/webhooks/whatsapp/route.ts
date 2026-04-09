@@ -1,13 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
-import {
-  findProgrammeByWhatsAppGroup,
-  findCoachById,
-  findMemberByPhone,
-  logConversation,
-  listFaqsByProgramme,
-  createFaq,
-} from '@/app/lib/db'
+import { sql } from '@vercel/postgres'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
+
+// Use sql.query() everywhere to avoid stale Neon read replica issues
+async function findProgrammeByGroup(groupJid: string) {
+  const { rows } = await sql.query(`
+    SELECT p.*, c.first_name as coach_first_name, c.last_name as coach_last_name, c.email as coach_email,
+      c.whatsapp_bot_status, c.id as coach_id, c.mobile as coach_mobile,
+      pr.trading_name
+    FROM programmes p
+    JOIN coaches_v2 c ON c.id = p.coach_id
+    JOIN providers pr ON pr.id = c.provider_id
+    WHERE p.whatsapp_group_id = $1 AND p.is_active = true
+    LIMIT 1
+  `, [groupJid])
+  return rows[0] || null
+}
+
+async function getFaqs(programmeId: string) {
+  const { rows } = await sql.query('SELECT * FROM faqs WHERE programme_id = $1 AND status = $2 ORDER BY created_at', [programmeId, 'active'])
+  return rows
+}
+
+async function findMemberByPhone(phone: string) {
+  const { rows } = await sql.query('SELECT m.*, p.programme_name FROM members m JOIN programmes p ON p.id = m.programme_id WHERE m.parent_phone = $1 OR m.parent_whatsapp_id = $1 ORDER BY m.joined_at DESC', [phone])
+  return rows
+}
+
+async function logConvo(data: Record<string, unknown>) {
+  await sql.query(`INSERT INTO conversations (programme_id, coach_id, sender_name, sender_identifier, sender_type, channel, message_text, category, bot_response, bot_mode, escalated, escalation_type, member_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+    [data.programmeId||null, data.coachId||null, data.senderName||null, data.senderIdentifier||null, data.senderType||null, data.channel, data.messageText, data.category||null, data.botResponse||null, data.botMode||null, data.escalated||false, data.escalationType||null, data.memberId||null])
+}
+
+async function savePendingFaq(programmeId: string, question: string, suggestedAnswer: string, category: string) {
+  await sql.query('INSERT INTO faqs (programme_id, question, answer, category, source, status) VALUES ($1,$2,$3,$4,$5,$6)',
+    [programmeId, question, suggestedAnswer, category, 'learned', 'pending_coach_approval'])
+}
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 
@@ -139,20 +167,15 @@ function extractSenderPhone(data: Record<string, unknown>): string {
 
 async function resolveSenderType(
   senderPhone: string,
-  coachId: string,
+  coachMobile: string,
 ): Promise<{ senderType: SenderType; memberRecord: Record<string, unknown> | null }> {
-  // Check if this is the coach
-  try {
-    const coach = await findCoachById(coachId)
-    if (coach) {
-      const coachMobile = (coach.mobile || '').replace(/\D/g, '')
-      const senderClean = senderPhone.replace(/\D/g, '')
-      if (coachMobile && senderClean && (coachMobile.endsWith(senderClean) || senderClean.endsWith(coachMobile))) {
-        return { senderType: 'known_coach', memberRecord: null }
-      }
+  // Check if this is the coach (compare phone numbers)
+  if (coachMobile) {
+    const coachClean = coachMobile.replace(/\D/g, '')
+    const senderClean = senderPhone.replace(/\D/g, '')
+    if (coachClean && senderClean && (coachClean.endsWith(senderClean) || senderClean.endsWith(coachClean))) {
+      return { senderType: 'known_coach', memberRecord: null }
     }
-  } catch {
-    // Coach lookup failed — continue
   }
 
   // Check if this is a known member/parent
@@ -349,14 +372,7 @@ async function learnNewFaq(
   category: Category,
 ): Promise<void> {
   try {
-    await createFaq({
-      programmeId,
-      question: messageText,
-      answer: botResponse,
-      category,
-      source: 'learned',
-      status: 'pending_coach_approval',
-    })
+    await savePendingFaq(programmeId, messageText, botResponse, category)
   } catch (err) {
     console.error('Failed to create learned FAQ:', err)
   }
@@ -409,7 +425,7 @@ export async function POST(request: NextRequest) {
     const instance: string = body.instance || ''
 
     // 2. Programme Lookup
-    const programme = await findProgrammeByWhatsAppGroup(groupJid)
+    const programme = await findProgrammeByGroup(groupJid)
 
     if (!programme) {
       console.log(`Unlinked group message from ${groupJid}, instance ${instance}`)
@@ -441,14 +457,15 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Identity Resolution
-    const { senderType, memberRecord } = await resolveSenderType(senderPhone, coachId)
+    const coachMobile = (programme.coach_mobile as string) || ''
+    const { senderType, memberRecord } = await resolveSenderType(senderPhone, coachMobile)
 
     // 5. Question Classification
     const category = classifyMessage(messageText)
 
     // Social messages — don't respond (emoji reactions, "thanks", etc.)
     if (category === 'social') {
-      await logConversation({
+      await logConvo({
         programmeId,
         coachId,
         senderName,
@@ -464,20 +481,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // Get coach phone for escalation DMs
-    let coachPhone = ''
-    try {
-      const coach = await findCoachById(coachId)
-      coachPhone = (coach?.mobile || '') as string
-    } catch {
-      // Continue without coach phone
-    }
+    // Get coach phone for escalation DMs (already available from programme lookup)
+    const coachPhone = coachMobile
 
     // 6. Escalation Check — Immediate
     if (IMMEDIATE_ESCALATION_CATEGORIES.includes(category)) {
       await handleImmediateEscalation(category, senderName, messageText, coachName, coachPhone, groupJid)
 
-      await logConversation({
+      await logConvo({
         programmeId,
         coachId,
         senderName,
@@ -497,7 +508,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 7. Build System Prompt
-    const faqs = await listFaqsByProgramme(programmeId, 'active')
+    const faqs = await getFaqs(programmeId)
     const systemPrompt = buildSystemPrompt(programme, faqs as Record<string, unknown>[], senderType, senderName)
     const messageWithContext = `${senderName} asks: ${messageText}`
 
@@ -506,7 +517,7 @@ export async function POST(request: NextRequest) {
 
     // Observation mode — log but don't send
     if (botStatus === 'observation') {
-      await logConversation({
+      await logConvo({
         programmeId,
         coachId,
         senderName,
@@ -532,7 +543,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 9. Log Everything
-    await logConversation({
+    await logConvo({
       programmeId,
       coachId,
       senderName,
