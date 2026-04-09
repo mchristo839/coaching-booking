@@ -163,58 +163,65 @@ export async function createProgramme(data: ProgrammeData) {
 }
 
 export async function updateProgramme(programmeId: string, fields: Partial<ProgrammeData>) {
-  // Single UPDATE with all fields — converts empty strings to null, formats arrays for Postgres
+  // Build individual UPDATE statements for each provided field
+  // This avoids the Neon parameter limit issue with 30+ params in one query
   const v = (val: string | undefined | null) => val && val.trim() ? val.trim() : null
-  const days = fields.sessionDays && fields.sessionDays.length > 0 ? `{${fields.sessionDays.join(',')}}` : null
-  const methods = fields.paymentMethods && fields.paymentMethods.length > 0 ? `{${fields.paymentMethods.join(',')}}` : null
 
-  const { rows } = await sql`
-    UPDATE programmes SET
-      programme_name = COALESCE(${fields.programmeName ?? null}, programme_name),
-      short_description = ${v(fields.shortDescription)},
-      target_audience = ${v(fields.targetAudience)},
-      specific_age_group = ${v(fields.specificAgeGroup)},
-      skill_level = ${v(fields.skillLevel)},
-      programme_type = ${v(fields.programmeType)},
-      session_days = COALESCE(${days}, session_days),
-      session_start_time = ${v(fields.sessionStartTime)},
-      session_duration = ${v(fields.sessionDuration)},
-      session_frequency = ${v(fields.sessionFrequency)},
-      holiday_schedule = ${v(fields.holidaySchedule)},
-      cancellation_notice = ${v(fields.cancellationNotice)},
-      venue_name = ${v(fields.venueName)},
-      venue_address = ${v(fields.venueAddress)},
-      parking = ${v(fields.parking)},
-      nearest_transport = ${v(fields.nearestTransport)},
-      indoor_outdoor = ${v(fields.indoorOutdoor)},
-      bad_weather_policy = ${v(fields.badWeatherPolicy)},
-      max_capacity = ${fields.maxCapacity !== undefined ? fields.maxCapacity : null},
-      full_threshold = ${v(fields.fullThreshold) || 'at_100'},
-      waitlist_enabled = ${fields.waitlistEnabled ?? true},
-      referral_trigger = ${v(fields.referralTrigger)},
-      referral_incentive = ${v(fields.referralIncentive)},
-      programme_status = ${v(fields.programmeStatus) || 'open'},
-      trial_available = ${v(fields.trialAvailable)},
-      trial_instructions = ${v(fields.trialInstructions)},
-      what_to_bring = ${v(fields.whatToBring)},
-      equipment_provided = ${v(fields.equipmentProvided)},
-      kit_required = ${v(fields.kitRequired)},
-      kit_details = ${v(fields.kitDetails)},
-      paid_or_free = ${v(fields.paidOrFree) || 'paid'},
-      payment_model = ${v(fields.paymentModel)},
-      price_gbp = ${fields.priceGbp !== undefined ? fields.priceGbp : null},
-      price_includes = ${v(fields.priceIncludes)},
-      sibling_discount = ${v(fields.siblingDiscount)},
-      refund_policy = ${v(fields.refundPolicy)},
-      refund_details = ${v(fields.refundDetails)},
-      payment_methods = COALESCE(${methods}, payment_methods),
-      payment_reminder_schedule = ${v(fields.paymentReminderSchedule)},
-      bot_notes = ${v(fields.botNotes)},
-      whatsapp_group_id = COALESCE(${v(fields.whatsappGroupId)}, whatsapp_group_id),
-      updated_at = NOW()
-    WHERE id = ${programmeId}
-    RETURNING *
-  `
+  const updates: Promise<unknown>[] = []
+
+  if (fields.programmeName !== undefined && fields.programmeName) updates.push(sql`UPDATE programmes SET programme_name = ${fields.programmeName}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.shortDescription !== undefined) updates.push(sql`UPDATE programmes SET short_description = ${v(fields.shortDescription)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.targetAudience !== undefined) updates.push(sql`UPDATE programmes SET target_audience = ${v(fields.targetAudience)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.specificAgeGroup !== undefined) updates.push(sql`UPDATE programmes SET specific_age_group = ${v(fields.specificAgeGroup)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.skillLevel !== undefined) updates.push(sql`UPDATE programmes SET skill_level = ${v(fields.skillLevel)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.programmeType !== undefined) updates.push(sql`UPDATE programmes SET programme_type = ${v(fields.programmeType)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.sessionDays !== undefined && fields.sessionDays.length > 0) {
+    const days = `{${fields.sessionDays.join(',')}}`
+    updates.push(sql`UPDATE programmes SET session_days = ${days}, updated_at = NOW() WHERE id = ${programmeId}`)
+  }
+  if (fields.sessionStartTime !== undefined) updates.push(sql`UPDATE programmes SET session_start_time = ${v(fields.sessionStartTime)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.sessionDuration !== undefined) updates.push(sql`UPDATE programmes SET session_duration = ${v(fields.sessionDuration)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.sessionFrequency !== undefined) updates.push(sql`UPDATE programmes SET session_frequency = ${v(fields.sessionFrequency)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.holidaySchedule !== undefined) updates.push(sql`UPDATE programmes SET holiday_schedule = ${v(fields.holidaySchedule)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.cancellationNotice !== undefined) updates.push(sql`UPDATE programmes SET cancellation_notice = ${v(fields.cancellationNotice)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.venueName !== undefined) updates.push(sql`UPDATE programmes SET venue_name = ${v(fields.venueName)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.venueAddress !== undefined) updates.push(sql`UPDATE programmes SET venue_address = ${v(fields.venueAddress)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.parking !== undefined) updates.push(sql`UPDATE programmes SET parking = ${v(fields.parking)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.nearestTransport !== undefined) updates.push(sql`UPDATE programmes SET nearest_transport = ${v(fields.nearestTransport)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.indoorOutdoor !== undefined) updates.push(sql`UPDATE programmes SET indoor_outdoor = ${v(fields.indoorOutdoor)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.badWeatherPolicy !== undefined) updates.push(sql`UPDATE programmes SET bad_weather_policy = ${v(fields.badWeatherPolicy)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.maxCapacity !== undefined) updates.push(sql`UPDATE programmes SET max_capacity = ${fields.maxCapacity}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.fullThreshold !== undefined) updates.push(sql`UPDATE programmes SET full_threshold = ${v(fields.fullThreshold) || 'at_100'}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.waitlistEnabled !== undefined) updates.push(sql`UPDATE programmes SET waitlist_enabled = ${fields.waitlistEnabled}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.referralTrigger !== undefined) updates.push(sql`UPDATE programmes SET referral_trigger = ${v(fields.referralTrigger)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.referralIncentive !== undefined) updates.push(sql`UPDATE programmes SET referral_incentive = ${v(fields.referralIncentive)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.programmeStatus !== undefined) updates.push(sql`UPDATE programmes SET programme_status = ${v(fields.programmeStatus) || 'open'}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.trialAvailable !== undefined) updates.push(sql`UPDATE programmes SET trial_available = ${v(fields.trialAvailable)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.trialInstructions !== undefined) updates.push(sql`UPDATE programmes SET trial_instructions = ${v(fields.trialInstructions)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.whatToBring !== undefined) updates.push(sql`UPDATE programmes SET what_to_bring = ${v(fields.whatToBring)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.equipmentProvided !== undefined) updates.push(sql`UPDATE programmes SET equipment_provided = ${v(fields.equipmentProvided)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.kitRequired !== undefined) updates.push(sql`UPDATE programmes SET kit_required = ${v(fields.kitRequired)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.kitDetails !== undefined) updates.push(sql`UPDATE programmes SET kit_details = ${v(fields.kitDetails)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.paidOrFree !== undefined) updates.push(sql`UPDATE programmes SET paid_or_free = ${v(fields.paidOrFree) || 'paid'}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.paymentModel !== undefined) updates.push(sql`UPDATE programmes SET payment_model = ${v(fields.paymentModel)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.priceGbp !== undefined) updates.push(sql`UPDATE programmes SET price_gbp = ${fields.priceGbp}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.priceIncludes !== undefined) updates.push(sql`UPDATE programmes SET price_includes = ${v(fields.priceIncludes)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.siblingDiscount !== undefined) updates.push(sql`UPDATE programmes SET sibling_discount = ${v(fields.siblingDiscount)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.refundPolicy !== undefined) updates.push(sql`UPDATE programmes SET refund_policy = ${v(fields.refundPolicy)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.refundDetails !== undefined) updates.push(sql`UPDATE programmes SET refund_details = ${v(fields.refundDetails)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.paymentMethods !== undefined && fields.paymentMethods.length > 0) {
+    const methods = `{${fields.paymentMethods.join(',')}}`
+    updates.push(sql`UPDATE programmes SET payment_methods = ${methods}, updated_at = NOW() WHERE id = ${programmeId}`)
+  }
+  if (fields.paymentReminderSchedule !== undefined) updates.push(sql`UPDATE programmes SET payment_reminder_schedule = ${v(fields.paymentReminderSchedule)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.botNotes !== undefined) updates.push(sql`UPDATE programmes SET bot_notes = ${v(fields.botNotes)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.whatsappGroupId !== undefined && fields.whatsappGroupId) updates.push(sql`UPDATE programmes SET whatsapp_group_id = ${fields.whatsappGroupId}, updated_at = NOW() WHERE id = ${programmeId}`)
+
+  // Run all updates in parallel
+  await Promise.all(updates)
+
+  // Read back the final state
+  const { rows } = await sql`SELECT * FROM programmes WHERE id = ${programmeId}`
   return rows[0]
 }
 
