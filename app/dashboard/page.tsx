@@ -208,6 +208,17 @@ export default function DashboardPage() {
   const [programmes, setProgrammes] = useState<Programme[]>([])
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  /* ---------- handlers ---------- */
+
+  function copyBookingLink(progId: string) {
+    const url = `${window.location.origin}/join/${progId}`
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(progId)
+      setTimeout(() => setCopiedId(null), 2000)
+    })
+  }
 
   /* ---------- data fetching ---------- */
 
@@ -466,6 +477,34 @@ export default function DashboardPage() {
                           {current} members
                         </span>
                       )}
+                    </div>
+
+                    {/* Booking Link */}
+                    <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
+                      <button
+                        onClick={() => copyBookingLink(prog.id)}
+                        className="flex items-center gap-1.5 text-xs font-medium text-[#3D8B37] hover:text-[#346E30] transition-colors"
+                      >
+                        {copiedId === prog.id ? (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                            Copy Booking Link
+                          </>
+                        )}
+                      </button>
+                      <Link
+                        href={`/join/${prog.id}`}
+                        target="_blank"
+                        className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                        Preview
+                      </Link>
                     </div>
                   </div>
                 )

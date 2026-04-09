@@ -188,6 +188,19 @@ export async function POST() {
       )
     `
 
+    // ── 9. Signup Sessions (WhatsApp signup conversation state) ──
+    await sql`
+      CREATE TABLE IF NOT EXISTS signup_sessions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        programme_id UUID NOT NULL REFERENCES programmes(id) ON DELETE CASCADE,
+        whatsapp_jid VARCHAR(50) NOT NULL,
+        step VARCHAR(30) NOT NULL DEFAULT 'parent_name',
+        data JSONB DEFAULT '{}',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+
     // ── Migrate existing data from old tables ──
     const oldCoachesExist = await sql`
       SELECT EXISTS (
@@ -256,7 +269,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: `Migration complete. 8 tables created. ${migrated} coach(es) migrated.`
+      message: `Migration complete. 9 tables created. ${migrated} coach(es) migrated.`
     })
   } catch (error) {
     console.error('Migration error:', error)
