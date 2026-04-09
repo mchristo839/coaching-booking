@@ -4,7 +4,12 @@ import { createCoach, updateProvider } from '@/app/lib/db'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { providerId, firstName, lastName, email, mobile, sport, coachingLevel, dbsStatus, dbsIssueDate, governingBody, firstAid, publicLiability } = body
+
+    const providerId = body.providerId
+    const firstName = body.firstName
+    const lastName = body.lastName
+    const email = body.email
+    const mobile = body.mobile
 
     if (!providerId || !firstName || !email) {
       return NextResponse.json({ error: 'Provider ID, first name and email are required' }, { status: 400 })
@@ -16,13 +21,13 @@ export async function POST(request: NextRequest) {
       lastName: lastName || '',
       email,
       mobile: mobile || '',
-      sport,
-      coachingLevel,
-      dbsStatus,
-      dbsIssueDate,
-      governingBody,
-      firstAid,
-      publicLiability,
+      sport: body.sport || null,
+      coachingLevel: body.coachingLevel || body.qualification || null,
+      dbsStatus: body.dbsStatus || null,
+      dbsIssueDate: body.dbsIssueDate || null,
+      governingBody: body.governingBody || null,
+      firstAid: body.firstAid || null,
+      publicLiability: body.publicLiability || body.insurance || null,
     })
 
     await updateProvider(providerId, { registrationStatus: 'coach_added' })
