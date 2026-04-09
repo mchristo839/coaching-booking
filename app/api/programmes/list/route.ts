@@ -1,63 +1,8 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { listProgrammesByCoach, listFaqsByProgramme } from '@/app/lib/db'
-
-// Map DB rows to camelCase — supports both snake_case and already-camelCase keys
-// because @vercel/postgres behavior can vary
-function mapProgramme(row: Record<string, unknown>) {
-  const g = (snake: string, camel: string) => row[snake] ?? row[camel] ?? null
-  return {
-    id: row.id,
-    programName: g('programme_name', 'programmeName') || g('program_name', 'programName'),
-    programmeName: g('programme_name', 'programmeName') || g('program_name', 'programName'),
-    shortDescription: g('short_description', 'shortDescription'),
-    targetAudience: g('target_audience', 'targetAudience'),
-    specificAgeGroup: g('specific_age_group', 'specificAgeGroup'),
-    skillLevel: g('skill_level', 'skillLevel'),
-    programmeType: g('programme_type', 'programmeType'),
-    sessionDays: g('session_days', 'sessionDays'),
-    sessionStartTime: g('session_start_time', 'sessionStartTime'),
-    sessionDuration: g('session_duration', 'sessionDuration'),
-    sessionFrequency: g('session_frequency', 'sessionFrequency'),
-    holidaySchedule: g('holiday_schedule', 'holidaySchedule'),
-    cancellationNotice: g('cancellation_notice', 'cancellationNotice'),
-    venueName: g('venue_name', 'venueName'),
-    venueAddress: g('venue_address', 'venueAddress'),
-    parking: row.parking,
-    nearestTransport: g('nearest_transport', 'nearestTransport'),
-    indoorOutdoor: g('indoor_outdoor', 'indoorOutdoor'),
-    badWeatherPolicy: g('bad_weather_policy', 'badWeatherPolicy'),
-    maxCapacity: g('max_capacity', 'maxCapacity'),
-    currentMembers: g('current_members', 'currentMembers'),
-    fullThreshold: g('full_threshold', 'fullThreshold'),
-    waitlistEnabled: g('waitlist_enabled', 'waitlistEnabled'),
-    referralTrigger: g('referral_trigger', 'referralTrigger'),
-    referralIncentive: g('referral_incentive', 'referralIncentive'),
-    programmeStatus: g('programme_status', 'programmeStatus'),
-    trialAvailable: g('trial_available', 'trialAvailable'),
-    trialInstructions: g('trial_instructions', 'trialInstructions'),
-    whatToBring: g('what_to_bring', 'whatToBring'),
-    equipmentProvided: g('equipment_provided', 'equipmentProvided'),
-    kitRequired: g('kit_required', 'kitRequired'),
-    kitDetails: g('kit_details', 'kitDetails'),
-    paidOrFree: g('paid_or_free', 'paidOrFree'),
-    paymentModel: g('payment_model', 'paymentModel'),
-    priceGbp: g('price_gbp', 'priceGbp'),
-    priceIncludes: g('price_includes', 'priceIncludes'),
-    siblingDiscount: g('sibling_discount', 'siblingDiscount'),
-    refundPolicy: g('refund_policy', 'refundPolicy'),
-    refundDetails: g('refund_details', 'refundDetails'),
-    paymentMethods: g('payment_methods', 'paymentMethods'),
-    paymentReminderSchedule: g('payment_reminder_schedule', 'paymentReminderSchedule'),
-    botNotes: g('bot_notes', 'botNotes'),
-    whatsappGroupId: g('whatsapp_group_id', 'whatsappGroupId'),
-    isActive: g('is_active', 'isActive'),
-    createdAt: g('created_at', 'createdAt'),
-    memberCount: Number(g('member_count', 'memberCount') || 0),
-    waitlistCount: Number(g('waitlist_count', 'waitlistCount') || 0),
-  }
-}
+import { listFaqsByProgramme } from '@/app/lib/db'
+import { sql } from '@vercel/postgres'
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,8 +11,63 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Coach ID required' }, { status: 400 })
     }
 
-    const rawProgrammes = await listProgrammesByCoach(coachId)
-    const programmes = rawProgrammes.map(r => mapProgramme(r as Record<string, unknown>))
+    // Direct query instead of going through db.ts — avoids any field mapping issues
+    const { rows } = await sql`
+      SELECT
+        p.id,
+        p.programme_name as "programmeName",
+        p.programme_name as "programName",
+        p.short_description as "shortDescription",
+        p.target_audience as "targetAudience",
+        p.specific_age_group as "specificAgeGroup",
+        p.skill_level as "skillLevel",
+        p.programme_type as "programmeType",
+        p.session_days as "sessionDays",
+        p.session_start_time as "sessionStartTime",
+        p.session_duration as "sessionDuration",
+        p.session_frequency as "sessionFrequency",
+        p.holiday_schedule as "holidaySchedule",
+        p.cancellation_notice as "cancellationNotice",
+        p.venue_name as "venueName",
+        p.venue_address as "venueAddress",
+        p.parking,
+        p.nearest_transport as "nearestTransport",
+        p.indoor_outdoor as "indoorOutdoor",
+        p.bad_weather_policy as "badWeatherPolicy",
+        p.max_capacity as "maxCapacity",
+        p.current_members as "currentMembers",
+        p.full_threshold as "fullThreshold",
+        p.waitlist_enabled as "waitlistEnabled",
+        p.referral_trigger as "referralTrigger",
+        p.referral_incentive as "referralIncentive",
+        p.programme_status as "programmeStatus",
+        p.trial_available as "trialAvailable",
+        p.trial_instructions as "trialInstructions",
+        p.what_to_bring as "whatToBring",
+        p.equipment_provided as "equipmentProvided",
+        p.kit_required as "kitRequired",
+        p.kit_details as "kitDetails",
+        p.paid_or_free as "paidOrFree",
+        p.payment_model as "paymentModel",
+        p.price_gbp as "priceGbp",
+        p.price_includes as "priceIncludes",
+        p.sibling_discount as "siblingDiscount",
+        p.refund_policy as "refundPolicy",
+        p.refund_details as "refundDetails",
+        p.payment_methods as "paymentMethods",
+        p.payment_reminder_schedule as "paymentReminderSchedule",
+        p.bot_notes as "botNotes",
+        p.whatsapp_group_id as "whatsappGroupId",
+        p.is_active as "isActive",
+        p.created_at as "createdAt",
+        (SELECT COUNT(*)::int FROM members m WHERE m.programme_id = p.id AND m.status = 'active') as "memberCount",
+        (SELECT COUNT(*)::int FROM members m WHERE m.programme_id = p.id AND m.status = 'waitlisted') as "waitlistCount"
+      FROM programmes p
+      WHERE p.coach_id = ${coachId} AND p.is_active = true
+      ORDER BY p.created_at DESC
+    `
+
+    const programmes = rows
 
     const includeFaqs = request.nextUrl.searchParams.get('includeFaqs') === 'true'
     if (includeFaqs) {
