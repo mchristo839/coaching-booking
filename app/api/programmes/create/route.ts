@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       maxCapacity: rest.maxCapacity ? Number(rest.maxCapacity) : undefined,
       programmeStatus: rest.programmeStatus || rest.status || rest.progStatus || 'open',
       trialAvailable: rest.trialAvailable || rest.trialSession || null,
-      waitlistEnabled: rest.waitlistEnabled ?? rest.waitlist === 'yes' ?? true,
+      waitlistEnabled: rest.waitlistEnabled !== undefined ? rest.waitlistEnabled : (rest.waitlist === 'yes' || true),
       whatToBring: rest.whatToBring || null,
       equipmentProvided: rest.equipmentProvided || null,
       kitRequired: rest.kitRequired || rest.kitRequirement || null,
