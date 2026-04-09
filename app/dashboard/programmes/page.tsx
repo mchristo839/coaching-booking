@@ -345,7 +345,7 @@ function ProgrammesPageInner() {
 
   function openEdit(prog: Programme) {
     // Support both camelCase (from API) and snake_case (legacy) field names
-    const p = prog as Record<string, unknown>
+    const p = prog as unknown as Record<string, unknown>
     const get = (camel: string, snake: string) => (p[camel] || p[snake] || '') as string
     const getArr = (camel: string, snake: string) => (p[camel] || p[snake] || []) as string[]
     const getBool = (camel: string, snake: string, fallback: boolean) => {
@@ -707,7 +707,7 @@ function ProgrammesPageInner() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {programmes.map((prog) => {
-              const p = prog as Record<string, unknown>
+              const p = prog as unknown as Record<string, unknown>
               const current = Number(p.memberCount ?? p.member_count ?? p.currentMembers ?? p.current_members ?? 0)
               const max = Number(p.maxCapacity ?? p.max_capacity ?? 0)
               const pct = capacityPercent(current, max)
@@ -736,12 +736,12 @@ function ProgrammesPageInner() {
 
                   {/* Sport / age badges */}
                   <div className="flex flex-wrap gap-1.5 mb-3">
-                    {(p.skillLevel || p.skill_level) && (
-                      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{(p.skillLevel || p.skill_level) as string}</span>
+                    {Boolean(p.skillLevel || p.skill_level) && (
+                      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{String(p.skillLevel || p.skill_level)}</span>
                     )}
-                    {(p.targetAudience || p.target_audience || p.specificAgeGroup || p.specific_age_group) && (
+                    {Boolean(p.targetAudience || p.target_audience || p.specificAgeGroup || p.specific_age_group) && (
                       <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
-                        {(p.specificAgeGroup || p.specific_age_group || p.targetAudience || p.target_audience) as string}
+                        {String(p.specificAgeGroup || p.specific_age_group || p.targetAudience || p.target_audience)}
                       </span>
                     )}
                   </div>
