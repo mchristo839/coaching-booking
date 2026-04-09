@@ -23,6 +23,7 @@ interface Faq {
 interface Programme {
   id: string
   programName: string
+  programmeName?: string
 }
 
 /* ------------------------------------------------------------------ */
@@ -330,6 +331,7 @@ export default function LearningPage() {
   const [programmes, setProgrammes] = useState<Programme[]>([])
   const [loading, setLoading] = useState(true)
   const [coachId, setCoachId] = useState('')
+  const [selectedProgrammeId, setSelectedProgrammeId] = useState<string>('all')
 
   /* ---------- data fetching ---------- */
 
@@ -481,7 +483,15 @@ export default function LearningPage() {
 
   /* ---------- derived ---------- */
 
-  const faqsByProgramme = programmes.map((prog) => ({
+  const filteredPending = selectedProgrammeId === 'all'
+    ? pendingFaqs
+    : pendingFaqs.filter((f) => f.programme_id === selectedProgrammeId)
+
+  const filteredProgrammes = selectedProgrammeId === 'all'
+    ? programmes
+    : programmes.filter((p) => p.id === selectedProgrammeId)
+
+  const faqsByProgramme = filteredProgrammes.map((prog) => ({
     programme: prog,
     faqs: libraryFaqs.filter((f) => f.programme_id === prog.id),
   }))
@@ -517,23 +527,52 @@ export default function LearningPage() {
         </Link>
 
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Learning Log</h1>
           <p className="text-gray-500 text-sm mt-0.5">Review questions your bot couldn&apos;t answer and manage your FAQ library.</p>
         </div>
+
+        {/* Programme filter tabs */}
+        {programmes.length > 1 && (
+          <div className="flex flex-wrap gap-2 mb-6">
+            <button
+              onClick={() => setSelectedProgrammeId('all')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                selectedProgrammeId === 'all'
+                  ? 'bg-[#3D8B37] text-white'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:border-[#3D8B37] hover:text-[#3D8B37]'
+              }`}
+            >
+              All Programmes
+            </button>
+            {programmes.map((prog) => (
+              <button
+                key={prog.id}
+                onClick={() => setSelectedProgrammeId(prog.id)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  selectedProgrammeId === prog.id
+                    ? 'bg-[#3D8B37] text-white'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:border-[#3D8B37] hover:text-[#3D8B37]'
+                }`}
+              >
+                {prog.programName}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* ===== Section 1: Pending Review ===== */}
         <section className="mb-10">
           <div className="flex items-center gap-3 mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Pending Review</h2>
-            {pendingFaqs.length > 0 && (
+            {filteredPending.length > 0 && (
               <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full">
-                {pendingFaqs.length} question{pendingFaqs.length !== 1 ? 's' : ''} awaiting your input
+                {filteredPending.length} question{filteredPending.length !== 1 ? 's' : ''} awaiting your input
               </span>
             )}
           </div>
 
-          {pendingFaqs.length === 0 ? (
+          {filteredPending.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
               <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-green-100 flex items-center justify-center">
                 <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -545,7 +584,7 @@ export default function LearningPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              {pendingFaqs.map((faq) => (
+              {filteredPending.map((faq) => (
                 <PendingCard
                   key={faq.id}
                   faq={faq}
