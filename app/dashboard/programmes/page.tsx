@@ -991,6 +991,17 @@ function ProgrammesPageInner() {
             </div>
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Schedule Notes</label>
+            <p className="text-xs text-gray-400 mb-1">Describe anything flexible about your schedule — e.g. &quot;Sundays vary depending on fixtures. Coach confirms each week via WhatsApp.&quot;</p>
+            <textarea
+              value={form.botNotes || ''}
+              onChange={(e) => updateField('botNotes', e.target.value)}
+              rows={3}
+              placeholder="e.g. Training is every Wednesday 18:20-20:00. Sundays change weekly — sometimes a home match (14:00 KO), sometimes away, sometimes training at a different time. Coach will post the Sunday details in the group each week."
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent text-sm"
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Cancellation Notice Required</label>
             <select
               value={form.cancellationNotice}
