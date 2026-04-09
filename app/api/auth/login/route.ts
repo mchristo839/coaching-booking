@@ -1,6 +1,5 @@
-// app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { findCoachByEmail } from '@/app/lib/db'
+import { findProviderByEmail, findCoachByProviderId } from '@/app/lib/db'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
@@ -8,41 +7,33 @@ export async function POST(request: NextRequest) {
     const { email, password } = await request.json()
 
     if (!email || !password) {
-      return NextResponse.json(
-        { error: 'Email and password are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
     }
 
-    const coach = await findCoachByEmail(email)
-
-    if (!coach) {
-      return NextResponse.json(
-        { error: 'Invalid email or password' },
-        { status: 401 }
-      )
+    const provider = await findProviderByEmail(email)
+    if (!provider) {
+      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
-    const passwordMatch = await bcrypt.compare(password, coach.password_hash)
-
+    const passwordMatch = await bcrypt.compare(password, provider.password_hash)
     if (!passwordMatch) {
-      return NextResponse.json(
-        { error: 'Invalid email or password' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
+
+    // Find the coach record linked to this provider
+    const coach = await findCoachByProviderId(provider.id)
 
     return NextResponse.json({
       success: true,
-      coachId: coach.id,
-      email: coach.email,
-      name: coach.name,
+      providerId: provider.id,
+      coachId: coach?.id || null,
+      email: provider.email,
+      name: `${provider.first_name} ${provider.last_name}`.trim(),
+      tradingName: provider.trading_name,
+      registrationStatus: provider.registration_status,
     })
   } catch (error) {
     console.error('Login error:', error)
-    return NextResponse.json(
-      { error: 'Login failed. Please try again.' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Login failed. Please try again.' }, { status: 500 })
   }
 }

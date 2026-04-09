@@ -1,38 +1,270 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { findProgramByWhatsAppGroup, type Knowledgebase } from '@/app/lib/db'
+import {
+  findProgrammeByWhatsAppGroup,
+  findCoachById,
+  findMemberByPhone,
+  logConversation,
+  listFaqsByProgramme,
+  createFaq,
+} from '@/app/lib/db'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
-const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'paul-bot'
 
-function buildSystemPrompt(program: { program_name: string; coach_name: string; knowledgebase: Knowledgebase }): string {
-  const kb = program.knowledgebase
+// ─── Types ───
 
-  const faqSection = kb.customFaqs && kb.customFaqs.length > 0
-    ? `\nAdditional Q&A:\n${kb.customFaqs.map((f) => `Q: ${f.q}\nA: ${f.a}`).join('\n\n')}`
-    : ''
+type SenderType = 'known_coach' | 'known_parent' | 'unknown'
 
-  return `You are a helpful assistant for ${program.program_name}, a coaching programme run by ${program.coach_name}.
+type Category =
+  | 'schedule' | 'venue' | 'pricing' | 'kit' | 'availability'
+  | 'holiday' | 'refund' | 'programme' | 'credentials' | 'fixture'
+  | 'welfare' | 'complaint' | 'medical' | 'social' | 'unknown'
 
-Your job is to answer questions from parents and participants in this WhatsApp group. Only answer questions about this specific programme. If asked about anything unrelated, politely say you can only help with questions about ${program.program_name}.
+const IMMEDIATE_ESCALATION_CATEGORIES: Category[] = ['welfare', 'complaint', 'medical']
+const SOFT_ESCALATION_CATEGORIES: Category[] = ['fixture', 'unknown']
 
-Keep answers concise and friendly — this is a WhatsApp group, not an email. 2-3 sentences max unless a list is genuinely helpful.
+// ─── Question Classifier ───
 
-Programme details:
-- Sport: ${kb.sport}
-- Venue: ${kb.venue}${kb.venueAddress ? ` (${kb.venueAddress})` : ''}
-- Age group: ${kb.ageGroup}
-- Skill level: ${kb.skillLevel}
-- Schedule: ${kb.schedule}
-- Price: £${(kb.priceCents / 100).toFixed(2)} per session
-- What to bring: ${kb.whatToBring}
-- Cancellation policy: ${kb.cancellationPolicy}
-- Medical/injury info: ${kb.medicalInfo}
-- About the coach: ${kb.coachBio}
+const CATEGORY_KEYWORDS: Record<Category, string[]> = {
+  welfare: [
+    'hurt', 'injured', 'upset', 'bullied', 'uncomfortable',
+    'worried about', 'safeguarding', 'concern', 'abuse', 'scared',
+  ],
+  complaint: [
+    'not happy', 'unhappy', 'complaint', 'disgusted', 'unacceptable',
+    'poor', 'terrible', 'appalling', 'disappointed', 'furious',
+  ],
+  medical: [
+    'asthma', 'injury', 'allergic', 'medical', 'condition',
+    'inhaler', 'epipen', 'medication', 'allergy', 'disability',
+  ],
+  social: [
+    'great session', 'thanks', 'well done', 'amazing', 'brilliant',
+    'love it', 'fantastic', 'good job', 'thank you', 'cheers',
+  ],
+  schedule: [
+    'time', 'when', 'what time', 'schedule', 'session',
+    'day', 'start', 'finish', 'what days', 'timetable',
+  ],
+  venue: [
+    'where', 'location', 'address', 'parking', 'directions',
+    'transport', 'postcode', 'find you', 'how to get',
+  ],
+  pricing: [
+    'cost', 'price', 'how much', 'pay', 'payment',
+    'fee', 'discount', 'charge', 'rates',
+  ],
+  kit: [
+    'bring', 'wear', 'kit', 'equipment', 'boots',
+    'uniform', 'shin pads', 'trainers', 'clothing',
+  ],
+  availability: [
+    'space', 'available', 'full', 'join', 'sign up',
+    'enrol', 'register', 'trial', 'waitlist', 'waiting list',
+  ],
+  holiday: [
+    'holiday', 'half term', 'easter', 'summer', 'christmas',
+    'break', 'bank holiday', 'closed', 'time off',
+  ],
+  refund: [
+    'refund', 'cancel', 'money back', 'cancellation',
+    'get my money', 'reimburs',
+  ],
+  programme: [
+    'age', 'ability', 'level', 'beginner', 'mixed',
+    'what do they learn', 'curriculum', 'syllabus', 'advanced',
+  ],
+  credentials: [
+    'dbs', 'qualified', 'qualification', 'accredited',
+    'insurance', 'first aid', 'certified', 'crb',
+  ],
+  fixture: [
+    'match', 'fixture', 'game', 'tournament', 'who are we playing',
+    'league', 'cup', 'competition',
+  ],
+  unknown: [],
+}
+
+function isEmojiOnly(text: string): boolean {
+  // Strip common emoji ranges, variation selectors, ZWJ, skin tones, and whitespace
+  const stripped = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{27BF}\u{2B50}\u{2764}\u{FE0F}\u{200D}\u{1F3FB}-\u{1F3FF}\u{2705}\u{274C}\s]/gu, '')
+  return stripped.length === 0 && text.trim().length > 0
+}
+
+function classifyMessage(text: string): Category {
+  const lower = text.toLowerCase().trim()
+
+  // Emoji-only messages are social
+  if (isEmojiOnly(text)) return 'social'
+
+  // Very short social messages (under 5 words, no question mark)
+  const wordCount = lower.split(/\s+/).length
+  if (wordCount <= 3 && !lower.includes('?')) {
+    const socialHits = CATEGORY_KEYWORDS.social.filter((kw) => lower.includes(kw))
+    if (socialHits.length > 0) return 'social'
+  }
+
+  // Check each category by keyword match — priority order matters
+  // Welfare/complaint/medical checked first (escalation categories)
+  const priorityOrder: Category[] = [
+    'welfare', 'complaint', 'medical',
+    'schedule', 'venue', 'pricing', 'kit', 'availability',
+    'holiday', 'refund', 'programme', 'credentials', 'fixture',
+    'social',
+  ]
+
+  for (const category of priorityOrder) {
+    const keywords = CATEGORY_KEYWORDS[category]
+    for (const kw of keywords) {
+      if (lower.includes(kw)) return category
+    }
+  }
+
+  return 'unknown'
+}
+
+// ─── Identity Resolution ───
+
+function extractSenderPhone(data: Record<string, unknown>): string {
+  // In groups, participant contains the sender's JID (e.g., 447123456789@s.whatsapp.net)
+  // In 1:1 chats, remoteJid is the sender
+  const key = data?.key as Record<string, unknown> | undefined
+  const participant = key?.participant as string || ''
+  const remoteJid = key?.remoteJid as string || ''
+
+  const jid = participant || remoteJid
+  // Extract phone number from JID: "447123456789@s.whatsapp.net" → "447123456789"
+  return jid.split('@')[0] || ''
+}
+
+async function resolveSenderType(
+  senderPhone: string,
+  coachId: string,
+): Promise<{ senderType: SenderType; memberRecord: Record<string, unknown> | null }> {
+  // Check if this is the coach
+  try {
+    const coach = await findCoachById(coachId)
+    if (coach) {
+      const coachMobile = (coach.mobile || '').replace(/\D/g, '')
+      const senderClean = senderPhone.replace(/\D/g, '')
+      if (coachMobile && senderClean && (coachMobile.endsWith(senderClean) || senderClean.endsWith(coachMobile))) {
+        return { senderType: 'known_coach', memberRecord: null }
+      }
+    }
+  } catch {
+    // Coach lookup failed — continue
+  }
+
+  // Check if this is a known member/parent
+  try {
+    const members = await findMemberByPhone(senderPhone)
+    if (members && members.length > 0) {
+      return { senderType: 'known_parent', memberRecord: members[0] as Record<string, unknown> }
+    }
+  } catch {
+    // Member lookup failed — continue
+  }
+
+  return { senderType: 'unknown', memberRecord: null }
+}
+
+// ─── System Prompt Builder ───
+
+function buildSystemPrompt(
+  programme: Record<string, unknown>,
+  faqs: Record<string, unknown>[],
+  senderType: SenderType,
+  senderName: string,
+): string {
+  const coachName = `${programme.coach_first_name || ''} ${programme.coach_last_name || ''}`.trim()
+  const tradingName = programme.trading_name as string || coachName
+  const progName = programme.programme_name as string || 'this programme'
+
+  // Build programme details section
+  const details: string[] = []
+  if (programme.programme_name) details.push(`Programme: ${programme.programme_name}`)
+  if (programme.short_description) details.push(`About: ${programme.short_description}`)
+  if (programme.target_audience) details.push(`For: ${programme.target_audience}`)
+  if (programme.specific_age_group) details.push(`Age group: ${programme.specific_age_group}`)
+  if (programme.skill_level) details.push(`Skill level: ${programme.skill_level}`)
+  if (programme.session_days) {
+    const days = Array.isArray(programme.session_days)
+      ? (programme.session_days as string[]).join(', ')
+      : String(programme.session_days)
+    details.push(`Session days: ${days}`)
+  }
+  if (programme.session_start_time) details.push(`Start time: ${programme.session_start_time}`)
+  if (programme.session_duration) details.push(`Duration: ${programme.session_duration}`)
+  if (programme.session_frequency) details.push(`Frequency: ${programme.session_frequency}`)
+  if (programme.holiday_schedule) details.push(`Holidays: ${programme.holiday_schedule}`)
+  if (programme.cancellation_notice) details.push(`Cancellation notice: ${programme.cancellation_notice}`)
+  if (programme.venue_name) details.push(`Venue: ${programme.venue_name}`)
+  if (programme.venue_address) details.push(`Address: ${programme.venue_address}`)
+  if (programme.parking) details.push(`Parking: ${programme.parking}`)
+  if (programme.nearest_transport) details.push(`Transport: ${programme.nearest_transport}`)
+  if (programme.indoor_outdoor) details.push(`Setting: ${programme.indoor_outdoor}`)
+  if (programme.bad_weather_policy) details.push(`Bad weather: ${programme.bad_weather_policy}`)
+  if (programme.max_capacity) details.push(`Capacity: ${programme.max_capacity}`)
+  if (programme.programme_status) details.push(`Status: ${programme.programme_status}`)
+  if (programme.trial_available) details.push(`Trial: ${programme.trial_available}`)
+  if (programme.trial_instructions) details.push(`Trial info: ${programme.trial_instructions}`)
+  if (programme.what_to_bring) details.push(`What to bring: ${programme.what_to_bring}`)
+  if (programme.equipment_provided) details.push(`Equipment provided: ${programme.equipment_provided}`)
+  if (programme.kit_required) details.push(`Kit required: ${programme.kit_required}`)
+  if (programme.kit_details) details.push(`Kit details: ${programme.kit_details}`)
+  if (programme.paid_or_free) details.push(`Pricing type: ${programme.paid_or_free}`)
+  if (programme.price_gbp) details.push(`Price: £${programme.price_gbp}`)
+  if (programme.price_includes) details.push(`Price includes: ${programme.price_includes}`)
+  if (programme.sibling_discount) details.push(`Sibling discount: ${programme.sibling_discount}`)
+  if (programme.payment_model) details.push(`Payment model: ${programme.payment_model}`)
+  if (programme.refund_policy) details.push(`Refund policy: ${programme.refund_policy}`)
+  if (programme.refund_details) details.push(`Refund details: ${programme.refund_details}`)
+  if (programme.payment_methods) {
+    const methods = Array.isArray(programme.payment_methods)
+      ? (programme.payment_methods as string[]).join(', ')
+      : String(programme.payment_methods)
+    details.push(`Payment methods: ${methods}`)
+  }
+  if (programme.bot_notes) details.push(`Additional notes: ${programme.bot_notes}`)
+
+  // Build FAQ section
+  const faqLines = faqs
+    .filter((f) => f.question && f.answer)
+    .map((f) => `Q: ${f.question}\nA: ${f.answer}`)
+    .join('\n\n')
+  const faqSection = faqLines ? `\n\nFrequently Asked Questions:\n${faqLines}` : ''
+
+  // Identity context
+  let identityContext = ''
+  if (senderType === 'known_coach') {
+    identityContext = `\nThe person messaging is the coach (${coachName}) themselves. Answer helpfully but remember you are their assistant, not a peer.`
+  } else if (senderType === 'known_parent') {
+    identityContext = `\nThe person messaging is ${senderName}, a known parent/member of this programme.`
+  } else {
+    identityContext = `\nThe person messaging is ${senderName}. They may be a prospective or existing member.`
+  }
+
+  return `You are the WhatsApp assistant for ${progName}, run by ${tradingName}.
+${identityContext}
+
+PROGRAMME DETAILS:
+${details.join('\n')}
 ${faqSection}
 
-If you don't know the answer, say "I'm not sure about that — please contact the coach directly."`
+HARD RULES — you must always follow these:
+1. Never invent information. If you don't know, say so and suggest contacting ${coachName} directly.
+2. Never answer welfare, safeguarding, or complaint messages — those are routed to the coach.
+3. Never share one family's information with another.
+4. Never contradict the coach or make promises the coach hasn't authorised.
+5. Always identify as the assistant, never pretend to be ${coachName}.
+6. Keep responses concise — 2-3 sentences max. This is WhatsApp, not email.
+7. Use ${coachName}'s name naturally, e.g. "${coachName}'s Saturday session".
+8. Be warm and helpful but professional.
+9. If asked something outside the scope of ${progName}, politely redirect.
+10. If you're unsure, recommend contacting ${coachName} directly.`
 }
+
+// ─── Claude API ───
 
 async function askClaude(systemPrompt: string, userMessage: string): Promise<string> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -58,81 +290,273 @@ async function askClaude(systemPrompt: string, userMessage: string): Promise<str
   return data.content?.[0]?.text || "I'm not sure about that — please contact the coach directly."
 }
 
+// ─── Escalation Handlers ───
+
+async function handleImmediateEscalation(
+  category: Category,
+  senderName: string,
+  messageText: string,
+  coachName: string,
+  coachPhone: string,
+  groupJid: string,
+): Promise<void> {
+  const categoryLabels: Record<string, string> = {
+    welfare: 'Welfare/Safeguarding',
+    complaint: 'Complaint',
+    medical: 'Medical',
+  }
+  const label = categoryLabels[category] || category
+
+  // DM the coach privately
+  if (coachPhone) {
+    const coachJid = `${coachPhone.replace(/\D/g, '')}@s.whatsapp.net`
+    await sendWhatsAppMessage(
+      coachJid,
+      `🔴 ${label} — ${senderName} said: "${messageText}". This needs your direct response.`,
+    )
+  }
+
+  // Reply in the group
+  await sendWhatsAppMessage(
+    groupJid,
+    `Thanks for letting us know. I've passed this to ${coachName} and they will be in touch with you directly.`,
+  )
+}
+
+async function handleSoftEscalation(
+  category: Category,
+  senderName: string,
+  messageText: string,
+  coachPhone: string,
+  reply: string,
+): Promise<void> {
+  // Flag to coach privately after answering
+  if (coachPhone) {
+    const coachJid = `${coachPhone.replace(/\D/g, '')}@s.whatsapp.net`
+    await sendWhatsAppMessage(
+      coachJid,
+      `🟡 Heads up — ${senderName} asked: "${messageText}". I answered but you may want to check. Category: ${category}.`,
+    )
+  }
+}
+
+// ─── FAQ Learning ───
+
+async function learnNewFaq(
+  programmeId: string,
+  messageText: string,
+  botResponse: string,
+  category: Category,
+): Promise<void> {
+  try {
+    await createFaq({
+      programmeId,
+      question: messageText,
+      answer: botResponse,
+      category,
+      source: 'learned',
+      status: 'pending_coach_approval',
+    })
+  } catch (err) {
+    console.error('Failed to create learned FAQ:', err)
+  }
+}
+
+function faqMatchesMessage(faqs: Record<string, unknown>[], messageText: string): boolean {
+  const lower = messageText.toLowerCase()
+  for (const faq of faqs) {
+    const question = ((faq.question as string) || '').toLowerCase()
+    // Simple overlap check: if 3+ words from the FAQ question appear in the message
+    const questionWords = question.split(/\s+/).filter((w) => w.length > 3)
+    const matchCount = questionWords.filter((w) => lower.includes(w)).length
+    if (matchCount >= 2) return true
+  }
+  return false
+}
+
+// ─── Main Webhook Handler ───
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    // Evolution API webhook payload structure
-    const event = body.event
-    const instance = body.instance
-    const data = body.data
-
-    // Only handle incoming text messages from groups
-    if (event !== 'messages.upsert') {
+    // 1. Filter
+    if (body.event !== 'messages.upsert') {
       return NextResponse.json({ ok: true })
     }
 
-    // Ignore messages sent by the bot itself
+    const data = body.data
     if (data?.key?.fromMe) {
       return NextResponse.json({ ok: true })
     }
 
-    // Only handle group messages (group JIDs end in @g.us)
     const groupJid: string = data?.key?.remoteJid || ''
     if (!groupJid.endsWith('@g.us')) {
       return NextResponse.json({ ok: true })
     }
 
-    // Extract message text
     const messageText: string =
       data?.message?.conversation ||
       data?.message?.extendedTextMessage?.text ||
       ''
-
     if (!messageText.trim()) {
       return NextResponse.json({ ok: true })
     }
 
-    // Look up which program this group belongs to
-    const program = await findProgramByWhatsAppGroup(groupJid)
+    const senderName: string = data?.pushName || 'there'
+    const senderPhone = extractSenderPhone(data)
+    const instance: string = body.instance || ''
 
-    if (!program) {
-      // Group not linked to any program — reply with the group ID so the coach can copy it
+    // 2. Programme Lookup
+    const programme = await findProgrammeByWhatsAppGroup(groupJid)
+
+    if (!programme) {
       console.log(`Unlinked group message from ${groupJid}, instance ${instance}`)
       await sendWhatsAppMessage(
         groupJid,
-        `👋 Hi! I'm your CoachBook bot. To activate me for this group, go to your Programmes dashboard and paste in this group ID:\n\n*${groupJid}*`
+        `👋 Hi! I'm your coaching assistant. To activate me for this group, go to your dashboard and paste in this group ID:\n\n*${groupJid}*`,
       )
       return NextResponse.json({ ok: true })
     }
 
-    if (!program.knowledgebase) {
-      // Program linked but knowledgebase not filled in yet
-      console.log(`Program ${program.id} has no knowledgebase, skipping`)
+    const coachId = programme.coach_id as string
+    const coachName = `${programme.coach_first_name || ''} ${programme.coach_last_name || ''}`.trim()
+    const programmeId = programme.id as string
+    const botStatus = (programme.whatsapp_bot_status as string) || 'not_yet_registered'
+
+    // Check if programme has enough data to operate
+    if (!programme.programme_name) {
+      console.log(`Programme ${programmeId} has no data configured, skipping`)
       await sendWhatsAppMessage(
         groupJid,
-        `👋 I'm connected to this group but my knowledgebase isn't set up yet. ${program.coach_name}, please go to your Programmes dashboard and fill in the programme details to activate me.`
+        `👋 I'm connected to this group but haven't been set up yet. ${coachName}, please go to your dashboard and fill in the programme details to activate me.`,
       )
       return NextResponse.json({ ok: true })
     }
 
-    const senderName: string = data?.pushName || 'there'
+    // 4. Check Bot Mode
+    if (botStatus === 'not_yet_registered' || botStatus === 'paused') {
+      return NextResponse.json({ ok: true })
+    }
+
+    // 3. Identity Resolution
+    const { senderType, memberRecord } = await resolveSenderType(senderPhone, coachId)
+
+    // 5. Question Classification
+    const category = classifyMessage(messageText)
+
+    // Social messages — don't respond (emoji reactions, "thanks", etc.)
+    if (category === 'social') {
+      await logConversation({
+        programmeId,
+        coachId,
+        senderName,
+        senderIdentifier: senderPhone,
+        senderType,
+        channel: 'whatsapp_group',
+        messageText,
+        category,
+        botResponse: null as unknown as string,
+        botMode: botStatus,
+        escalated: false,
+      })
+      return NextResponse.json({ ok: true })
+    }
+
+    // Get coach phone for escalation DMs
+    let coachPhone = ''
+    try {
+      const coach = await findCoachById(coachId)
+      coachPhone = (coach?.mobile || '') as string
+    } catch {
+      // Continue without coach phone
+    }
+
+    // 6. Escalation Check — Immediate
+    if (IMMEDIATE_ESCALATION_CATEGORIES.includes(category)) {
+      await handleImmediateEscalation(category, senderName, messageText, coachName, coachPhone, groupJid)
+
+      await logConversation({
+        programmeId,
+        coachId,
+        senderName,
+        senderIdentifier: senderPhone,
+        senderType,
+        channel: 'whatsapp_group',
+        messageText,
+        category,
+        botResponse: 'Escalated to coach',
+        botMode: botStatus,
+        escalated: true,
+        escalationType: category,
+        memberId: (memberRecord?.id as string) || undefined,
+      })
+
+      return NextResponse.json({ ok: true })
+    }
+
+    // 7. Build System Prompt
+    const faqs = await listFaqsByProgramme(programmeId, 'active')
+    const systemPrompt = buildSystemPrompt(programme, faqs as Record<string, unknown>[], senderType, senderName)
     const messageWithContext = `${senderName} asks: ${messageText}`
 
-    const systemPrompt = buildSystemPrompt({
-      program_name: program.program_name,
-      coach_name: program.coach_name,
-      knowledgebase: program.knowledgebase as Knowledgebase,
-    })
-
+    // 8. Call Claude
     const reply = await askClaude(systemPrompt, messageWithContext)
 
+    // Observation mode — log but don't send
+    if (botStatus === 'observation') {
+      await logConversation({
+        programmeId,
+        coachId,
+        senderName,
+        senderIdentifier: senderPhone,
+        senderType,
+        channel: 'whatsapp_group',
+        messageText,
+        category,
+        botResponse: reply,
+        botMode: 'observation',
+        escalated: false,
+        memberId: (memberRecord?.id as string) || undefined,
+      })
+      return NextResponse.json({ ok: true })
+    }
+
+    // Live mode — send the reply
     await sendWhatsAppMessage(groupJid, reply)
+
+    // 6b. Soft Escalation — answer was sent, but flag the coach
+    if (SOFT_ESCALATION_CATEGORIES.includes(category)) {
+      await handleSoftEscalation(category, senderName, messageText, coachPhone, reply)
+    }
+
+    // 9. Log Everything
+    await logConversation({
+      programmeId,
+      coachId,
+      senderName,
+      senderIdentifier: senderPhone,
+      senderType,
+      channel: 'whatsapp_group',
+      messageText,
+      category,
+      botResponse: reply,
+      botMode: botStatus,
+      escalated: SOFT_ESCALATION_CATEGORIES.includes(category),
+      escalationType: SOFT_ESCALATION_CATEGORIES.includes(category) ? category : undefined,
+      memberId: (memberRecord?.id as string) || undefined,
+    })
+
+    // 10. FAQ Learning — if no FAQ matched, create a pending one
+    const hadFaqMatch = faqMatchesMessage(faqs as Record<string, unknown>[], messageText)
+    if (!hadFaqMatch && !IMMEDIATE_ESCALATION_CATEGORIES.includes(category)) {
+      await learnNewFaq(programmeId, messageText, reply, category)
+    }
 
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('WhatsApp webhook error:', error)
-    // Always return 200 to Evolution API so it doesn't retry endlessly
+    // Always return 200 so Evolution API doesn't retry endlessly
     return NextResponse.json({ ok: true })
   }
 }
