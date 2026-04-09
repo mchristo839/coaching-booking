@@ -381,7 +381,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // 1. Filter
-    if (body.event !== 'messages.upsert') {
+    const event = (body.event || '').toLowerCase()
+    if (event !== 'messages.upsert') {
       return NextResponse.json({ ok: true })
     }
 
