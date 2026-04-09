@@ -11,14 +11,20 @@ import Link from 'next/link'
 interface Programme {
   id: string
   programName: string
+  programmeName?: string
   whatsappGroupId: string | null
-  knowledgebase: Record<string, unknown> | null
   isActive: boolean
   createdAt: string
-  current_members?: number
-  max_capacity?: number
-  waitlist_count?: number
-  status?: string
+  currentMembers?: number
+  maxCapacity?: number
+  memberCount?: number
+  waitlistCount?: number
+  programmeStatus?: string
+  skillLevel?: string
+  targetAudience?: string
+  venueName?: string
+  sessionDays?: string[]
+  sessionStartTime?: string
 }
 
 interface TopCategory {
@@ -83,13 +89,13 @@ function capacityColor(percent: number): string {
 }
 
 function statusBadge(programme: Programme): { label: string; cls: string } {
-  const pct = capacityPercent(programme.current_members ?? 0, programme.max_capacity ?? 0)
-  if (programme.status) {
-    const s = programme.status.toLowerCase()
+  const pct = capacityPercent(programme.memberCount ?? programme.currentMembers ?? 0, programme.maxCapacity ?? 0)
+  if (programme.programmeStatus) {
+    const s = programme.programmeStatus.toLowerCase()
     if (s === 'full') return { label: 'Full', cls: 'bg-red-100 text-red-700' }
     if (s === 'almost full') return { label: 'Almost Full', cls: 'bg-amber-100 text-amber-700' }
     if (s === 'open') return { label: 'Open', cls: 'bg-green-100 text-green-700' }
-    return { label: programme.status, cls: 'bg-gray-100 text-gray-700' }
+    return { label: programme.programmeStatus || 'Open', cls: 'bg-gray-100 text-gray-700' }
   }
   if (pct >= 95) return { label: 'Full', cls: 'bg-red-100 text-red-700' }
   if (pct >= 80) return { label: 'Almost Full', cls: 'bg-amber-100 text-amber-700' }
@@ -388,19 +394,26 @@ export default function DashboardPage() {
             /* ---------- Programme list ---------- */
             <div className="grid gap-4 sm:grid-cols-2">
               {programmes.map((prog) => {
-                const current = prog.current_members ?? 0
-                const max = prog.max_capacity ?? 0
+                const current = prog.memberCount ?? prog.currentMembers ?? 0
+                const max = prog.maxCapacity ?? 0
                 const pct = capacityPercent(current, max)
                 const badge = statusBadge(prog)
                 const hasGroup = !!prog.whatsappGroupId
-                const hasKb = !!prog.knowledgebase
-                const isLive = hasGroup && hasKb
+                const isLive = hasGroup
+                const name = prog.programName || prog.programmeName || 'Untitled Programme'
 
                 return (
                   <div key={prog.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col">
                     {/* Top row: name + edit */}
                     <div className="flex justify-between items-start mb-3">
-                      <h3 className="font-semibold text-gray-900">{prog.programName}</h3>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{name}</h3>
+                        {(prog.skillLevel || prog.targetAudience || prog.venueName) && (
+                          <p className="text-sm text-gray-500 mt-0.5">
+                            {[prog.skillLevel, prog.targetAudience, prog.venueName].filter(Boolean).join(' · ')}
+                          </p>
+                        )}
+                      </div>
                       <Link
                         href={`/dashboard/programmes?edit=${prog.id}`}
                         className="text-[#3D8B37] text-sm font-medium hover:underline ml-3 whitespace-nowrap"
@@ -442,9 +455,9 @@ export default function DashboardPage() {
                         </span>
                       )}
 
-                      {(prog.waitlist_count ?? 0) > 0 && (
+                      {(prog.waitlistCount ?? 0) > 0 && (
                         <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                          {prog.waitlist_count} waitlisted
+                          {prog.waitlistCount} waitlisted
                         </span>
                       )}
 
