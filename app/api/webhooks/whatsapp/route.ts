@@ -439,7 +439,8 @@ export async function POST(request: NextRequest) {
     const coachId = programme.coach_id as string
     const coachName = `${programme.coach_first_name || ''} ${programme.coach_last_name || ''}`.trim()
     const programmeId = programme.id as string
-    const botStatus = (programme.whatsapp_bot_status as string) || 'not_yet_registered'
+    // For MVP, treat all coaches as live — observation mode is Phase 2
+    const botStatus = (programme.whatsapp_bot_status as string) || 'live'
 
     // Check if programme has enough data to operate
     if (!programme.programme_name) {
@@ -452,7 +453,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Check Bot Mode
-    if (botStatus === 'not_yet_registered' || botStatus === 'paused') {
+    if (botStatus === 'paused') {
       return NextResponse.json({ ok: true })
     }
 
