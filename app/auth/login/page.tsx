@@ -33,7 +33,15 @@ export default function LoginPage() {
       localStorage.setItem('coachId', data.coachId)
       localStorage.setItem('coachEmail', data.email)
       localStorage.setItem('coachName', data.name)
-      router.push('/dashboard')
+      if (data.providerId) localStorage.setItem('providerId', data.providerId)
+      if (data.tradingName) localStorage.setItem('tradingName', data.tradingName)
+
+      const status = data.registrationStatus
+      if (status !== 'complete' && status !== 'programme_added') {
+        router.push('/register')
+      } else {
+        router.push('/dashboard')
+      }
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {
@@ -45,7 +53,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4 py-12">
       <div className="bg-white rounded-xl shadow-sm w-full max-w-md p-6 md:p-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-          Coach Login
+          Log In to MyCoachingAssistant
         </h1>
 
         {error && (
@@ -65,7 +73,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent text-gray-900"
               placeholder="coach@example.com"
             />
           </div>
@@ -80,7 +88,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent text-gray-900"
               placeholder="Your password"
             />
           </div>
@@ -88,7 +96,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+            className="w-full bg-[#3D8B37] text-white py-3 rounded-lg font-medium hover:bg-[#346F2F] transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
           >
             {loading ? 'Logging in...' : 'Log In'}
           </button>
@@ -96,7 +104,7 @@ export default function LoginPage() {
 
         <p className="text-center text-sm text-gray-600 mt-6">
           Don&apos;t have an account?{' '}
-          <Link href="/auth/signup" className="text-blue-600 hover:underline">
+          <Link href="/register" className="text-[#3D8B37] hover:underline">
             Sign up
           </Link>
         </p>
