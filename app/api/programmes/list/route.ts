@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { listFaqsByProgramme } from '@/app/lib/db'
 import { sql } from '@vercel/postgres'
 
 export async function GET(request: NextRequest) {
@@ -11,8 +12,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Coach ID required' }, { status: 400 })
     }
 
-    // Direct query instead of going through db.ts — avoids any field mapping issues
-    const { rows } = await sql`
+    // Use sql.query() for consistent reads (template tag may use stale read replica)
+    const { rows } = await sql.query(`
       SELECT
         p.id,
         p.programme_name as "programmeName",
@@ -63,20 +64,23 @@ export async function GET(request: NextRequest) {
         (SELECT COUNT(*)::int FROM members m WHERE m.programme_id = p.id AND m.status = 'active') as "memberCount",
         (SELECT COUNT(*)::int FROM members m WHERE m.programme_id = p.id AND m.status = 'waitlisted') as "waitlistCount"
       FROM programmes p
-      WHERE p.coach_id = ${coachId} AND p.is_active = true
+      WHERE p.coach_id = $1 AND p.is_active = true
       ORDER BY p.created_at DESC
-    `
+    `, [coachId])
 
-    const programmes = rows
-
+    // Optionally include FAQs
     const includeFaqs = request.nextUrl.searchParams.get('includeFaqs') === 'true'
     if (includeFaqs) {
-      for (const prog of programmes) {
-        (prog as Record<string, unknown>).faqs = await listFaqsByProgramme(prog.id as string)
+      for (const prog of rows) {
+        const faqResult = await sql.query('SELECT * FROM faqs WHERE programme_id = $1 ORDER BY created_at', [prog.id])
+        ;(prog as Record<string, unknown>).faqs = faqResult.rows
       }
     }
 
-    return NextResponse.json({ programmes })
+    return NextResponse.json(
+      { programmes: rows },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' } }
+    )
   } catch (error) {
     console.error('List programmes error:', error)
     return NextResponse.json({ error: 'Failed to list programmes' }, { status: 500 })
