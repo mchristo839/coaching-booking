@@ -163,48 +163,58 @@ export async function createProgramme(data: ProgrammeData) {
 }
 
 export async function updateProgramme(programmeId: string, fields: Partial<ProgrammeData>) {
-  // Update individual fields that are provided
-  if (fields.programmeName !== undefined) await sql`UPDATE programmes SET programme_name = ${fields.programmeName}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.shortDescription !== undefined) await sql`UPDATE programmes SET short_description = ${fields.shortDescription || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.targetAudience !== undefined) await sql`UPDATE programmes SET target_audience = ${fields.targetAudience || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.specificAgeGroup !== undefined) await sql`UPDATE programmes SET specific_age_group = ${fields.specificAgeGroup || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.skillLevel !== undefined) await sql`UPDATE programmes SET skill_level = ${fields.skillLevel || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.programmeType !== undefined) await sql`UPDATE programmes SET programme_type = ${fields.programmeType || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.sessionStartTime !== undefined) await sql`UPDATE programmes SET session_start_time = ${fields.sessionStartTime || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.sessionDuration !== undefined) await sql`UPDATE programmes SET session_duration = ${fields.sessionDuration || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.sessionFrequency !== undefined) await sql`UPDATE programmes SET session_frequency = ${fields.sessionFrequency || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.holidaySchedule !== undefined) await sql`UPDATE programmes SET holiday_schedule = ${fields.holidaySchedule || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.cancellationNotice !== undefined) await sql`UPDATE programmes SET cancellation_notice = ${fields.cancellationNotice || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.venueName !== undefined) await sql`UPDATE programmes SET venue_name = ${fields.venueName || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.venueAddress !== undefined) await sql`UPDATE programmes SET venue_address = ${fields.venueAddress || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.parking !== undefined) await sql`UPDATE programmes SET parking = ${fields.parking || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.nearestTransport !== undefined) await sql`UPDATE programmes SET nearest_transport = ${fields.nearestTransport || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.indoorOutdoor !== undefined) await sql`UPDATE programmes SET indoor_outdoor = ${fields.indoorOutdoor || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.badWeatherPolicy !== undefined) await sql`UPDATE programmes SET bad_weather_policy = ${fields.badWeatherPolicy || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.maxCapacity !== undefined) await sql`UPDATE programmes SET max_capacity = ${fields.maxCapacity || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.programmeStatus !== undefined) await sql`UPDATE programmes SET programme_status = ${fields.programmeStatus || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.trialAvailable !== undefined) await sql`UPDATE programmes SET trial_available = ${fields.trialAvailable || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.trialInstructions !== undefined) await sql`UPDATE programmes SET trial_instructions = ${fields.trialInstructions || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.whatToBring !== undefined) await sql`UPDATE programmes SET what_to_bring = ${fields.whatToBring || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.paidOrFree !== undefined) await sql`UPDATE programmes SET paid_or_free = ${fields.paidOrFree || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.paymentModel !== undefined) await sql`UPDATE programmes SET payment_model = ${fields.paymentModel || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.priceGbp !== undefined) await sql`UPDATE programmes SET price_gbp = ${fields.priceGbp || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.priceIncludes !== undefined) await sql`UPDATE programmes SET price_includes = ${fields.priceIncludes || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.siblingDiscount !== undefined) await sql`UPDATE programmes SET sibling_discount = ${fields.siblingDiscount || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.refundPolicy !== undefined) await sql`UPDATE programmes SET refund_policy = ${fields.refundPolicy || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.refundDetails !== undefined) await sql`UPDATE programmes SET refund_details = ${fields.refundDetails || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.botNotes !== undefined) await sql`UPDATE programmes SET bot_notes = ${fields.botNotes || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.whatsappGroupId !== undefined) await sql`UPDATE programmes SET whatsapp_group_id = ${fields.whatsappGroupId || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.fullThreshold !== undefined) await sql`UPDATE programmes SET full_threshold = ${fields.fullThreshold || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.waitlistEnabled !== undefined) await sql`UPDATE programmes SET waitlist_enabled = ${fields.waitlistEnabled}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.referralTrigger !== undefined) await sql`UPDATE programmes SET referral_trigger = ${fields.referralTrigger || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.referralIncentive !== undefined) await sql`UPDATE programmes SET referral_incentive = ${fields.referralIncentive || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.equipmentProvided !== undefined) await sql`UPDATE programmes SET equipment_provided = ${fields.equipmentProvided || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.kitRequired !== undefined) await sql`UPDATE programmes SET kit_required = ${fields.kitRequired || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.kitDetails !== undefined) await sql`UPDATE programmes SET kit_details = ${fields.kitDetails || null}, updated_at = NOW() WHERE id = ${programmeId}`
-  if (fields.paymentReminderSchedule !== undefined) await sql`UPDATE programmes SET payment_reminder_schedule = ${fields.paymentReminderSchedule || null}, updated_at = NOW() WHERE id = ${programmeId}`
+  // Single UPDATE with all fields — converts empty strings to null, formats arrays for Postgres
+  const v = (val: string | undefined | null) => val && val.trim() ? val.trim() : null
+  const days = fields.sessionDays && fields.sessionDays.length > 0 ? `{${fields.sessionDays.join(',')}}` : null
+  const methods = fields.paymentMethods && fields.paymentMethods.length > 0 ? `{${fields.paymentMethods.join(',')}}` : null
 
-  const { rows } = await sql`SELECT * FROM programmes WHERE id = ${programmeId}`
+  const { rows } = await sql`
+    UPDATE programmes SET
+      programme_name = COALESCE(${fields.programmeName ?? null}, programme_name),
+      short_description = ${v(fields.shortDescription)},
+      target_audience = ${v(fields.targetAudience)},
+      specific_age_group = ${v(fields.specificAgeGroup)},
+      skill_level = ${v(fields.skillLevel)},
+      programme_type = ${v(fields.programmeType)},
+      session_days = COALESCE(${days}, session_days),
+      session_start_time = ${v(fields.sessionStartTime)},
+      session_duration = ${v(fields.sessionDuration)},
+      session_frequency = ${v(fields.sessionFrequency)},
+      holiday_schedule = ${v(fields.holidaySchedule)},
+      cancellation_notice = ${v(fields.cancellationNotice)},
+      venue_name = ${v(fields.venueName)},
+      venue_address = ${v(fields.venueAddress)},
+      parking = ${v(fields.parking)},
+      nearest_transport = ${v(fields.nearestTransport)},
+      indoor_outdoor = ${v(fields.indoorOutdoor)},
+      bad_weather_policy = ${v(fields.badWeatherPolicy)},
+      max_capacity = ${fields.maxCapacity !== undefined ? fields.maxCapacity : null},
+      full_threshold = ${v(fields.fullThreshold) || 'at_100'},
+      waitlist_enabled = ${fields.waitlistEnabled ?? true},
+      referral_trigger = ${v(fields.referralTrigger)},
+      referral_incentive = ${v(fields.referralIncentive)},
+      programme_status = ${v(fields.programmeStatus) || 'open'},
+      trial_available = ${v(fields.trialAvailable)},
+      trial_instructions = ${v(fields.trialInstructions)},
+      what_to_bring = ${v(fields.whatToBring)},
+      equipment_provided = ${v(fields.equipmentProvided)},
+      kit_required = ${v(fields.kitRequired)},
+      kit_details = ${v(fields.kitDetails)},
+      paid_or_free = ${v(fields.paidOrFree) || 'paid'},
+      payment_model = ${v(fields.paymentModel)},
+      price_gbp = ${fields.priceGbp !== undefined ? fields.priceGbp : null},
+      price_includes = ${v(fields.priceIncludes)},
+      sibling_discount = ${v(fields.siblingDiscount)},
+      refund_policy = ${v(fields.refundPolicy)},
+      refund_details = ${v(fields.refundDetails)},
+      payment_methods = COALESCE(${methods}, payment_methods),
+      payment_reminder_schedule = ${v(fields.paymentReminderSchedule)},
+      bot_notes = ${v(fields.botNotes)},
+      whatsapp_group_id = COALESCE(${v(fields.whatsappGroupId)}, whatsapp_group_id),
+      updated_at = NOW()
+    WHERE id = ${programmeId}
+    RETURNING *
+  `
   return rows[0]
 }
 
