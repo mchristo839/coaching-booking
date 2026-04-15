@@ -1,13 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
+import { getAuthFromRequest } from '@/app/lib/auth'
 
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const coachId = auth.coachId
+    if (!coachId) {
+      return NextResponse.json({ error: 'No coach profile linked' }, { status: 400 })
+    }
+
     const body = await request.json()
     const { programmeId, ...fields } = body
 
     if (!programmeId) {
       return NextResponse.json({ error: 'Programme ID required' }, { status: 400 })
+    }
+
+    // Verify ownership
+    const { rows: ownerCheck } = await sql`SELECT id FROM programmes WHERE id = ${programmeId} AND coach_id = ${coachId}`
+    if (ownerCheck.length === 0) {
+      return NextResponse.json({ error: 'Programme not found or access denied' }, { status: 403 })
     }
 
     // Build SET clauses dynamically — direct SQL to avoid any abstraction issues

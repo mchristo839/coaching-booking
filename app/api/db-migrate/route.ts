@@ -201,6 +201,17 @@ export async function POST() {
       )
     `
 
+    // ── 10. Bot Replies (rate limiting auto-replies) ──
+    await sql`
+      CREATE TABLE IF NOT EXISTS bot_replies (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        group_jid VARCHAR(50) NOT NULL,
+        reply_type VARCHAR(30) NOT NULL,
+        sent_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_bot_replies_lookup ON bot_replies (group_jid, reply_type, sent_at)`
+
     // ── Migrate existing data from old tables ──
     const oldCoachesExist = await sql`
       SELECT EXISTS (
@@ -269,7 +280,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: `Migration complete. 9 tables created. ${migrated} coach(es) migrated.`
+      message: `Migration complete. 10 tables created. ${migrated} coach(es) migrated.`
     })
   } catch (error) {
     console.error('Migration error:', error)

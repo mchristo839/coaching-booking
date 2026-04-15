@@ -226,7 +226,7 @@ export default function DashboardPage() {
     try {
       const [statsRes, progsRes] = await Promise.all([
         fetch(`/api/dashboard/stats?coachId=${encodeURIComponent(coachId)}`),
-        fetch(`/api/programmes/list?coachId=${encodeURIComponent(coachId)}`),
+        fetch('/api/programmes/list'),
       ])
 
       if (statsRes.ok) {
@@ -260,7 +260,8 @@ export default function DashboardPage() {
 
   /* ---------- handlers ---------- */
 
-  function handleLogout() {
+  async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
     localStorage.removeItem('coachId')
     localStorage.removeItem('coachEmail')
     localStorage.removeItem('coachName')

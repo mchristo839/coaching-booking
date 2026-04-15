@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { createProvider, findProviderByEmail } from '@/app/lib/db'
+import { signJwt, setAuthCookie } from '@/app/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,13 +30,17 @@ export async function POST(request: NextRequest) {
       referralSource,
     })
 
-    return NextResponse.json({
+    // Sign JWT and set HTTP-only cookie
+    const token = await signJwt(provider.id)
+    const response = NextResponse.json({
       success: true,
       providerId: provider.id,
       email: provider.email,
       firstName: provider.first_name,
       lastName: provider.last_name,
     })
+    setAuthCookie(response, token)
+    return response
   } catch (error) {
     console.error('Registration error:', error)
     return NextResponse.json({ error: 'Registration failed' }, { status: 500 })

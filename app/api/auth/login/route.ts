@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { findProviderByEmail, findCoachByProviderId } from '@/app/lib/db'
+import { signJwt, setAuthCookie } from '@/app/lib/auth'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
@@ -23,7 +24,9 @@ export async function POST(request: NextRequest) {
     // Find the coach record linked to this provider
     const coach = await findCoachByProviderId(provider.id)
 
-    return NextResponse.json({
+    // Sign JWT and set HTTP-only cookie
+    const token = await signJwt(provider.id, coach?.id || undefined)
+    const response = NextResponse.json({
       success: true,
       providerId: provider.id,
       coachId: coach?.id || null,
@@ -32,6 +35,8 @@ export async function POST(request: NextRequest) {
       tradingName: provider.trading_name,
       registrationStatus: provider.registration_status,
     })
+    setAuthCookie(response, token)
+    return response
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json({ error: 'Login failed. Please try again.' }, { status: 500 })
