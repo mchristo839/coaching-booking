@@ -1,6 +1,6 @@
-// app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { findCoachByEmail } from '@/app/lib/db'
+import { signJwt, setAuthCookie } from '@/app/lib/auth'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
@@ -32,12 +32,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({
+    const token = await signJwt(coach.id)
+    const response = NextResponse.json({
       success: true,
       coachId: coach.id,
       email: coach.email,
       name: coach.name,
     })
+    return setAuthCookie(response, token)
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(

@@ -1,17 +1,12 @@
-// app/api/programs/list/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { listProgramsByCoach } from '@/app/lib/db'
+import { getCoachIdFromRequest } from '@/app/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const coachId = searchParams.get('coachId')
-
+    const coachId = await getCoachIdFromRequest(request)
     if (!coachId) {
-      return NextResponse.json(
-        { error: 'coachId is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
     const rows = await listProgramsByCoach(coachId)

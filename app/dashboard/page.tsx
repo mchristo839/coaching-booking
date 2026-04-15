@@ -19,25 +19,26 @@ export default function DashboardPage() {
   const [programs, setPrograms] = useState<Program[]>([])
   const [loading, setLoading] = useState(true)
 
-  const fetchPrograms = useCallback(async (id: string) => {
+  const fetchPrograms = useCallback(async () => {
     try {
-      const res = await fetch(`/api/programs/list?coachId=${encodeURIComponent(id)}`)
+      const res = await fetch('/api/programs/list')
+      if (res.status === 401) { router.push('/auth/login'); return }
       const data = await res.json()
       if (res.ok) setPrograms(data.programs || [])
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [router])
 
   useEffect(() => {
-    const id = localStorage.getItem('coachId')
     const name = localStorage.getItem('coachName')
-    if (!id) { router.push('/auth/login'); return }
+    if (!name) { router.push('/auth/login'); return }
     setCoachName(name || 'Coach')
-    fetchPrograms(id)
+    fetchPrograms()
   }, [router, fetchPrograms])
 
-  function handleLogout() {
+  async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' })
     localStorage.removeItem('coachId')
     localStorage.removeItem('coachEmail')
     localStorage.removeItem('coachName')

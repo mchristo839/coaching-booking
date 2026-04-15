@@ -52,7 +52,6 @@ type View = 'list' | 'create' | 'edit'
 
 export default function ProgramsPage() {
   const router = useRouter()
-  const [coachId, setCoachId] = useState<string | null>(null)
   const [programs, setPrograms] = useState<Program[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -67,9 +66,10 @@ export default function ProgramsPage() {
   const [whatsappGroupId, setWhatsappGroupId] = useState('')
   const [priceInput, setPriceInput] = useState('')
 
-  const fetchPrograms = useCallback(async (id: string) => {
+  const fetchPrograms = useCallback(async () => {
     try {
-      const res = await fetch(`/api/programs/list?coachId=${encodeURIComponent(id)}`)
+      const res = await fetch('/api/programs/list')
+      if (res.status === 401) { router.push('/auth/login'); return }
       const data = await res.json()
       if (res.ok) {
         setPrograms(
@@ -88,13 +88,12 @@ export default function ProgramsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [router])
 
   useEffect(() => {
-    const id = localStorage.getItem('coachId')
-    if (!id) { router.push('/auth/login'); return }
-    setCoachId(id)
-    fetchPrograms(id)
+    const name = localStorage.getItem('coachName')
+    if (!name) { router.push('/auth/login'); return }
+    fetchPrograms()
   }, [router, fetchPrograms])
 
   function openCreate() {
@@ -141,7 +140,6 @@ export default function ProgramsPage() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
-    if (!coachId) return
     setSaving(true)
     setError('')
 
@@ -154,7 +152,7 @@ export default function ProgramsPage() {
       const res = await fetch('/api/programs/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coachId, programName, knowledgebase }),
+        body: JSON.stringify({ programName, knowledgebase }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Failed to create program'); return }
@@ -170,7 +168,7 @@ export default function ProgramsPage() {
 
       setSuccessMsg(`"${programName}" created. Your WhatsApp bot is ready for this programme.`)
       setView('list')
-      fetchPrograms(coachId)
+      fetchPrograms()
     } catch {
       setError('Failed to create program')
     } finally {
@@ -205,7 +203,7 @@ export default function ProgramsPage() {
 
       setSuccessMsg('Programme updated. The bot knowledgebase is live immediately.')
       setView('list')
-      if (coachId) fetchPrograms(coachId)
+      fetchPrograms()
     } catch {
       setError('Failed to update program')
     } finally {

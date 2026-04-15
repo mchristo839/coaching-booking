@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createProgram, type Knowledgebase } from '@/app/lib/db'
+import { getCoachIdFromRequest } from '@/app/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const { coachId, programName, knowledgebase } = await request.json()
+    const coachId = await getCoachIdFromRequest(request)
+    if (!coachId) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
 
-    if (!coachId || !programName) {
+    const { programName, knowledgebase } = await request.json()
+
+    if (!programName) {
       return NextResponse.json(
-        { error: 'coachId and programName are required' },
+        { error: 'programName is required' },
         { status: 400 }
       )
     }
