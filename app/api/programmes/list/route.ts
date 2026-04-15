@@ -4,12 +4,17 @@ export const fetchCache = 'force-no-store'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
+import { getAuthFromRequest } from '@/app/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
-    const coachId = request.nextUrl.searchParams.get('coachId')
+    const auth = await getAuthFromRequest(request)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const coachId = auth.coachId
     if (!coachId) {
-      return NextResponse.json({ error: 'Coach ID required' }, { status: 400 })
+      return NextResponse.json({ error: 'No coach profile linked' }, { status: 400 })
     }
 
     // Use sql.query() for consistent reads (template tag may use stale read replica)

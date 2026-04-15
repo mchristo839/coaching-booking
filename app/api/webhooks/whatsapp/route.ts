@@ -2,6 +2,43 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 
+const WEBHOOK_SECRET = process.env.EVOLUTION_WEBHOOK_SECRET || ''
+const BOT_JID = process.env.BOT_JID || ''
+
+// ─── HMAC Signature Verification ───
+
+async function verifyWebhookSignature(rawBody: string, signature: string | null): Promise<boolean> {
+  if (!WEBHOOK_SECRET || !signature) return !WEBHOOK_SECRET // skip if not configured
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(WEBHOOK_SECRET),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    )
+    const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody))
+    const computed = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('')
+    return computed === signature.replace(/^sha256=/, '')
+  } catch {
+    return false
+  }
+}
+
+// ─── Bot Reply Rate Limiting ───
+
+async function canSendBotReply(groupJid: string, replyType: string, cooldownMinutes = 60): Promise<boolean> {
+  const { rows } = await sql.query(
+    "SELECT id FROM bot_replies WHERE group_jid = $1 AND reply_type = $2 AND sent_at > NOW() - ($3 || ' minutes')::INTERVAL LIMIT 1",
+    [groupJid, replyType, cooldownMinutes.toString()]
+  )
+  return rows.length === 0
+}
+
+async function recordBotReply(groupJid: string, replyType: string): Promise<void> {
+  await sql.query('INSERT INTO bot_replies (group_jid, reply_type) VALUES ($1, $2)', [groupJid, replyType])
+}
+
 // Use sql.query() everywhere to avoid stale Neon read replica issues
 async function findProgrammeByGroup(groupJid: string) {
   const { rows } = await sql.query(`
@@ -471,6 +508,106 @@ async function handleSoftEscalation(
   }
 }
 
+// ─── Coach Auto-Learning ───
+
+async function getRecentConversations(groupJid: string, limit = 20) {
+  const { rows } = await sql.query(
+    'SELECT sender_name, sender_type, message_text, created_at FROM conversations WHERE programme_id IN (SELECT id FROM programmes WHERE whatsapp_group_id = $1) ORDER BY created_at DESC LIMIT $2',
+    [groupJid, limit]
+  )
+  return rows.reverse()
+}
+
+async function extractCoachLearning(
+  programmeId: string,
+  coachMessage: string,
+  recentMessages: Record<string, unknown>[],
+): Promise<void> {
+  try {
+    // Build context from recent messages to find what question the coach is answering
+    const context = recentMessages
+      .slice(-10)
+      .map((m) => `${m.sender_name} (${m.sender_type}): ${m.message_text}`)
+      .join('\n')
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        system: 'You extract Q&A pairs from coaching group conversations. When a coach answers a parent question, extract a clean FAQ. Respond ONLY with valid JSON: {"question":"...", "answer":"..."} or {"skip":true} if the coach message is not answering a question.',
+        messages: [{
+          role: 'user',
+          content: `Recent messages:\n${context}\n\nCoach just said: "${coachMessage}"\n\nExtract the Q&A pair if the coach is answering a question. Return JSON only.`,
+        }],
+      }),
+    })
+
+    if (!res.ok) return
+
+    const data = await res.json()
+    const text = data.content?.[0]?.text || ''
+    const parsed = JSON.parse(text)
+    if (parsed.skip || !parsed.question || !parsed.answer) return
+
+    await savePendingFaq(programmeId, parsed.question, parsed.answer, 'learned')
+  } catch {
+    // Silent — learning is best-effort
+  }
+}
+
+async function batchLearnFromMessages(
+  programmeId: string,
+  groupJid: string,
+): Promise<string> {
+  try {
+    const messages = await getRecentConversations(groupJid, 20)
+    if (messages.length < 2) return 'Not enough messages to learn from yet.'
+
+    const context = messages
+      .map((m) => `${m.sender_name} (${m.sender_type}): ${m.message_text}`)
+      .join('\n')
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1000,
+        system: 'Extract all Q&A pairs from this coaching group conversation where parents asked questions and the coach answered. Return a JSON array: [{"question":"...", "answer":"..."}]. If no Q&A pairs found, return [].',
+        messages: [{ role: 'user', content: context }],
+      }),
+    })
+
+    if (!res.ok) return 'Failed to process messages.'
+
+    const data = await res.json()
+    const text = data.content?.[0]?.text || '[]'
+    const pairs = JSON.parse(text)
+    if (!Array.isArray(pairs) || pairs.length === 0) return 'No new Q&A pairs found in recent messages.'
+
+    let saved = 0
+    for (const pair of pairs) {
+      if (pair.question && pair.answer) {
+        await savePendingFaq(programmeId, pair.question, pair.answer, 'learned')
+        saved++
+      }
+    }
+    return `Found ${saved} Q&A pair${saved !== 1 ? 's' : ''} from recent messages. Check your Learning Log to review and approve them.`
+  } catch {
+    return 'Something went wrong while learning. Try again later.'
+  }
+}
+
 // ─── FAQ Learning ───
 
 async function learnNewFaq(
@@ -768,7 +905,16 @@ async function handleStartWhatsAppSignup(
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    // ─── HMAC Signature Verification ───
+    const rawBody = await request.text()
+    const signature = request.headers.get('x-evox-signature')
+    if (WEBHOOK_SECRET) {
+      const valid = await verifyWebhookSignature(rawBody, signature)
+      if (!valid) {
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+      }
+    }
+    const body = JSON.parse(rawBody)
 
     // 1. Filter
     const event = (body.event || '').toLowerCase()
@@ -886,10 +1032,13 @@ export async function POST(request: NextRequest) {
 
     if (!programme) {
       console.log(`Unlinked group message from ${groupJid}, instance ${instance}`)
-      await sendWhatsAppMessage(
-        groupJid,
-        `👋 Hi! I'm your coaching assistant. To activate me for this group, go to your dashboard and paste in this group ID:\n\n*${groupJid}*`,
-      )
+      if (await canSendBotReply(groupJid, 'unlinked', 60)) {
+        await sendWhatsAppMessage(
+          groupJid,
+          `👋 Hi! I'm your coaching assistant. To activate me for this group, go to your dashboard and paste in this group ID:\n\n*${groupJid}*`,
+        )
+        await recordBotReply(groupJid, 'unlinked')
+      }
       return NextResponse.json({ ok: true })
     }
 
@@ -900,10 +1049,13 @@ export async function POST(request: NextRequest) {
 
     if (!programme.programme_name) {
       console.log(`Programme ${programmeId} has no data configured, skipping`)
-      await sendWhatsAppMessage(
-        groupJid,
-        `👋 I'm connected to this group but haven't been set up yet. ${coachName}, please go to your dashboard and fill in the programme details to activate me.`,
-      )
+      if (await canSendBotReply(groupJid, 'no_config', 60)) {
+        await sendWhatsAppMessage(
+          groupJid,
+          `👋 I'm connected to this group but haven't been set up yet. ${coachName}, please go to your dashboard and fill in the programme details to activate me.`,
+        )
+        await recordBotReply(groupJid, 'no_config')
+      }
       return NextResponse.json({ ok: true })
     }
 
@@ -915,16 +1067,46 @@ export async function POST(request: NextRequest) {
     const coachMobile = (programme.coach_mobile as string) || ''
     const { senderType, memberRecord } = await resolveSenderType(senderPhone, coachMobile)
 
+    // Log ALL messages for conversation context
+    await logConvo({
+      programmeId, coachId, senderName, senderIdentifier: senderPhone, senderType,
+      channel: 'whatsapp_group', messageText, category: classifyMessage(messageText),
+      botMode: botStatus, escalated: false,
+      memberId: (memberRecord?.id as string) || undefined,
+    })
+
+    // ─── Coach message handling ───
+    if (senderType === 'known_coach') {
+      // !learn command: batch extract Q&A from recent messages
+      if (messageText.trim().toLowerCase() === '!learn') {
+        const result = await batchLearnFromMessages(programmeId, groupJid)
+        await sendWhatsAppMessage(groupJid, result)
+        return NextResponse.json({ ok: true })
+      }
+
+      // Auto-learn from coach responses (silent)
+      const recentMessages = await getRecentConversations(groupJid, 10)
+      extractCoachLearning(programmeId, messageText, recentMessages).catch(() => {})
+
+      return NextResponse.json({ ok: true })
+    }
+
+    // ─── @mention check: only respond if bot is mentioned ───
+    const mentionedJids: string[] = data?.message?.extendedTextMessage?.contextInfo?.mentionedJid || []
+    const botPhone = BOT_JID.split('@')[0]
+    const isMentioned = mentionedJids.includes(BOT_JID) ||
+      (botPhone && messageText.includes(`@${botPhone}`))
+
+    if (!isMentioned) {
+      // Not mentioned — don't respond, message is already logged above
+      return NextResponse.json({ ok: true })
+    }
+
     // 5. Question Classification
     const category = classifyMessage(messageText)
 
     // Social messages — don't respond
     if (category === 'social') {
-      await logConvo({
-        programmeId, coachId, senderName, senderIdentifier: senderPhone, senderType,
-        channel: 'whatsapp_group', messageText, category, botResponse: null as unknown as string,
-        botMode: botStatus, escalated: false,
-      })
       return NextResponse.json({ ok: true })
     }
 
@@ -933,49 +1115,44 @@ export async function POST(request: NextRequest) {
     // 6. Escalation Check — Immediate
     if (IMMEDIATE_ESCALATION_CATEGORIES.includes(category)) {
       await handleImmediateEscalation(category, senderName, messageText, coachName, coachPhone, groupJid)
-      await logConvo({
-        programmeId, coachId, senderName, senderIdentifier: senderPhone, senderType,
-        channel: 'whatsapp_group', messageText, category, botResponse: 'Escalated to coach',
-        botMode: botStatus, escalated: true, escalationType: category,
-        memberId: (memberRecord?.id as string) || undefined,
-      })
       return NextResponse.json({ ok: true })
     }
 
-    // 7. Build System Prompt & Call Claude
+    // 7. Build System Prompt & Call Claude (with conversation context)
     const faqs = await getFaqs(programmeId)
+    const recentContext = await getRecentConversations(groupJid, 15)
+    const contextLines = recentContext
+      .map((m) => `${m.sender_name}: ${m.message_text}`)
+      .join('\n')
+
     const systemPrompt = buildSystemPrompt(programme, faqs as Record<string, unknown>[], senderType, senderName)
+    const systemWithContext = contextLines
+      ? `${systemPrompt}\n\nRECENT CONVERSATION:\n${contextLines}`
+      : systemPrompt
     const messageWithContext = `${senderName} asks: ${messageText}`
-    const reply = await askClaude(systemPrompt, messageWithContext)
+    const reply = await askClaude(systemWithContext, messageWithContext)
 
     // Observation mode
     if (botStatus === 'observation') {
-      await logConvo({
-        programmeId, coachId, senderName, senderIdentifier: senderPhone, senderType,
-        channel: 'whatsapp_group', messageText, category, botResponse: reply,
-        botMode: 'observation', escalated: false, memberId: (memberRecord?.id as string) || undefined,
-      })
       return NextResponse.json({ ok: true })
     }
 
     // Live mode — send reply
     await sendWhatsAppMessage(groupJid, reply)
 
+    // Log bot response
+    await logConvo({
+      programmeId, coachId, senderName: 'Bot', senderIdentifier: BOT_JID,
+      senderType: 'bot', channel: 'whatsapp_group', messageText: reply,
+      category, botResponse: reply, botMode: botStatus, escalated: false,
+    })
+
     // Soft escalation
     if (SOFT_ESCALATION_CATEGORIES.includes(category)) {
       await handleSoftEscalation(category, senderName, messageText, coachPhone)
     }
 
-    // 9. Log
-    await logConvo({
-      programmeId, coachId, senderName, senderIdentifier: senderPhone, senderType,
-      channel: 'whatsapp_group', messageText, category, botResponse: reply,
-      botMode: botStatus, escalated: SOFT_ESCALATION_CATEGORIES.includes(category),
-      escalationType: SOFT_ESCALATION_CATEGORIES.includes(category) ? category : undefined,
-      memberId: (memberRecord?.id as string) || undefined,
-    })
-
-    // 10. FAQ Learning
+    // FAQ Learning
     const hadFaqMatch = faqMatchesMessage(faqs as Record<string, unknown>[], messageText)
     if (!hadFaqMatch && !IMMEDIATE_ESCALATION_CATEGORIES.includes(category)) {
       await learnNewFaq(programmeId, messageText, reply, category)

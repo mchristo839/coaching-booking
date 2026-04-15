@@ -273,9 +273,10 @@ function ProgrammesPageInner() {
 
   /* ---------- Fetch ---------- */
 
-  const fetchProgrammes = useCallback(async (cId: string) => {
+  const fetchProgrammes = useCallback(async () => {
     try {
-      const res = await fetch(`/api/programmes/list?coachId=${encodeURIComponent(cId)}&includeFaqs=true`)
+      const res = await fetch('/api/programmes/list?includeFaqs=true')
+      if (res.status === 401) { router.push('/auth/login'); return }
       if (res.ok) {
         const data = await res.json()
         setProgrammes(data.programmes ?? [])
@@ -285,7 +286,7 @@ function ProgrammesPageInner() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [router])
 
   useEffect(() => {
     const id = localStorage.getItem('coachId')
@@ -294,7 +295,7 @@ function ProgrammesPageInner() {
       return
     }
     setCoachId(id)
-    fetchProgrammes(id)
+    fetchProgrammes()
   }, [router, fetchProgrammes])
 
   // Handle ?edit=programmeId in URL
@@ -495,7 +496,6 @@ function ProgrammesPageInner() {
     setError('')
 
     const body: Record<string, unknown> = {
-      coachId,
       programmeName: form.programmeName.trim(),
       shortDescription: form.shortDescription || undefined,
       targetAudience: form.targetAudience || undefined,
@@ -561,7 +561,7 @@ function ProgrammesPageInner() {
       }
       setSuccessMsg(`"${form.programmeName}" created successfully. Your bot is ready.`)
       setView('list')
-      fetchProgrammes(coachId)
+      fetchProgrammes()
     } catch {
       setError('Failed to create programme')
     } finally {
@@ -635,7 +635,7 @@ function ProgrammesPageInner() {
       }
       setSuccessMsg('Programme updated. Changes are live immediately.')
       setView('list')
-      fetchProgrammes(coachId)
+      fetchProgrammes()
       router.replace('/dashboard/programmes', { scroll: false })
     } catch {
       setError('Failed to update programme')

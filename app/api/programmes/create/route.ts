@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createProgramme, createFaqsBulk, updateProvider, findCoachById, type ProgrammeData } from '@/app/lib/db'
+import { getAuthFromRequest } from '@/app/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const coachId = auth.coachId
+    if (!coachId) {
+      return NextResponse.json({ error: 'No coach profile linked' }, { status: 400 })
+    }
+
     const body = await request.json()
-    const { coachId, faqs, ...rest } = body
+    const { faqs, ...rest } = body
 
     // Accept both 'programmeName' and 'name' for flexibility
     const programmeName = rest.programmeName || rest.name
-    if (!coachId || !programmeName) {
-      return NextResponse.json({ error: 'Coach ID and programme name are required' }, { status: 400 })
+    if (!programmeName) {
+      return NextResponse.json({ error: 'Programme name is required' }, { status: 400 })
     }
 
     // Map registration form field names → db field names
