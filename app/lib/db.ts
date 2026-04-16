@@ -482,3 +482,200 @@ export async function getDashboardStats(coachId: string) {
   `
   return rows[0]
 }
+
+// ═══════════════════════════════════════════════════════════
+// Week 1 operational functions
+// ═══════════════════════════════════════════════════════════
+
+// ─── Backward-compat wrappers for webhook handler ───
+
+export interface Knowledgebase {
+  sport: string
+  venue: string
+  venueAddress: string
+  ageGroup: string
+  skillLevel: string
+  schedule: string
+  priceCents: number
+  whatToBring: string
+  cancellationPolicy: string
+  medicalInfo: string
+  coachBio: string
+  customFaqs: { q: string; a: string }[]
+}
+
+export async function findProgramByWhatsAppGroup(whatsappGroupId: string) {
+  const result = await findProgrammeByWhatsAppGroup(whatsappGroupId)
+  if (!result) return null
+
+  // Build a knowledgebase object from V2 individual columns + FAQs
+  const { rows: faqRows } = await sql`
+    SELECT question, answer FROM faqs
+    WHERE programme_id = ${result.id} AND status = 'active'
+  `
+
+  const knowledgebase: Knowledgebase = {
+    sport: result.target_audience || '',
+    venue: result.venue_name || '',
+    venueAddress: result.venue_address || '',
+    ageGroup: result.specific_age_group || '',
+    skillLevel: result.skill_level || '',
+    schedule: result.session_days
+      ? `${(result.session_days || []).join(', ')} ${result.session_start_time || ''} (${result.session_duration || ''})`
+      : '',
+    priceCents: result.price_gbp ? Math.round(Number(result.price_gbp) * 100) : 0,
+    whatToBring: result.what_to_bring || '',
+    cancellationPolicy: result.cancellation_notice || '',
+    medicalInfo: result.bot_notes || '',
+    coachBio: result.short_description || '',
+    customFaqs: faqRows.map((f) => ({ q: String(f.question || ''), a: String(f.answer || '') })),
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapped: any = { ...result }
+  mapped.program_name = result.programme_name
+  mapped.coach_name = `${result.coach_first_name} ${result.coach_last_name}`.trim()
+  mapped.coach_email = result.coach_email
+  mapped.knowledgebase = knowledgebase
+  return mapped
+}
+
+// ─── Conversation logging ───
+
+export interface ConversationRow {
+  programmeId?: string | null
+  groupJid: string
+  senderJid?: string | null
+  senderName?: string | null
+  messageText: string
+  botResponse?: string | null
+  category?: string | null
+  escalated?: boolean
+}
+
+export async function safeLogConversation(
+  row: ConversationRow
+): Promise<{ success: boolean; conversationId?: string; error?: string }> {
+  try {
+    console.log('[LOG] Inserting conversation:', {
+      groupJid: row.groupJid,
+      senderName: row.senderName,
+      category: row.category,
+      escalated: row.escalated,
+      hasResponse: !!row.botResponse,
+    })
+
+    const { rows } = await sql`
+      INSERT INTO conversations (
+        programme_id, group_jid, sender_identifier, sender_name,
+        message_text, bot_response, category, escalated, channel
+      ) VALUES (
+        ${row.programmeId ?? null},
+        ${row.groupJid},
+        ${row.senderJid ?? null},
+        ${row.senderName ?? null},
+        ${row.messageText},
+        ${row.botResponse ?? null},
+        ${row.category ?? null},
+        ${row.escalated ?? false},
+        'whatsapp'
+      )
+      RETURNING id
+    `
+
+    const id = rows[0]?.id
+    console.log('[LOG] Conversation logged, id:', id)
+    return { success: true, conversationId: id }
+  } catch (error) {
+    console.error('[LOG-ERROR] Failed to log conversation:', error, row)
+    return { success: false, error: String(error) }
+  }
+}
+
+// ─── Message Dedup ───
+
+export async function isMessageProcessed(messageId: string): Promise<boolean> {
+  try {
+    const { rows } = await sql`
+      SELECT message_id FROM processed_messages WHERE message_id = ${messageId} LIMIT 1
+    `
+    if (rows.length > 0) return true
+    await sql`INSERT INTO processed_messages (message_id) VALUES (${messageId}) ON CONFLICT (message_id) DO NOTHING`
+    return false
+  } catch (error) {
+    console.error('[LOG-ERROR] Message dedup check failed:', error)
+    return false
+  }
+}
+
+// ─── Bot Reply Tracking ───
+
+export async function trackBotReply(
+  groupJid: string,
+  replyType: string,
+  messageId?: string
+): Promise<{ isDuplicate: boolean }> {
+  try {
+    const { rows } = await sql`
+      SELECT id FROM bot_replies
+      WHERE group_jid = ${groupJid} AND reply_type = ${replyType} AND sent_at > NOW() - INTERVAL '10 seconds'
+      LIMIT 1
+    `
+    if (rows.length > 0) {
+      console.log(`[SKIP-DUPLICATE] Duplicate bot reply detected: ${groupJid} ${replyType}`)
+      return { isDuplicate: true }
+    }
+    await sql`INSERT INTO bot_replies (group_jid, reply_type, message_id) VALUES (${groupJid}, ${replyType}, ${messageId ?? null})`
+    return { isDuplicate: false }
+  } catch (error) {
+    console.error('[LOG-ERROR] Bot reply tracking failed:', error)
+    return { isDuplicate: false }
+  }
+}
+
+export async function cleanupProcessedMessages(): Promise<number> {
+  const { rowCount } = await sql`DELETE FROM processed_messages WHERE processed_at < NOW() - INTERVAL '24 hours'`
+  return rowCount ?? 0
+}
+
+// ─── Invite Codes ───
+
+export async function createInviteCode(code: string, createdBy: string, maxUses: number, expiresAt: string | null, notes: string | null) {
+  const { rows } = await sql`INSERT INTO invite_codes (code, created_by, max_uses, expires_at, notes) VALUES (${code}, ${createdBy}, ${maxUses}, ${expiresAt}, ${notes}) RETURNING *`
+  return rows[0]
+}
+
+export async function listInviteCodes() {
+  const { rows } = await sql`SELECT * FROM invite_codes ORDER BY created_at DESC`
+  return rows
+}
+
+export async function validateInviteCode(code: string): Promise<{ valid: boolean; error?: string }> {
+  const { rows } = await sql`SELECT * FROM invite_codes WHERE code = ${code} LIMIT 1`
+  if (rows.length === 0) return { valid: false, error: 'Invalid invite code' }
+  const invite = rows[0]
+  if (invite.expires_at && new Date(invite.expires_at) < new Date()) return { valid: false, error: 'Invite code has expired' }
+  if (invite.uses >= invite.max_uses) return { valid: false, error: 'Invite code has reached its maximum uses' }
+  return { valid: true }
+}
+
+export async function useInviteCode(code: string) {
+  await sql`UPDATE invite_codes SET uses = uses + 1 WHERE code = ${code}`
+}
+
+export async function createCoachWithInvite(email: string, name: string, passwordHash: string, inviteCode: string) {
+  const { rows } = await sql`INSERT INTO coaches (email, name, password_hash, invite_code, is_tester) VALUES (${email}, ${name}, ${passwordHash}, ${inviteCode}, true) RETURNING *`
+  return rows[0]
+}
+
+// ─── Legacy coach functions (old coaches table, still used by signup + webhook) ───
+
+export async function findCoachByEmail(email: string) {
+  const { rows } = await sql`SELECT * FROM coaches WHERE email = ${email} LIMIT 1`
+  return rows[0] || null
+}
+
+export async function createLegacyCoach(email: string, name: string, passwordHash: string) {
+  const { rows } = await sql`INSERT INTO coaches (email, name, password_hash) VALUES (${email}, ${name}, ${passwordHash}) RETURNING *`
+  return rows[0]
+}

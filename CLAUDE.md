@@ -1,190 +1,167 @@
-# Coaching Platform - Claude Code Context
+# MyCoachingAssistant - Claude Code Context
 
-This file gives Claude Code full context on the coaching platform. Read this before making any changes.
+## What this project is
 
----
+A multi-coach WhatsApp bot platform. Coaches sign up, create programmes, and their WhatsApp group gets an AI-powered assistant that answers parent questions using the programme's knowledgebase.
 
-## What This Project Is
+First live coach: Paul (coach ID `481181c9`, programme ID `89557f36`, group `120363422695360945@g.us`).
 
-A multi-coach WhatsApp bot platform. Coaches sign up, create programs, fill a Google Form to configure their bot personality, and their WhatsApp group gets an AI-powered assistant that answers questions using their config.
+## Working rules for Claude Code
 
----
+1. **One task per session.** Don't wander across features. If a task spec says "Create Program page", do only that.
+2. **Plan first.** Before writing code, read the relevant files, then propose a plan and list open questions. Wait for confirmation before implementing.
+3. **Branch per feature.** `git checkout -b feat/<task-name>`. Never commit to main directly.
+4. **Test on Paul's group.** Every feature gets tested with the live bot before merging. Paul's group is the staging environment.
+5. **Update this file.** After every feature ships, update the relevant section here.
+6. **British spelling.** `programmes` not `programs`, `register` not `signup` in routes.
+7. **No new dependencies without asking.** If you think a package is needed, explain why first.
+8. **Keep responses short.** WhatsApp messages from the bot max out at 300 tokens for a reason.
 
-## Repo Structure
+## Tech stack
 
-```
-coaching-booking/
-  app/                          ← Next.js booking app (deployed on Vercel)
-  n8n-workflows/
-    whatsapp-message-handler.json   ← ACTIVE: main bot workflow
-    whatsapp-faq-airtable.json      ← OLD: Airtable-based FAQ workflow, not in use
-  CLAUDE.md                     ← this file
-  .env.local                    ← local env vars (never commit secrets)
-  .env.example                  ← template for env vars
-```
-
----
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 14 (App Router, TypeScript) |
+| Database | Neon Postgres via Vercel Postgres (`@vercel/postgres`, tagged template literals) |
+| Auth | localStorage-based (bcryptjs password hashing) |
+| AI | Claude Haiku 4.5 via Anthropic API (raw fetch) |
+| WhatsApp | Evolution API v2 (Baileys-based) |
+| Hosting | Vercel Hobby (app) + Contabo VPS (Evolution API + cron) |
+| Styling | Tailwind CSS |
 
 ## Infrastructure
 
-| Component | Location | Notes |
-|-----------|----------|-------|
-| Next.js booking app | Vercel | https://coaching-booking-v3.vercel.app |
-| Evolution API | GCP 35.239.224.242:8080 | WhatsApp gateway |
-| Evolution Manager UI | http://35.239.224.242:8080/manager | Login with global API key |
-| n8n | https://n8n.courseadvisor.ai | All workflow automation |
-| Neon Postgres | Cloud | Connection string in .env |
-| Google Sheets config | Sheet ID: 1t8di6B3MI3PDo6IlUEAjae2YtyKAfc7C9P2iPA2LR-M | Form responses land here |
-| Google Form | https://docs.google.com/forms/d/e/1FAIpQLSe2jW7EXI1OLCjhnKVU7Nha2a5dQMpfUCYAH39NNo2PygNViA/viewform | Bot config form |
+| Component | Location |
+|-----------|----------|
+| Next.js app | https://coaching-booking-v3.vercel.app |
+| Evolution API | http://161.97.176.176:8080 |
+| Evolution Manager UI | http://161.97.176.176:8080/manager |
+| Neon Postgres | Vercel-managed connection |
+| GitHub repo | mchristo839/coaching-booking |
+| Ops cron | Contabo VPS via `/ops/contabo/` scripts |
 
----
+## Environment variables
 
-## API Keys & Credentials
+| Variable | Description | Used in |
+|----------|-------------|---------|
+| `ANTHROPIC_API_KEY` | Claude API key | webhook handler, health check |
+| `EVOLUTION_API_URL` | `http://161.97.176.176:8080` | evolution.ts, health check |
+| `EVOLUTION_API_KEY` | Evolution API auth key | evolution.ts, health check |
+| `EVOLUTION_INSTANCE` | `paul-bot` | evolution.ts, health check |
+| `POSTGRES_URL` | Neon connection string | auto-injected by Vercel |
+| `NEXT_PUBLIC_APP_URL` | Public app URL | admin invites page |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot for ops alerts | alerts.ts |
+| `TELEGRAM_CHAT_ID` | `1412433866` (Mario's personal chat) | alerts.ts |
+| `MCA_ALERT_PREFIX` | `[MCA]` prefix for alert messages | alerts.ts |
+| `HEALTH_CHECK_SECRET` | Bearer token for health/maintenance endpoints | health, cleanup, smoke-test |
+| `ADMIN_EMAIL` | Mario's email for admin access | admin invites API |
 
-| Service | Key/Value |
-|---------|-----------|
-| Evolution API key | YOUR_EVOLUTION_API_KEY |
-| Evolution instance | paul-bot |
-| Anthropic API key | YOUR_ANTHROPIC_API_KEY |
-| Claude model in n8n | claude-haiku-4-5-20251001 |
-| Airtable base (old) | app0TNasJdiqvLQAJ |
-| Airtable token (old) | patm6E3wSnEVDqvGk.4309858a4add3ccaf6860ec0ec76fdaf4db9b4e10fc730e87c6fb6ca3bcfb7be |
+## Project structure (actual)
 
----
+```
+app/
+├── api/
+│   ├── auth/login/            # POST — bcrypt login, returns JSON
+│   ├── auth/signup/            # POST — bcrypt signup with invite code validation
+│   ├── admin/invites/          # GET/POST — invite code management (admin-only)
+│   ├── programs/create/        # POST — create programme
+│   ├── programs/list/          # GET — list programmes by coach
+│   ├── programs/update/        # PATCH — update programme
+│   ├── webhooks/whatsapp/      # POST — main bot handler (Evolution API webhook)
+│   ├── health/                 # GET — ops health check with 6 checks + alerting
+│   ├── maintenance/cleanup/    # POST — purge stale processed_messages
+│   ├── dev/smoke-test/         # POST — self-test for conversation/dedup systems
+│   └── db-migrate/             # POST — idempotent migration runner
+│
+├── admin/invites/              # admin page: generate + manage invite codes
+├── auth/login/                 # login page
+├── auth/signup/                # signup page (requires invite code during beta)
+├── components/
+│   └── ProgrammeForm.tsx       # shared form used by create + edit
+├── dashboard/
+│   ├── page.tsx                # main dashboard
+│   ├── programmes/new/         # dedicated create programme page
+│   ├── programs/               # programme list + edit
+│   └── settings/               # bot setup help page
+│
+├── lib/
+│   ├── alerts.ts               # Telegram alert dispatcher with dedup
+│   ├── db.ts                   # ~15 DB functions (coaches, programs, conversations, dedup, invites)
+│   ├── evolution.ts            # WhatsApp message sender
+│   └── health-checks.ts        # 6 health checks (Evolution, Postgres, Anthropic, staleness, escalations, duplicates)
+│
+└── layout.tsx, page.tsx        # root layout and home page
 
-## Test Coach: Paul
-
-| Field | Value |
-|-------|-------|
-| Coach ID | 481181c9-ba2b-4eeb-8159-b975c8e628f7 |
-| Program ID | 89557f36 |
-| WhatsApp group | 120363422695360945@g.us |
-| Evolution instance | paul-bot |
-| Bot phone number | +447458164754 |
-| Pre-filled config form | https://docs.google.com/forms/d/e/1FAIpQLSe2jW7EXI1OLCjhnKVU7Nha2a5dQMpfUCYAH39NNo2PygNViA/viewform?usp=pp_url&entry.1018023075=89557f36&entry.1525338853=481181c9-ba2b-4eeb-8159-b975c8e628f7 |
-
----
-
-## Database: Neon Postgres
-
-Key tables:
-
-```sql
-coaches (id, name, email, ...)
-programs (id, coach_id, program_name, whatsapp_group_id, google_doc_id, evolution_instance_id, is_active)
+ops/contabo/                    # Contabo VPS cron scripts (health check, cleanup)
+docs/                           # Audit reports and task specs
 ```
 
-The `whatsapp_group_id` in `programs` links a WhatsApp group to a program config. If this is wrong or missing, the bot falls back to a generic response.
+## Database tables (actual)
 
-To check Paul's program:
-```sql
-SELECT * FROM programs WHERE id = '89557f36';
-```
+| Table | Purpose | Status |
+|-------|---------|--------|
+| `coaches` | Coach accounts (id, email, name, password_hash, invite_code, is_tester) | Active |
+| `programs` | Programme config with JSONB knowledgebase, whatsapp_group_id | Active |
+| `conversations` | Message log (sender, text, bot_response, category, escalated) | Active (populated by webhook) |
+| `bot_replies` | Reply tracking for duplicate detection | Active |
+| `processed_messages` | Message ID dedup (24h TTL) | Active |
+| `alert_log` | Telegram alert dedup (30min window) | Active |
+| `health_state` | Health check state tracking (consecutive failures) | Active |
+| `invite_codes` | Beta invite codes (code, max_uses, uses, expires_at) | Active |
 
-To link a WhatsApp group to a program:
-```sql
-UPDATE programs SET whatsapp_group_id = '120363422695360945@g.us' WHERE id = '89557f36';
-```
+## Bot behaviour
 
----
+- Responds to **all group messages** (no @mention filtering yet)
+- Classifies messages into: `question`, `social`, `escalation`, `general`
+- Escalation keywords trigger `escalated=true` flag (injury, complaint, safeguard, etc.)
+- Every message + bot response logged to `conversations` table
+- Duplicate webhook calls deduped via `processed_messages` table
+- Duplicate bot replies prevented via `bot_replies` 10-second window check
 
-## How the Bot Works (Message Flow)
+## PLANNED (not yet implemented)
 
-1. Message arrives in Paul's WhatsApp group
-2. Evolution API fires webhook to n8n: `https://n8n.courseadvisor.ai/webhook/whatsapp-incoming`
-3. n8n extracts message text, group ID, sender
-4. Looks up program in Neon DB by `whatsapp_group_id`
-5. Reads bot config from Google Sheet (filters by Program ID column)
-6. Checks for quick reply keyword matches first
-7. If no keyword match, builds Claude system prompt from config and calls Claude API
-8. Sends response back via Evolution API to the group
+- @mention-only mode (bot only responds when @mentioned)
+- Member/parent signup system (`members` table)
+- FAQ learning from coach responses (`faqs` table)
+- Escalation acknowledgement (coach replies mark `escalation_acked_at`)
+- DM signup flow (`signup_sessions` table)
+- JWT/cookie auth (replacing localStorage)
+- Observation mode (bot watches but doesn't reply)
+- `whatsapp_bot_status` on coaches (live/observation/paused)
 
-**Common failure points:**
-- `paul-bot` disconnected from WhatsApp (check Evolution Manager, reconnect via QR)
-- `whatsapp_group_id` not set in DB for the program
-- Google Sheet has no row for that Program ID (coach hasn't submitted the form yet)
-- n8n workflow is inactive (toggle it on in n8n)
-- Wrong webhook URL configured in Evolution API
+## Known quirks (read before debugging)
 
----
+- **Bot disconnects** — `paul-bot` periodically hits `device_removed`. Requires manual QR re-scan via Evolution Manager. Health endpoint detects this.
+- **`pushName` quirks** — Evolution API sometimes sends LIDs instead of display names. Falls back to "there".
+- **evolution.ts default URL** — Still has old GCP IP as fallback. Env var overrides it in production.
+- **Vercel Hobby tier** — No server-side cron. Health monitoring runs from Contabo VPS.
 
-## Google Form Config Fields
+## Common operations
 
-The form at the URL above collects:
-- Program Name
-- Greeting Message
-- Bot Tone (Friendly / Professional / Casual)
-- About This Program
-- Schedule
-- Location Details
-- Pricing
-- Booking Link
-- Frequently Asked Questions (Q: ... A: ... format, one pair per paragraph)
-- Cancellation Policy
-- Safety & Medical Info
-- Contact Info
-- Quick Replies (KEYWORD -> response, one per line)
-- Program ID (pre-filled, entry.1018023075)
-- Coach ID (pre-filled, entry.1525338853)
-
-The n8n workflow filters the sheet by the `Program ID - Leave blank` column. The coach's latest submission wins.
-
----
-
-## n8n Workflows
-
-### ACTIVE: WhatsApp Message Handler
-- File: `n8n-workflows/whatsapp-message-handler.json`
-- Webhook path: `whatsapp-incoming`
-- Reads config from Google Sheets
-- Uses Claude Haiku for AI responses
-- Sends via Evolution API paul-bot instance
-
-### OLD (not in use): WhatsApp FAQ Airtable
-- File: `n8n-workflows/whatsapp-faq-airtable.json`
-- Webhook path: `paul-bot-incoming`
-- Used Airtable for FAQ matching (keyword scoring)
-- Replaced by the Google Sheets + Claude approach
-
----
-
-## Booking App (Next.js)
-
-- Deployed at: https://coaching-booking-v3.vercel.app
-- Repo: https://github.com/mchristo839/coaching-booking
-- `app/` folder contains all Next.js pages and API routes
-- Key pages: `/book/[coachId]`, `/dashboard`, `/api/programs/create`
-
----
-
-## Common Tasks
-
-**Reconnect paul-bot WhatsApp:**
 ```bash
-curl -s http://35.239.224.242:8080/instance/connect/paul-bot \
-  -H "apikey: YOUR_EVOLUTION_API_KEY" | jq .
+# Check bot connection
+curl -s http://161.97.176.176:8080/instance/connectionState/paul-bot \
+  -H "apikey: $EVOLUTION_API_KEY"
+
+# Reconnect bot (get QR)
+curl -s http://161.97.176.176:8080/instance/connect/paul-bot \
+  -H "apikey: $EVOLUTION_API_KEY"
+
+# Run health check
+curl -s https://coaching-booking-v3.vercel.app/api/health \
+  -H "Authorization: Bearer $HEALTH_CHECK_SECRET"
+
+# Run migration
+curl -X POST https://coaching-booking-v3.vercel.app/api/db-migrate
+
+# Run cleanup
+curl -X POST https://coaching-booking-v3.vercel.app/api/maintenance/cleanup \
+  -H "Authorization: Bearer $HEALTH_CHECK_SECRET"
+
+# Deploy
+npx vercel deploy --prod
 ```
-Then decode the base64 QR or use Evolution Manager UI.
 
-**Check Evolution instances:**
-```bash
-curl -s http://35.239.224.242:8080/instance/fetchInstances \
-  -H "apikey: YOUR_EVOLUTION_API_KEY" | jq .
-```
+## What's currently broken / in progress
 
-**Test send a WhatsApp message:**
-```bash
-curl -s -X POST http://35.239.224.242:8080/message/sendText/paul-bot \
-  -H "apikey: YOUR_EVOLUTION_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"number": "120363422695360945@g.us", "text": "Test message"}' | jq .
-```
-
----
-
-## Known Issues / To Fix
-
-- paul-bot disconnects periodically due to WhatsApp session conflicts (device_removed error). Needs manual QR re-scan.
-- Program ID field on Google Form says "Leave blank" — coaches need the pre-filled link or they won't populate it, breaking the config lookup.
-- No automated trigger when form is submitted — config updates take effect on the next incoming message, not instantly.
-- The `Program Found?` IF node in n8n uses `Object.keys($json).length === 0` which may not correctly detect empty Postgres results. Worth testing.
+See the open task specs in `/docs/tasks/`.

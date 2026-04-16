@@ -1,3 +1,7 @@
+// Migration route — idempotent, safe to run multiple times.
+// Hit POST /api/db-migrate after deploying.
+// Contains both V2 schema (providers/coaches_v2/programmes) and
+// Week 1 operational tables (conversations, bot_replies, etc).
 import { NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
 
@@ -136,6 +140,9 @@ export async function POST() {
     `
 
     // ── 6. Conversations (bot memory + comms audit trail) ──
+    // Note: the V2 schema below coexists with the simpler Week 1 version.
+    // Both use CREATE IF NOT EXISTS, so whichever runs first wins.
+    // The V2 schema has more columns (coach_id, sender_type, channel, etc).
     await sql`
       CREATE TABLE IF NOT EXISTS conversations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -144,7 +151,7 @@ export async function POST() {
         sender_name VARCHAR(200),
         sender_identifier VARCHAR(255),
         sender_type VARCHAR(30),
-        channel VARCHAR(20) NOT NULL,
+        channel VARCHAR(20) NOT NULL DEFAULT 'whatsapp',
         message_text TEXT NOT NULL,
         category VARCHAR(50),
         bot_response TEXT,
@@ -152,7 +159,10 @@ export async function POST() {
         score VARCHAR(20),
         escalated BOOLEAN DEFAULT false,
         escalation_type VARCHAR(30),
+        escalation_acked_at TIMESTAMP,
         member_id UUID REFERENCES members(id),
+        group_jid TEXT,
+        sender_jid TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `
@@ -201,16 +211,79 @@ export async function POST() {
       )
     `
 
-    // ── 10. Bot Replies (rate limiting auto-replies) ──
+    // ── 10. Bot Replies (rate limiting + dedup) ──
     await sql`
       CREATE TABLE IF NOT EXISTS bot_replies (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         group_jid VARCHAR(50) NOT NULL,
         reply_type VARCHAR(30) NOT NULL,
+        message_id TEXT,
         sent_at TIMESTAMPTZ DEFAULT NOW()
       )
     `
     await sql`CREATE INDEX IF NOT EXISTS idx_bot_replies_lookup ON bot_replies (group_jid, reply_type, sent_at)`
+
+    // ── Week 1 operational tables ──
+
+    // Alert dedup log
+    await sql`
+      CREATE TABLE IF NOT EXISTS alert_log (
+        id SERIAL PRIMARY KEY,
+        alert_key TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        message TEXT NOT NULL,
+        sent_at TIMESTAMP DEFAULT NOW()
+      )
+    `
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_alert_log_key_sent
+      ON alert_log(alert_key, sent_at DESC)
+    `
+
+    // Message dedup
+    await sql`
+      CREATE TABLE IF NOT EXISTS processed_messages (
+        message_id TEXT PRIMARY KEY,
+        processed_at TIMESTAMP DEFAULT NOW()
+      )
+    `
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_processed_messages_age
+      ON processed_messages(processed_at)
+    `
+
+    // Health check state tracking
+    await sql`
+      CREATE TABLE IF NOT EXISTS health_state (
+        check_name TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        consecutive_failures INTEGER DEFAULT 0,
+        last_checked_at TIMESTAMP DEFAULT NOW()
+      )
+    `
+
+    // Invite codes
+    await sql`
+      CREATE TABLE IF NOT EXISTS invite_codes (
+        code TEXT PRIMARY KEY,
+        created_by TEXT NOT NULL,
+        max_uses INTEGER DEFAULT 1,
+        uses INTEGER DEFAULT 0,
+        expires_at TIMESTAMP,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `
+
+    // Tester flags on coaches (old table, still used by current auth)
+    await sql`
+      ALTER TABLE coaches
+      ADD COLUMN IF NOT EXISTS invite_code TEXT
+    `
+    await sql`
+      ALTER TABLE coaches
+      ADD COLUMN IF NOT EXISTS is_tester BOOLEAN DEFAULT FALSE
+    `
 
     // ── Migrate existing data from old tables ──
     const oldCoachesExist = await sql`
@@ -280,7 +353,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: `Migration complete. 10 tables created. ${migrated} coach(es) migrated.`
+      message: `Migration complete. All tables created. ${migrated} coach(es) migrated.`
     })
   } catch (error) {
     console.error('Migration error:', error)
