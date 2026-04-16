@@ -1,17 +1,17 @@
-// app/api/cron/cleanup/route.ts
-// Daily cleanup cron — removes stale processed_messages rows.
+// app/api/maintenance/cleanup/route.ts
+// Daily cleanup — removes stale processed_messages rows.
+// Called from Contabo cron via POST with bearer token.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { cleanupProcessedMessages } from '@/app/lib/db'
 
 function isAuthorised(request: NextRequest): boolean {
-  if (request.headers.get('x-vercel-cron')) return true
   const secret = process.env.HEALTH_CHECK_SECRET
   if (!secret) return false
   return request.headers.get('authorization') === `Bearer ${secret}`
 }
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   if (!isAuthorised(request)) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
