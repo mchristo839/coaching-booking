@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { findProgramByWhatsAppGroup, safeLogConversation, type Knowledgebase } from '@/app/lib/db'
+import { findProgramByWhatsAppGroup, safeLogConversation, isMessageProcessed, trackBotReply, type Knowledgebase } from '@/app/lib/db'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
@@ -110,6 +110,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
+    // Message dedup: Evolution API can fire the same webhook twice
+    const messageId: string = data?.key?.id || ''
+    if (messageId) {
+      const alreadyProcessed = await isMessageProcessed(messageId)
+      if (alreadyProcessed) {
+        console.log(`[SKIP-DUPLICATE] Message ${messageId} already processed`)
+        return NextResponse.json({ ok: true })
+      }
+    }
+
     // Extract message text
     const messageText: string =
       data?.message?.conversation ||
@@ -135,6 +145,10 @@ export async function POST(request: NextRequest) {
       // Group not linked to any program
       console.log(`[LOG] Unlinked group: ${groupJid}`)
       const reply = `👋 Hi! I'm your CoachBook bot. To activate me for this group, go to your Programmes dashboard and paste in this group ID:\n\n*${groupJid}*`
+
+      const { isDuplicate: dupUnlinked } = await trackBotReply(groupJid, 'unlinked', messageId)
+      if (dupUnlinked) return NextResponse.json({ ok: true })
+
       await sendWhatsAppMessage(groupJid, reply)
 
       await safeLogConversation({
@@ -154,6 +168,10 @@ export async function POST(request: NextRequest) {
       // Program linked but knowledgebase not filled in yet
       console.log(`[LOG] Programme ${program.id} has no knowledgebase`)
       const reply = `👋 I'm connected to this group but my knowledgebase isn't set up yet. ${program.coach_name}, please go to your Programmes dashboard and fill in the programme details to activate me.`
+
+      const { isDuplicate: dupNoKb } = await trackBotReply(groupJid, 'no_knowledgebase', messageId)
+      if (dupNoKb) return NextResponse.json({ ok: true })
+
       await sendWhatsAppMessage(groupJid, reply)
 
       await safeLogConversation({
@@ -179,6 +197,9 @@ export async function POST(request: NextRequest) {
     })
 
     const reply = await askClaude(systemPrompt, messageWithContext)
+
+    const { isDuplicate } = await trackBotReply(groupJid, category, messageId)
+    if (isDuplicate) return NextResponse.json({ ok: true })
 
     await sendWhatsAppMessage(groupJid, reply)
 

@@ -155,3 +155,80 @@ export async function safeLogConversation(
     return { success: false, error: String(error) }
   }
 }
+
+// ─── Message Dedup ───
+
+/**
+ * Check if a messageId has already been processed. If not, mark it.
+ * Returns true if this is a duplicate (already processed).
+ */
+export async function isMessageProcessed(messageId: string): Promise<boolean> {
+  try {
+    const { rows } = await sql`
+      SELECT message_id FROM processed_messages
+      WHERE message_id = ${messageId}
+      LIMIT 1
+    `
+    if (rows.length > 0) return true
+
+    // Mark as processed
+    await sql`
+      INSERT INTO processed_messages (message_id)
+      VALUES (${messageId})
+      ON CONFLICT (message_id) DO NOTHING
+    `
+    return false
+  } catch (error) {
+    console.error('[LOG-ERROR] Message dedup check failed:', error)
+    return false // On error, allow processing (don't block the bot)
+  }
+}
+
+// ─── Bot Reply Tracking ───
+
+/**
+ * Record a bot reply. Returns true if a duplicate was detected
+ * (same group + reply_type within 10 seconds).
+ */
+export async function trackBotReply(
+  groupJid: string,
+  replyType: string,
+  messageId?: string
+): Promise<{ isDuplicate: boolean }> {
+  try {
+    // Check for recent duplicate
+    const { rows } = await sql`
+      SELECT id FROM bot_replies
+      WHERE group_jid = ${groupJid}
+        AND reply_type = ${replyType}
+        AND sent_at > NOW() - INTERVAL '10 seconds'
+      LIMIT 1
+    `
+
+    if (rows.length > 0) {
+      console.log(`[SKIP-DUPLICATE] Duplicate bot reply detected: ${groupJid} ${replyType}`)
+      return { isDuplicate: true }
+    }
+
+    // Record this reply
+    await sql`
+      INSERT INTO bot_replies (group_jid, reply_type, message_id)
+      VALUES (${groupJid}, ${replyType}, ${messageId ?? null})
+    `
+    return { isDuplicate: false }
+  } catch (error) {
+    console.error('[LOG-ERROR] Bot reply tracking failed:', error)
+    return { isDuplicate: false } // On error, allow sending
+  }
+}
+
+/**
+ * Clean up old processed messages (older than 24 hours).
+ */
+export async function cleanupProcessedMessages(): Promise<number> {
+  const { rowCount } = await sql`
+    DELETE FROM processed_messages
+    WHERE processed_at < NOW() - INTERVAL '24 hours'
+  `
+  return rowCount ?? 0
+}
