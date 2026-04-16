@@ -100,3 +100,58 @@ export async function findProgramByWhatsAppGroup(whatsappGroupId: string) {
   `
   return rows[0] || null
 }
+
+// ─── Conversations ───
+
+export interface ConversationRow {
+  programmeId?: string | null
+  groupJid: string
+  senderJid?: string | null
+  senderName?: string | null
+  messageText: string
+  botResponse?: string | null
+  category?: string | null
+  escalated?: boolean
+}
+
+/**
+ * Safely log a conversation to the database.
+ * Never throws — logging failure must not break the bot's reply.
+ */
+export async function safeLogConversation(
+  row: ConversationRow
+): Promise<{ success: boolean; conversationId?: number; error?: string }> {
+  try {
+    console.log('[LOG] Inserting conversation:', {
+      groupJid: row.groupJid,
+      senderName: row.senderName,
+      category: row.category,
+      escalated: row.escalated,
+      hasResponse: !!row.botResponse,
+    })
+
+    const { rows } = await sql`
+      INSERT INTO conversations (
+        programme_id, group_jid, sender_jid, sender_name,
+        message_text, bot_response, category, escalated
+      ) VALUES (
+        ${row.programmeId ?? null},
+        ${row.groupJid},
+        ${row.senderJid ?? null},
+        ${row.senderName ?? null},
+        ${row.messageText},
+        ${row.botResponse ?? null},
+        ${row.category ?? null},
+        ${row.escalated ?? false}
+      )
+      RETURNING id
+    `
+
+    const id = rows[0]?.id
+    console.log('[LOG] Conversation logged, id:', id)
+    return { success: true, conversationId: id }
+  } catch (error) {
+    console.error('[LOG-ERROR] Failed to log conversation:', error, row)
+    return { success: false, error: String(error) }
+  }
+}

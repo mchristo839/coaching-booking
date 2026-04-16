@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { findProgramByWhatsAppGroup, type Knowledgebase } from '@/app/lib/db'
+import { findProgramByWhatsAppGroup, safeLogConversation, type Knowledgebase } from '@/app/lib/db'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
-const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'paul-bot'
 
 function buildSystemPrompt(program: { program_name: string; coach_name: string; knowledgebase: Knowledgebase }): string {
   const kb = program.knowledgebase
@@ -58,16 +57,44 @@ async function askClaude(systemPrompt: string, userMessage: string): Promise<str
   return data.content?.[0]?.text || "I'm not sure about that — please contact the coach directly."
 }
 
+/** Simple category classification based on message content */
+function classifyMessage(text: string): { category: string; escalated: boolean } {
+  const lower = text.toLowerCase()
+
+  // Escalation keywords
+  const escalationPatterns = [
+    /injur/i, /hurt/i, /accident/i, /emergency/i, /ambulance/i,
+    /complain/i, /safeguard/i, /abuse/i, /bully/i, /inappropriat/i,
+    /refund/i, /legal/i, /solicitor/i, /lawyer/i,
+  ]
+
+  for (const pattern of escalationPatterns) {
+    if (pattern.test(lower)) {
+      return { category: 'escalation', escalated: true }
+    }
+  }
+
+  // Question detection
+  if (lower.includes('?') || /^(when|where|what|how|can|do|is|are|will|does)\b/i.test(lower)) {
+    return { category: 'question', escalated: false }
+  }
+
+  // Social / greeting
+  if (/^(hi|hey|hello|thanks|thank you|cheers|good morning|good evening|👍|😊|🙏)/i.test(lower)) {
+    return { category: 'social', escalated: false }
+  }
+
+  return { category: 'general', escalated: false }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    // Evolution API webhook payload structure
     const event = body.event
-    const instance = body.instance
     const data = body.data
 
-    // Only handle incoming text messages from groups
+    // Only handle incoming text messages
     if (event !== 'messages.upsert') {
       return NextResponse.json({ ok: true })
     }
@@ -93,30 +120,56 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
+    const senderJid: string = data?.key?.participant || data?.key?.remoteJid || ''
+    const senderName: string = data?.pushName || 'there'
+
+    console.log(`[LOG] Incoming message from ${senderName} in ${groupJid}: ${messageText.slice(0, 100)}`)
+
+    // Classify the message
+    const { category, escalated } = classifyMessage(messageText)
+
     // Look up which program this group belongs to
     const program = await findProgramByWhatsAppGroup(groupJid)
 
     if (!program) {
-      // Group not linked to any program — reply with the group ID so the coach can copy it
-      console.log(`Unlinked group message from ${groupJid}, instance ${instance}`)
-      await sendWhatsAppMessage(
+      // Group not linked to any program
+      console.log(`[LOG] Unlinked group: ${groupJid}`)
+      const reply = `👋 Hi! I'm your CoachBook bot. To activate me for this group, go to your Programmes dashboard and paste in this group ID:\n\n*${groupJid}*`
+      await sendWhatsAppMessage(groupJid, reply)
+
+      await safeLogConversation({
         groupJid,
-        `👋 Hi! I'm your CoachBook bot. To activate me for this group, go to your Programmes dashboard and paste in this group ID:\n\n*${groupJid}*`
-      )
+        senderJid,
+        senderName,
+        messageText,
+        botResponse: reply,
+        category: 'unlinked',
+        escalated: false,
+      })
+
       return NextResponse.json({ ok: true })
     }
 
     if (!program.knowledgebase) {
       // Program linked but knowledgebase not filled in yet
-      console.log(`Program ${program.id} has no knowledgebase, skipping`)
-      await sendWhatsAppMessage(
+      console.log(`[LOG] Programme ${program.id} has no knowledgebase`)
+      const reply = `👋 I'm connected to this group but my knowledgebase isn't set up yet. ${program.coach_name}, please go to your Programmes dashboard and fill in the programme details to activate me.`
+      await sendWhatsAppMessage(groupJid, reply)
+
+      await safeLogConversation({
+        programmeId: program.id,
         groupJid,
-        `👋 I'm connected to this group but my knowledgebase isn't set up yet. ${program.coach_name}, please go to your Programmes dashboard and fill in the programme details to activate me.`
-      )
+        senderJid,
+        senderName,
+        messageText,
+        botResponse: reply,
+        category: 'no_knowledgebase',
+        escalated: false,
+      })
+
       return NextResponse.json({ ok: true })
     }
 
-    const senderName: string = data?.pushName || 'there'
     const messageWithContext = `${senderName} asks: ${messageText}`
 
     const systemPrompt = buildSystemPrompt({
@@ -129,9 +182,22 @@ export async function POST(request: NextRequest) {
 
     await sendWhatsAppMessage(groupJid, reply)
 
+    console.log(`[LOG] Bot replied in ${groupJid}, category: ${category}, escalated: ${escalated}`)
+
+    await safeLogConversation({
+      programmeId: program.id,
+      groupJid,
+      senderJid,
+      senderName,
+      messageText,
+      botResponse: reply,
+      category,
+      escalated,
+    })
+
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('WhatsApp webhook error:', error)
+    console.error('[LOG-ERROR] WhatsApp webhook error:', error)
     // Always return 200 to Evolution API so it doesn't retry endlessly
     return NextResponse.json({ ok: true })
   }
