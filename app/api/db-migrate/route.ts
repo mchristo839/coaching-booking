@@ -223,6 +223,12 @@ export async function POST() {
     `
     await sql`CREATE INDEX IF NOT EXISTS idx_bot_replies_lookup ON bot_replies (group_jid, reply_type, sent_at)`
 
+    // ── Backfill columns that may be missing if V2 tables were created before Week 1 merge ──
+    await sql`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS group_jid TEXT`
+    await sql`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS sender_jid TEXT`
+    await sql`ALTER TABLE conversations ADD COLUMN IF NOT EXISTS escalation_acked_at TIMESTAMP`
+    await sql`ALTER TABLE bot_replies ADD COLUMN IF NOT EXISTS message_id TEXT`
+
     // ── Week 1 operational tables ──
 
     // Alert dedup log
