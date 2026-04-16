@@ -1092,18 +1092,43 @@ export async function POST(request: NextRequest) {
     }
 
     // ─── @mention check: only respond if bot is mentioned ───
+    // WhatsApp uses LIDs (Linked Identities) in groups, so mentionedJid may contain
+    // a LID like "165722051334265@lid" instead of the phone-based "447458164754@s.whatsapp.net".
+    // We detect @mentions by checking: (1) exact BOT_JID match, (2) phone in text,
+    // (3) any mentionedJid number appears in message text (LID-based @mention).
     const mentionedJids: string[] = data?.message?.extendedTextMessage?.contextInfo?.mentionedJid || []
     const botPhone = BOT_JID.split('@')[0]
-    const isMentioned = mentionedJids.includes(BOT_JID) ||
-      (botPhone && messageText.includes(`@${botPhone}`))
+
+    let isMentioned = false
+    // Check 1: exact JID match (phone-based)
+    if (mentionedJids.includes(BOT_JID)) {
+      isMentioned = true
+    }
+    // Check 2: bot phone number appears in message text
+    if (!isMentioned && botPhone && messageText.includes(`@${botPhone}`)) {
+      isMentioned = true
+    }
+    // Check 3: LID-based — if any mentionedJid's number appears in message text as @number
+    if (!isMentioned && mentionedJids.length > 0) {
+      for (const jid of mentionedJids) {
+        const jidNumber = jid.split('@')[0]
+        if (jidNumber && messageText.includes(`@${jidNumber}`)) {
+          isMentioned = true
+          break
+        }
+      }
+    }
 
     if (!isMentioned) {
       // Not mentioned — don't respond, message is already logged above
       return NextResponse.json({ ok: true })
     }
 
+    // Clean @mention tags from message text before processing
+    const cleanedText = messageText.replace(/@\d+/g, '').trim()
+
     // 5. Question Classification
-    const category = classifyMessage(messageText)
+    const category = classifyMessage(cleanedText)
 
     // Social messages — don't respond
     if (category === 'social') {
@@ -1114,7 +1139,7 @@ export async function POST(request: NextRequest) {
 
     // 6. Escalation Check — Immediate
     if (IMMEDIATE_ESCALATION_CATEGORIES.includes(category)) {
-      await handleImmediateEscalation(category, senderName, messageText, coachName, coachPhone, groupJid)
+      await handleImmediateEscalation(category, senderName, cleanedText, coachName, coachPhone, groupJid)
       return NextResponse.json({ ok: true })
     }
 
@@ -1129,7 +1154,7 @@ export async function POST(request: NextRequest) {
     const systemWithContext = contextLines
       ? `${systemPrompt}\n\nRECENT CONVERSATION:\n${contextLines}`
       : systemPrompt
-    const messageWithContext = `${senderName} asks: ${messageText}`
+    const messageWithContext = `${senderName} asks: ${cleanedText}`
     const reply = await askClaude(systemWithContext, messageWithContext)
 
     // Observation mode
