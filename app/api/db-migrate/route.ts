@@ -76,6 +76,29 @@ export async function POST() {
       )
     `
 
+    // Invite codes (Task 5)
+    await sql`
+      CREATE TABLE IF NOT EXISTS invite_codes (
+        code TEXT PRIMARY KEY,
+        created_by TEXT NOT NULL,
+        max_uses INTEGER DEFAULT 1,
+        uses INTEGER DEFAULT 0,
+        expires_at TIMESTAMP,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `
+
+    // Tester flags on coaches (Task 5)
+    await sql`
+      ALTER TABLE coaches
+      ADD COLUMN IF NOT EXISTS invite_code TEXT
+    `
+    await sql`
+      ALTER TABLE coaches
+      ADD COLUMN IF NOT EXISTS is_tester BOOLEAN DEFAULT FALSE
+    `
+
     return NextResponse.json({ success: true, message: 'Migration complete' })
   } catch (error) {
     console.error('Migration error:', error)

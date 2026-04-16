@@ -232,3 +232,70 @@ export async function cleanupProcessedMessages(): Promise<number> {
   `
   return rowCount ?? 0
 }
+
+// ─── Invite Codes ───
+
+export async function createInviteCode(
+  code: string,
+  createdBy: string,
+  maxUses: number,
+  expiresAt: string | null,
+  notes: string | null
+) {
+  const { rows } = await sql`
+    INSERT INTO invite_codes (code, created_by, max_uses, expires_at, notes)
+    VALUES (${code}, ${createdBy}, ${maxUses}, ${expiresAt}, ${notes})
+    RETURNING *
+  `
+  return rows[0]
+}
+
+export async function listInviteCodes() {
+  const { rows } = await sql`
+    SELECT * FROM invite_codes ORDER BY created_at DESC
+  `
+  return rows
+}
+
+export async function validateInviteCode(code: string): Promise<{
+  valid: boolean
+  error?: string
+}> {
+  const { rows } = await sql`
+    SELECT * FROM invite_codes WHERE code = ${code} LIMIT 1
+  `
+
+  if (rows.length === 0) return { valid: false, error: 'Invalid invite code' }
+
+  const invite = rows[0]
+
+  if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+    return { valid: false, error: 'Invite code has expired' }
+  }
+
+  if (invite.uses >= invite.max_uses) {
+    return { valid: false, error: 'Invite code has reached its maximum uses' }
+  }
+
+  return { valid: true }
+}
+
+export async function useInviteCode(code: string) {
+  await sql`
+    UPDATE invite_codes SET uses = uses + 1 WHERE code = ${code}
+  `
+}
+
+export async function createCoachWithInvite(
+  email: string,
+  name: string,
+  passwordHash: string,
+  inviteCode: string
+) {
+  const { rows } = await sql`
+    INSERT INTO coaches (email, name, password_hash, invite_code, is_tester)
+    VALUES (${email}, ${name}, ${passwordHash}, ${inviteCode}, true)
+    RETURNING *
+  `
+  return rows[0]
+}
