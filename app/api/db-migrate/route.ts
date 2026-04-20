@@ -291,6 +291,203 @@ export async function POST() {
       ADD COLUMN IF NOT EXISTS is_tester BOOLEAN DEFAULT FALSE
     `
 
+    // ═══════════════════════════════════════════════════════════
+    // Coach Control Centre — Phase 1: Permissions
+    // ═══════════════════════════════════════════════════════════
+
+    // provider_staff: who (coaches_v2 row) has GM/admin role in a provider
+    await sql`
+      CREATE TABLE IF NOT EXISTS provider_staff (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        provider_id UUID NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+        coach_id UUID REFERENCES coaches_v2(id) ON DELETE CASCADE,
+        role VARCHAR(20) NOT NULL CHECK (role IN ('gm','admin')),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (provider_id, coach_id)
+      )
+    `
+
+    // programme_assignments: a coach can be assigned to programmes they don't own
+    await sql`
+      CREATE TABLE IF NOT EXISTS programme_assignments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        programme_id UUID NOT NULL REFERENCES programmes(id) ON DELETE CASCADE,
+        coach_id UUID NOT NULL REFERENCES coaches_v2(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (programme_id, coach_id)
+      )
+    `
+
+    // ═══════════════════════════════════════════════════════════
+    // Coach Control Centre — Phase 2: Promotions
+    // ═══════════════════════════════════════════════════════════
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS promotions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        created_by UUID NOT NULL REFERENCES coaches_v2(id),
+        promotion_type VARCHAR(30) NOT NULL CHECK (promotion_type IN ('social_event','refer_a_friend','holiday_camp','other')),
+        title TEXT,
+        detail TEXT NOT NULL,
+        start_at TIMESTAMPTZ,
+        end_at TIMESTAMPTZ,
+        venue TEXT,
+        cost_gbp NUMERIC(10,2),
+        is_free BOOLEAN DEFAULT FALSE,
+        payment_link TEXT,
+        send_mode VARCHAR(20) NOT NULL CHECK (send_mode IN ('all_groups','selected_groups')),
+        generated_message TEXT,
+        status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','cancelled','partial_failure')),
+        slug TEXT UNIQUE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        sent_at TIMESTAMPTZ
+      )
+    `
+    await sql`
+      CREATE TABLE IF NOT EXISTS promotion_targets (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        promotion_id UUID NOT NULL REFERENCES promotions(id) ON DELETE CASCADE,
+        programme_id UUID NOT NULL REFERENCES programmes(id),
+        send_status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (send_status IN ('pending','sent','failed')),
+        sent_at TIMESTAMPTZ,
+        error TEXT,
+        UNIQUE (promotion_id, programme_id)
+      )
+    `
+
+    // ═══════════════════════════════════════════════════════════
+    // Coach Control Centre — Phase 3: Polls
+    // ═══════════════════════════════════════════════════════════
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS polls (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        created_by UUID NOT NULL REFERENCES coaches_v2(id),
+        question TEXT NOT NULL,
+        options JSONB NOT NULL,
+        response_type VARCHAR(20) NOT NULL DEFAULT 'single' CHECK (response_type IN ('single','multiple')),
+        closes_at TIMESTAMPTZ,
+        anonymous BOOLEAN DEFAULT FALSE,
+        status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active','closed')),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        closed_at TIMESTAMPTZ
+      )
+    `
+    await sql`
+      CREATE TABLE IF NOT EXISTS poll_targets (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        poll_id UUID NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+        programme_id UUID NOT NULL REFERENCES programmes(id),
+        UNIQUE (poll_id, programme_id)
+      )
+    `
+    await sql`
+      CREATE TABLE IF NOT EXISTS poll_responses (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        poll_id UUID NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+        programme_id UUID NOT NULL REFERENCES programmes(id),
+        sender_jid TEXT NOT NULL,
+        sender_name TEXT,
+        chosen_option TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_poll_responses_poll ON poll_responses(poll_id)`
+
+    // ═══════════════════════════════════════════════════════════
+    // Coach Control Centre — Phase 4: Fixtures
+    // ═══════════════════════════════════════════════════════════
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS fixtures (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        programme_id UUID NOT NULL REFERENCES programmes(id) ON DELETE CASCADE,
+        created_by UUID NOT NULL REFERENCES coaches_v2(id),
+        fixture_type VARCHAR(20) NOT NULL CHECK (fixture_type IN ('league','friendly','cup','tournament','other')),
+        opposition TEXT,
+        home_away VARCHAR(4) CHECK (home_away IN ('home','away')),
+        kickoff_at TIMESTAMPTZ NOT NULL,
+        meet_at TIMESTAMPTZ,
+        venue TEXT,
+        kit_notes TEXT,
+        availability_poll_id UUID REFERENCES polls(id),
+        status VARCHAR(20) NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled','cancelled','played')),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+
+    // ═══════════════════════════════════════════════════════════
+    // Coach Control Centre — Phase 5: Schedule + cancellations
+    // ═══════════════════════════════════════════════════════════
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS schedule_series (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        programme_id UUID NOT NULL REFERENCES programmes(id) ON DELETE CASCADE,
+        series_type VARCHAR(20) NOT NULL CHECK (series_type IN ('training','fixture_recurring')),
+        title TEXT,
+        recurrence_rule TEXT NOT NULL,
+        series_start DATE NOT NULL,
+        series_end DATE,
+        default_time TIME NOT NULL,
+        default_duration_mins INTEGER DEFAULT 60,
+        default_venue TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`
+      CREATE TABLE IF NOT EXISTS schedule_exceptions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        series_id UUID NOT NULL REFERENCES schedule_series(id) ON DELETE CASCADE,
+        original_date DATE NOT NULL,
+        status VARCHAR(20) NOT NULL CHECK (status IN ('cancelled','rescheduled')),
+        rescheduled_to TIMESTAMPTZ,
+        reason TEXT,
+        cancelled_by UUID NOT NULL REFERENCES coaches_v2(id),
+        cancelled_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (series_id, original_date)
+      )
+    `
+
+    // Notifications log (used by cancellation cascade + everything else)
+    await sql`
+      CREATE TABLE IF NOT EXISTS notifications_log (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        event_type VARCHAR(40) NOT NULL,
+        trigger_user UUID REFERENCES coaches_v2(id),
+        programme_id UUID REFERENCES programmes(id),
+        recipient_type VARCHAR(20) NOT NULL CHECK (recipient_type IN ('coach','gm','admin','group','parent')),
+        recipient_jid TEXT,
+        channel VARCHAR(20) NOT NULL DEFAULT 'whatsapp',
+        status VARCHAR(20) NOT NULL CHECK (status IN ('sent','failed')),
+        error TEXT,
+        sent_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+
+    // ═══════════════════════════════════════════════════════════
+    // Coach Control Centre — Phase 6: Refer-a-Friend
+    // ═══════════════════════════════════════════════════════════
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS referrals (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        promotion_id UUID NOT NULL REFERENCES promotions(id) ON DELETE CASCADE,
+        programme_id UUID NOT NULL REFERENCES programmes(id),
+        friend_first_name TEXT NOT NULL,
+        child_name TEXT,
+        friend_email TEXT,
+        friend_phone TEXT NOT NULL,
+        referred_by_name TEXT,
+        status VARCHAR(30) NOT NULL DEFAULT 'referral_pending' CHECK (status IN ('referral_pending','confirmed','attended','converted','lapsed')),
+        first_session_at TIMESTAMPTZ,
+        attended_at TIMESTAMPTZ,
+        converted_at TIMESTAMPTZ,
+        last_nudged_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+
     // ── Migrate existing data from old tables ──
     const oldCoachesExist = await sql`
       SELECT EXISTS (
