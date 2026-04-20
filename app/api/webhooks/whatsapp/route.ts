@@ -3,6 +3,35 @@ import { findProgramByWhatsAppGroup, safeLogConversation, isMessageProcessed, tr
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
+const BOT_JID = process.env.BOT_JID || ''
+
+/**
+ * Detect if the bot was @mentioned in a WhatsApp group message.
+ * WhatsApp uses LIDs (Linked Identities) in groups, so mentionedJid may contain
+ * a LID like "165722051334265@lid" instead of the phone-based "447458164754@s.whatsapp.net".
+ * Uses 3 detection strategies:
+ *   1. Exact BOT_JID match in mentionedJid array
+ *   2. Bot's phone number appears in message text as @phone
+ *   3. Any mentionedJid number appears in message text as @number (LID-based)
+ */
+function isBotMentioned(messageText: string, mentionedJids: string[]): boolean {
+  if (!BOT_JID) return false
+  const botPhone = BOT_JID.split('@')[0]
+
+  // Check 1: exact JID match
+  if (mentionedJids.includes(BOT_JID)) return true
+
+  // Check 2: bot phone number appears in message text
+  if (botPhone && messageText.includes(`@${botPhone}`)) return true
+
+  // Check 3: LID-based — any mentionedJid number appears in message text
+  for (const jid of mentionedJids) {
+    const jidNumber = jid.split('@')[0]
+    if (jidNumber && messageText.includes(`@${jidNumber}`)) return true
+  }
+
+  return false
+}
 
 function buildSystemPrompt(program: { program_name: string; coach_name: string; knowledgebase: Knowledgebase }): string {
   const kb = program.knowledgebase
@@ -188,7 +217,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const messageWithContext = `${senderName} asks: ${messageText}`
+    // ─── @mention check: only respond if bot is @mentioned ───
+    // Configured groups should not be spammed by the bot on every message.
+    // Unlinked/no-kb paths above are exempt (coach needs to see the setup prompt).
+    const mentionedJids: string[] = data?.message?.extendedTextMessage?.contextInfo?.mentionedJid || []
+    const mentioned = isBotMentioned(messageText, mentionedJids)
+
+    // Still log the message for audit trail, but don't reply
+    if (!mentioned) {
+      console.log(`[LOG] Not mentioned, skipping reply in ${groupJid}`)
+      await safeLogConversation({
+        programmeId: program.id,
+        groupJid,
+        senderJid,
+        senderName,
+        messageText,
+        botResponse: null,
+        category,
+        escalated,
+      })
+      return NextResponse.json({ ok: true })
+    }
+
+    // Strip @number tags from message text before sending to Claude
+    const cleanedText = messageText.replace(/@\d+/g, '').trim()
+    const messageWithContext = `${senderName} asks: ${cleanedText}`
 
     const systemPrompt = buildSystemPrompt({
       program_name: program.program_name,
