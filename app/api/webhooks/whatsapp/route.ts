@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { findProgramByWhatsAppGroup, safeLogConversation, isMessageProcessed, trackBotReply, type Knowledgebase } from '@/app/lib/db'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
+import { getActivePollForGroup, recordPollResponse } from '@/app/lib/control-centre-db'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 const BOT_JID = process.env.BOT_JID || ''
@@ -215,6 +216,57 @@ export async function POST(request: NextRequest) {
       })
 
       return NextResponse.json({ ok: true })
+    }
+
+    // ─── Poll response parsing ───
+    // If there's an active poll for this group and the message matches a letter (a/b/c)
+    // or an option string, record the vote and return without replying.
+    const activePoll = await getActivePollForGroup(groupJid)
+    if (activePoll) {
+      const pollOptions: string[] = Array.isArray(activePoll.options)
+        ? activePoll.options
+        : JSON.parse(activePoll.options || '[]')
+      const trimmed = messageText.trim()
+      const lowered = trimmed.toLowerCase()
+
+      let chosen: string | null = null
+
+      // Letter match: "a", "A", "a)", "a." etc.
+      const letterMatch = lowered.match(/^([a-z])[\).\s]?$/)
+      if (letterMatch) {
+        const idx = letterMatch[1].charCodeAt(0) - 97
+        if (idx >= 0 && idx < pollOptions.length) {
+          chosen = pollOptions[idx]
+        }
+      }
+
+      // Exact option text match (case insensitive)
+      if (!chosen) {
+        const exact = pollOptions.find((opt: string) => opt.toLowerCase() === lowered)
+        if (exact) chosen = exact
+      }
+
+      if (chosen) {
+        console.log(`[LOG] Poll vote from ${senderName}: ${chosen}`)
+        await recordPollResponse(
+          activePoll.id,
+          activePoll.programme_id,
+          senderJid,
+          senderName,
+          chosen
+        )
+        await safeLogConversation({
+          programmeId: program.id,
+          groupJid,
+          senderJid,
+          senderName,
+          messageText,
+          botResponse: null,
+          category: 'poll_vote',
+          escalated: false,
+        })
+        return NextResponse.json({ ok: true })
+      }
     }
 
     // ─── @mention check: only respond if bot is @mentioned ───

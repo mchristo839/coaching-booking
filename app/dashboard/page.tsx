@@ -108,8 +108,10 @@ function statusBadge(programme: Programme): { label: string; cls: string } {
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', active: true },
+  { label: 'Control Centre', href: '/dashboard/control-centre' },
   { label: 'Programmes', href: '/dashboard/programmes' },
   { label: 'Members', href: '/dashboard/members' },
+  { label: 'Referrals', href: '/dashboard/referrals' },
   { label: 'Learning Log', href: '/dashboard/learning' },
   { label: 'Settings', href: '/dashboard/settings' },
 ]
