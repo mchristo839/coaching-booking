@@ -207,6 +207,33 @@ export async function getActivePollForGroup(groupJid: string) {
   return rows[0] || null
 }
 
+export async function setPollTargetMessageId(
+  pollId: string,
+  programmeId: string,
+  waMessageId: string
+) {
+  await sql`
+    UPDATE poll_targets
+    SET wa_message_id = ${waMessageId}
+    WHERE poll_id = ${pollId} AND programme_id = ${programmeId}
+  `
+}
+
+/**
+ * Find the poll + programme for a given WhatsApp poll message id.
+ * Used by the webhook when a pollUpdateMessage event arrives.
+ */
+export async function getPollByWaMessageId(waMessageId: string) {
+  const { rows } = await sql`
+    SELECT p.id as poll_id, p.options, p.response_type, p.status, pt.programme_id
+    FROM poll_targets pt
+    JOIN polls p ON p.id = pt.poll_id
+    WHERE pt.wa_message_id = ${waMessageId}
+    LIMIT 1
+  `
+  return rows[0] || null
+}
+
 // ─── Fixtures ───
 
 export interface FixtureCreateInput {

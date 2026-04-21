@@ -5,10 +5,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthFromRequest } from '@/app/lib/auth'
 import { getAuthorisedProgrammes, requireAuthorityOver, PermissionError } from '@/app/lib/permissions'
-import { createPoll, getPollTargets, listPollsForCoach, logNotification } from '@/app/lib/control-centre-db'
-import { generatePollMessage } from '@/app/lib/ai-messages'
-import { sendWhatsAppMessage } from '@/app/lib/evolution'
-import { sql } from '@vercel/postgres'
+import { createPoll, getPollTargets, listPollsForCoach, logNotification, setPollTargetMessageId } from '@/app/lib/control-centre-db'
+import { sendWhatsAppPoll } from '@/app/lib/evolution'
 
 export async function POST(request: NextRequest) {
   const auth = await getAuthFromRequest(request)
@@ -51,42 +49,27 @@ export async function POST(request: NextRequest) {
       programmeIds: resolvedProgrammeIds,
     })
 
-    // Generate message once, send per group
-    const { rows: coachRows } = await sql`
-      SELECT first_name, last_name FROM coaches_v2 WHERE id = ${auth.coachId} LIMIT 1
-    `
-    const coachName = coachRows[0]
-      ? `${coachRows[0].first_name} ${coachRows[0].last_name}`.trim()
-      : 'Coach'
-
     const targets = await getPollTargets(poll.id)
-    const firstProgrammeName = targets[0]?.programme_name || 'your programme'
-
-    let message = ''
-    try {
-      message = await generatePollMessage({
-        question,
-        options,
-        closesAt: closesAt || null,
-        coachName,
-        programmeName: firstProgrammeName,
-      })
-    } catch {
-      const lettered = options
-        .map((o: string, i: number) => `${String.fromCharCode(97 + i)}) ${o}`)
-        .join('\n')
-      message = `📊 ${question}\n\n${lettered}\n\nReply with the letter of your choice.`
-    }
+    const selectableCount = (responseType || 'single') === 'multiple' ? options.length : 1
 
     let sentCount = 0
     let failedCount = 0
+
     for (const target of targets) {
       if (!target.whatsapp_group_id) {
         failedCount++
         continue
       }
       try {
-        await sendWhatsAppMessage(target.whatsapp_group_id, message)
+        const { messageId } = await sendWhatsAppPoll(
+          target.whatsapp_group_id,
+          question,
+          options,
+          selectableCount
+        )
+        if (messageId) {
+          await setPollTargetMessageId(poll.id, target.programme_id, messageId)
+        }
         await logNotification({
           eventType: 'poll_sent',
           triggerUser: auth.coachId,
@@ -112,7 +95,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       poll,
-      message,
       sent: sentCount,
       failed: failedCount,
     })

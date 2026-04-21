@@ -392,6 +392,10 @@ export async function POST() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `
+    // Per-group WhatsApp message ID returned from sendPoll, used to match
+    // incoming pollUpdateMessage webhook events back to our poll.
+    await sql`ALTER TABLE poll_targets ADD COLUMN IF NOT EXISTS wa_message_id TEXT`
+    await sql`CREATE INDEX IF NOT EXISTS idx_poll_targets_wa_msgid ON poll_targets(wa_message_id)`
     await sql`CREATE INDEX IF NOT EXISTS idx_poll_responses_poll ON poll_responses(poll_id)`
 
     // ═══════════════════════════════════════════════════════════

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { findProgramByWhatsAppGroup, safeLogConversation, isMessageProcessed, trackBotReply, type Knowledgebase } from '@/app/lib/db'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
-import { getActivePollForGroup, recordPollResponse } from '@/app/lib/control-centre-db'
+import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId } from '@/app/lib/control-centre-db'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 const BOT_JID = process.env.BOT_JID || ''
@@ -123,6 +123,76 @@ export async function POST(request: NextRequest) {
 
     const event = body.event
     const data = body.data
+
+    // ─── Native WhatsApp poll vote handler ───
+    // Native polls send pollUpdateMessage events (may arrive as messages.update
+    // or messages.upsert with message.pollUpdateMessage). Evolution v2 also fires
+    // its own "pollUpdate" event in some configurations. Handle all three.
+    const pollUpdate =
+      data?.message?.pollUpdateMessage ||
+      data?.pollUpdateMessage ||
+      (event === 'poll.update' ? data : null) ||
+      (event === 'messages.update' && data?.update?.pollUpdates ? data.update.pollUpdates[0] : null)
+
+    if (pollUpdate) {
+      try {
+        // The id of the original poll (our stored wa_message_id)
+        const pollWaId: string =
+          pollUpdate?.pollCreationMessageKey?.id ||
+          pollUpdate?.pollCreationMessage?.key?.id ||
+          data?.pollCreationMessageKey?.id ||
+          ''
+
+        // The voter's JID and name
+        const voterJid: string =
+          data?.key?.participant ||
+          data?.key?.remoteJid ||
+          pollUpdate?.pollUpdater ||
+          ''
+        const voterName: string = data?.pushName || 'there'
+
+        // The selected options — Evolution may send this as decrypted strings
+        // or as SHA256 hashes. We try decrypted first, fall back to nothing.
+        const selectedOptions: string[] =
+          pollUpdate?.vote?.selectedOptions ||
+          pollUpdate?.selectedOptions ||
+          pollUpdate?.selected ||
+          []
+
+        if (pollWaId && selectedOptions.length > 0) {
+          const pollRow = await getPollByWaMessageId(pollWaId)
+          if (pollRow && pollRow.status === 'active') {
+            const allOptions: string[] = Array.isArray(pollRow.options)
+              ? pollRow.options
+              : JSON.parse(pollRow.options || '[]')
+
+            // Match selected values against known options (case-insensitive).
+            // If they come as hashes we can't match here — fallback is nothing.
+            for (const sel of selectedOptions) {
+              const selStr = String(sel)
+              const matched = allOptions.find(
+                (o: string) => o.toLowerCase() === selStr.toLowerCase()
+              )
+              if (matched) {
+                await recordPollResponse(
+                  pollRow.poll_id,
+                  pollRow.programme_id,
+                  voterJid,
+                  voterName,
+                  matched
+                )
+              }
+            }
+            console.log(`[POLL-VOTE] ${voterName} -> ${selectedOptions.join(', ')}`)
+          }
+        } else {
+          console.log('[POLL-VOTE] Could not parse pollUpdate payload:', JSON.stringify(pollUpdate).slice(0, 500))
+        }
+      } catch (e) {
+        console.error('[POLL-VOTE] error parsing pollUpdate:', e)
+      }
+      return NextResponse.json({ ok: true })
+    }
 
     // Only handle incoming text messages
     if (event !== 'messages.upsert') {
