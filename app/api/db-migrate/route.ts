@@ -487,6 +487,8 @@ export async function POST() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `
+    // Track which nudge was last sent (pre_session | session_day | post_session | lapsed_check | null)
+    await sql`ALTER TABLE referrals ADD COLUMN IF NOT EXISTS last_nudge_step TEXT`
 
     // ── Migrate existing data from old tables ──
     const oldCoachesExist = await sql`

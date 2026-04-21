@@ -106,24 +106,36 @@ function statusBadge(programme: Programme): { label: string; cls: string } {
 /*  Sidebar / Nav                                                      */
 /* ------------------------------------------------------------------ */
 
-const NAV_ITEMS = [
+interface NavItem {
+  label: string
+  href: string
+  active?: boolean
+  requiresAuthority?: boolean
+}
+
+const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', active: true },
-  { label: 'Control Centre', href: '/dashboard/control-centre' },
+  { label: 'Control Centre', href: '/dashboard/control-centre', requiresAuthority: true },
   { label: 'Programmes', href: '/dashboard/programmes' },
   { label: 'Members', href: '/dashboard/members' },
-  { label: 'Referrals', href: '/dashboard/referrals' },
+  { label: 'Referrals', href: '/dashboard/referrals', requiresAuthority: true },
   { label: 'Learning Log', href: '/dashboard/learning' },
   { label: 'Settings', href: '/dashboard/settings' },
 ]
 
-function Sidebar({ onLogout }: { onLogout: () => void }) {
+function visibleNavItems(hasAuthority: boolean): NavItem[] {
+  return NAV_ITEMS.filter((item) => !item.requiresAuthority || hasAuthority)
+}
+
+function Sidebar({ onLogout, hasAuthority }: { onLogout: () => void; hasAuthority: boolean }) {
+  const items = visibleNavItems(hasAuthority)
   return (
     <aside className="hidden lg:flex lg:flex-col lg:w-56 lg:min-h-screen bg-white border-r border-gray-200 py-6 px-4 fixed left-0 top-0">
       <div className="mb-8">
         <p className="text-xs font-semibold uppercase tracking-wider text-[#3D8B37]">MyCoachingAssistant</p>
       </div>
       <nav className="flex flex-col gap-1 flex-1">
-        {NAV_ITEMS.map((item) => (
+        {items.map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -147,8 +159,9 @@ function Sidebar({ onLogout }: { onLogout: () => void }) {
   )
 }
 
-function MobileNav({ onLogout }: { onLogout: () => void }) {
+function MobileNav({ onLogout, hasAuthority }: { onLogout: () => void; hasAuthority: boolean }) {
   const [open, setOpen] = useState(false)
+  const items = visibleNavItems(hasAuthority)
 
   return (
     <div className="lg:hidden">
@@ -173,7 +186,7 @@ function MobileNav({ onLogout }: { onLogout: () => void }) {
       {/* Dropdown */}
       {open && (
         <nav className="bg-white border-b border-gray-200 px-4 py-2 flex flex-col gap-1">
-          {NAV_ITEMS.map((item) => (
+          {items.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -211,6 +224,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [hasAuthority, setHasAuthority] = useState(false)
 
   /* ---------- handlers ---------- */
 
@@ -226,9 +240,10 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(async (coachId: string) => {
     try {
-      const [statsRes, progsRes] = await Promise.all([
+      const [statsRes, progsRes, authProgsRes] = await Promise.all([
         fetch(`/api/dashboard/stats?coachId=${encodeURIComponent(coachId)}`),
         fetch('/api/programmes/list'),
+        fetch('/api/auth/authorised-programmes', { credentials: 'include' }),
       ])
 
       if (statsRes.ok) {
@@ -239,6 +254,11 @@ export default function DashboardPage() {
       if (progsRes.ok) {
         const d = await progsRes.json()
         setProgrammes(d.programmes ?? d.programs ?? [])
+      }
+
+      if (authProgsRes.ok) {
+        const d = await authProgsRes.json()
+        setHasAuthority((d.programmes || []).length > 0)
       }
     } catch {
       // silently fail — dashboard still renders with defaults
@@ -299,8 +319,8 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Sidebar onLogout={handleLogout} />
-      <MobileNav onLogout={handleLogout} />
+      <Sidebar onLogout={handleLogout} hasAuthority={hasAuthority} />
+      <MobileNav onLogout={handleLogout} hasAuthority={hasAuthority} />
 
       {/* Main content — offset for sidebar on desktop */}
       <main className="lg:ml-56 px-4 py-6 md:px-8 lg:px-10 max-w-6xl mx-auto">

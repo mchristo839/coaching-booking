@@ -427,3 +427,54 @@ export async function getPromotionBySlug(slug: string) {
   const { rows } = await sql`SELECT * FROM promotions WHERE slug = ${slug} LIMIT 1`
   return rows[0] || null
 }
+
+// ─── Referral context + nudge queue ───
+
+/**
+ * Returns the referral plus the context needed to compose a message:
+ * programme name, coach name, venue, first session time.
+ */
+export async function getReferralContext(referralId: string) {
+  const { rows } = await sql`
+    SELECT r.*,
+           p.programme_name, p.venue_name, p.session_days, p.session_start_time,
+           c.first_name as coach_first_name, c.last_name as coach_last_name
+    FROM referrals r
+    JOIN programmes p ON p.id = r.programme_id
+    JOIN coaches_v2 c ON c.id = p.coach_id
+    WHERE r.id = ${referralId}
+    LIMIT 1
+  `
+  return rows[0] || null
+}
+
+/**
+ * Referrals that may be due for a nudge based on time elapsed.
+ * Only returns active referrals (not lapsed / converted).
+ * The cron handler decides which specific step to send.
+ */
+export async function listReferralsDueForNudge() {
+  const { rows } = await sql`
+    SELECT r.*,
+           p.programme_name, p.venue_name, p.session_days, p.session_start_time,
+           c.first_name as coach_first_name, c.last_name as coach_last_name
+    FROM referrals r
+    JOIN programmes p ON p.id = r.programme_id
+    JOIN coaches_v2 c ON c.id = p.coach_id
+    WHERE r.status IN ('referral_pending', 'confirmed', 'attended')
+      AND r.created_at > NOW() - INTERVAL '30 days'
+  `
+  return rows
+}
+
+export async function markReferralNudged(id: string, step: string) {
+  await sql`
+    UPDATE referrals
+    SET last_nudged_at = NOW(), last_nudge_step = ${step}
+    WHERE id = ${id}
+  `
+}
+
+export async function setReferralFirstSession(id: string, firstSessionAt: string) {
+  await sql`UPDATE referrals SET first_session_at = ${firstSessionAt} WHERE id = ${id}`
+}

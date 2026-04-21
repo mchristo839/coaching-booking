@@ -208,3 +208,79 @@ Rules:
 
   return callClaude(systemPrompt, [{ role: 'user', content: parts.join('\n') }], 200)
 }
+
+// ─── Referral messages ───
+
+export interface ReferralMessageInput {
+  friendFirstName: string
+  childName?: string | null
+  programmeName: string
+  coachName: string
+  venue?: string | null
+  firstSessionAt?: string | null
+  referredByName?: string | null
+}
+
+/**
+ * Confirmation message sent immediately after a friend submits the referral form.
+ */
+export async function generateReferralConfirmation(input: ReferralMessageInput): Promise<string> {
+  const systemPrompt = `You write short WhatsApp messages welcoming new parents to a youth coaching programme.
+
+Rules:
+- Warm, welcoming, coach's voice.
+- 2-3 sentences. One emoji max.
+- Confirm you've got their details and briefly say what happens next (the coach will be in touch).
+- British English.`
+
+  const parts = [
+    `Greet: ${input.friendFirstName}`,
+    input.childName ? `Child: ${input.childName}` : '',
+    `Programme: ${input.programmeName}`,
+    `Coach: ${input.coachName}`,
+    input.venue ? `Venue: ${input.venue}` : '',
+    input.firstSessionAt ? `First session: ${input.firstSessionAt}` : '',
+    input.referredByName ? `Referred by: ${input.referredByName}` : '',
+  ].filter(Boolean)
+
+  return callClaude(systemPrompt, [{ role: 'user', content: parts.join('\n') }], 200)
+}
+
+export type NudgeStep = 'pre_session' | 'session_day' | 'post_session' | 'lapsed_check'
+
+/**
+ * Nudge messages at various points in the referral journey.
+ */
+export async function generateReferralNudge(
+  step: NudgeStep,
+  input: ReferralMessageInput
+): Promise<string> {
+  const intents: Record<NudgeStep, string> = {
+    pre_session: 'Friendly reminder that their first session is tomorrow. Include what to bring if obvious.',
+    session_day: 'Quick "see you today" with venue and time. One sentence + emoji.',
+    post_session: 'Hope they enjoyed their first session. Invite them to come back next time or ask for feedback.',
+    lapsed_check: "Gentle check-in after 7 days of no response — would they still like to come along? Don't be pushy.",
+  }
+
+  const systemPrompt = `You write short WhatsApp nudge messages to parents considering joining a youth coaching programme.
+
+Rules:
+- Warm, personal, coach's voice (not marketing).
+- 1-3 sentences. One emoji max.
+- No "Dear Mr/Mrs" openings.
+- British English.
+- Don't be pushy — this is a referral, not a cold outreach.
+
+Intent for this message: ${intents[step]}`
+
+  const parts = [
+    `Parent first name: ${input.friendFirstName}`,
+    input.childName ? `Child's name: ${input.childName}` : '',
+    `Programme: ${input.programmeName}`,
+    `Coach: ${input.coachName}`,
+    input.venue ? `Venue: ${input.venue}` : '',
+    input.firstSessionAt ? `First session: ${input.firstSessionAt}` : '',
+  ].filter(Boolean)
+
+  return callClaude(systemPrompt, [{ role: 'user', content: parts.join('\n') }], 200)
+}
