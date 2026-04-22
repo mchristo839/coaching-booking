@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createProgramme, createFaqsBulk, updateProvider, findCoachById, type ProgrammeData } from '@/app/lib/db'
-import { getAuthFromRequest } from '@/app/lib/auth'
+import { createProgramme, createFaqsBulk, updateProvider, findCoachById, findCoachByProviderId, type ProgrammeData } from '@/app/lib/db'
+import { getAuthFromRequest, signJwt, setAuthCookie } from '@/app/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,10 +8,23 @@ export async function POST(request: NextRequest) {
     if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const coachId = auth.coachId
-    if (!coachId) {
-      return NextResponse.json({ error: 'No coach profile linked' }, { status: 400 })
+
+    // If the JWT has no coachId (stale token from before coach-creation),
+    // fall back to looking up the coach_v2 row by provider_id. This
+    // self-heals anyone whose token was issued at signup before the coach
+    // profile existed.
+    let resolvedCoachId: string | null = auth.coachId
+    let jwtNeedsRefresh = false
+    if (!resolvedCoachId) {
+      const coach = await findCoachByProviderId(auth.providerId)
+      if (coach) {
+        resolvedCoachId = coach.id as string
+        jwtNeedsRefresh = true
+      } else {
+        return NextResponse.json({ error: 'No coach profile linked' }, { status: 400 })
+      }
     }
+    const coachId: string = resolvedCoachId
 
     const body = await request.json()
     const { faqs, ...rest } = body
@@ -89,11 +102,19 @@ export async function POST(request: NextRequest) {
       await updateProvider(coach.provider_id, { registrationStatus: 'programme_added' })
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       programmeId: programme.id,
       programmeName: programme.programme_name,
     })
+
+    // Re-sign JWT with the resolved coachId so subsequent requests have it.
+    if (jwtNeedsRefresh) {
+      const token = await signJwt(auth.providerId, coachId)
+      setAuthCookie(response, token)
+    }
+
+    return response
   } catch (error) {
     console.error('Create programme error:', error)
     return NextResponse.json({ error: 'Failed to create programme' }, { status: 500 })

@@ -5,6 +5,7 @@ export const fetchCache = 'force-no-store'
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
 import { getAuthFromRequest } from '@/app/lib/auth'
+import { findCoachByProviderId } from '@/app/lib/db'
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,9 +13,12 @@ export async function GET(request: NextRequest) {
     if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const coachId = auth.coachId
+    let coachId = auth.coachId
     if (!coachId) {
-      return NextResponse.json({ error: 'No coach profile linked' }, { status: 400 })
+      // Self-heal: JWT may have been signed before coach-create
+      const coach = await findCoachByProviderId(auth.providerId)
+      if (coach) coachId = coach.id
+      else return NextResponse.json({ programmes: [] })
     }
 
     // Use sql.query() for consistent reads (template tag may use stale read replica)

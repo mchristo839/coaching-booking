@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createCoach, updateProvider } from '@/app/lib/db'
+import { signJwt, setAuthCookie } from '@/app/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,11 +33,17 @@ export async function POST(request: NextRequest) {
 
     await updateProvider(providerId, { registrationStatus: 'coach_added' })
 
-    return NextResponse.json({
+    // Re-sign the JWT so the auth cookie now contains the new coachId.
+    // Without this, the existing cookie has coachId=null and subsequent
+    // programme-create calls would fail with "No coach profile linked".
+    const token = await signJwt(providerId, coach.id)
+    const response = NextResponse.json({
       success: true,
       coachId: coach.id,
       providerId,
     })
+    setAuthCookie(response, token)
+    return response
   } catch (error) {
     console.error('Create coach error:', error)
     return NextResponse.json({ error: 'Failed to create coach profile' }, { status: 500 })

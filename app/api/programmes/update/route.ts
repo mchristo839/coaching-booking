@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@vercel/postgres'
 import { getAuthFromRequest } from '@/app/lib/auth'
+import { findCoachByProviderId } from '@/app/lib/db'
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -8,9 +9,11 @@ export async function PATCH(request: NextRequest) {
     if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const coachId = auth.coachId
+    let coachId = auth.coachId
     if (!coachId) {
-      return NextResponse.json({ error: 'No coach profile linked' }, { status: 400 })
+      const coach = await findCoachByProviderId(auth.providerId)
+      if (coach) coachId = coach.id
+      else return NextResponse.json({ error: 'No coach profile linked' }, { status: 400 })
     }
 
     const body = await request.json()
