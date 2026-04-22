@@ -3,14 +3,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import ProgrammeForm, { type Knowledgebase, emptyKb } from '@/app/components/ProgrammeForm'
+import ProgrammeForm, {
+  type Knowledgebase,
+  type ProgrammeRow,
+  kbFromProgrammeRow,
+  programmePayloadFromForm,
+} from '@/app/components/ProgrammeForm'
 
 interface Program {
   id: string
   programName: string
   whatsappGroupId: string | null
   isActive: boolean
-  knowledgebase: Knowledgebase | null
+  knowledgebase: Knowledgebase
   createdAt: string
 }
 
@@ -18,7 +23,6 @@ type View = 'list' | 'edit'
 
 export default function ProgramsPage() {
   const router = useRouter()
-  const [coachId, setCoachId] = useState<string | null>(null)
   const [programs, setPrograms] = useState<Program[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -27,24 +31,24 @@ export default function ProgramsPage() {
   const [view, setView] = useState<View>('list')
   const [editingProgram, setEditingProgram] = useState<Program | null>(null)
 
-  const fetchPrograms = useCallback(async (id: string) => {
+  const fetchPrograms = useCallback(async () => {
     try {
-      const res = await fetch(`/api/programs/list?coachId=${encodeURIComponent(id)}`)
+      const res = await fetch('/api/programmes/list?includeFaqs=true')
       const data = await res.json()
       if (res.ok) {
         setPrograms(
-          (data.programs || []).map((p: Record<string, unknown>) => ({
+          (data.programmes || []).map((p: ProgrammeRow) => ({
             id: p.id,
-            programName: p.programName,
+            programName: p.programName || '',
             whatsappGroupId: p.whatsappGroupId || null,
-            isActive: p.isActive,
-            knowledgebase: p.knowledgebase || null,
-            createdAt: p.createdAt,
+            isActive: p.isActive ?? true,
+            knowledgebase: kbFromProgrammeRow(p),
+            createdAt: p.createdAt || '',
           }))
         )
       }
     } catch {
-      setError('Failed to load programs')
+      setError('Failed to load programmes')
     } finally {
       setLoading(false)
     }
@@ -53,8 +57,7 @@ export default function ProgramsPage() {
   useEffect(() => {
     const id = localStorage.getItem('coachId')
     if (!id) { router.push('/auth/login'); return }
-    setCoachId(id)
-    fetchPrograms(id)
+    fetchPrograms()
   }, [router, fetchPrograms])
 
   function openEdit(program: Program) {
@@ -74,24 +77,25 @@ export default function ProgramsPage() {
     setError('')
 
     try {
-      const res = await fetch('/api/programs/update', {
+      // Update route ignores fields outside its fieldMap (including `faqs`).
+      const fields = programmePayloadFromForm(
+        data.programName,
+        data.knowledgebase,
+        data.whatsappGroupId
+      )
+      const res = await fetch('/api/programmes/update', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          programId: editingProgram.id,
-          programName: data.programName,
-          knowledgebase: data.knowledgebase,
-          whatsappGroupId: data.whatsappGroupId || undefined,
-        }),
+        body: JSON.stringify({ programmeId: editingProgram.id, ...fields }),
       })
       const result = await res.json()
-      if (!res.ok) { setError(result.error || 'Failed to update program'); return }
+      if (!res.ok) { setError(result.error || 'Failed to update programme'); return }
 
       setSuccessMsg('Programme updated. The bot knowledgebase is live immediately.')
       setView('list')
-      if (coachId) fetchPrograms(coachId)
+      fetchPrograms()
     } catch {
-      setError('Failed to update program')
+      setError('Failed to update programme')
     } finally {
       setSaving(false)
     }
@@ -196,7 +200,7 @@ export default function ProgramsPage() {
         <ProgrammeForm
           mode="edit"
           initialName={editingProgram.programName}
-          initialKb={editingProgram.knowledgebase || emptyKb()}
+          initialKb={editingProgram.knowledgebase}
           initialWhatsappGroupId={editingProgram.whatsappGroupId || ''}
           onSubmit={handleUpdate}
           onCancel={() => { setView('list'); setError('') }}
