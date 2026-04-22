@@ -3,7 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import ProgrammeForm from '@/app/components/ProgrammeForm'
+import ProgrammeForm, {
+  programmePayloadFromForm,
+  type Knowledgebase,
+} from '@/app/components/ProgrammeForm'
 
 export default function NewProgrammePage() {
   const router = useRouter()
@@ -19,7 +22,7 @@ export default function NewProgrammePage() {
 
   async function handleSubmit(data: {
     programName: string
-    knowledgebase: { sport: string; venue: string; venueAddress: string; ageGroup: string; skillLevel: string; schedule: string; priceCents: number; whatToBring: string; cancellationPolicy: string; medicalInfo: string; coachBio: string; customFaqs: { q: string; a: string }[] }
+    knowledgebase: Knowledgebase
     whatsappGroupId: string
   }) {
     if (!coachId) return
@@ -27,29 +30,15 @@ export default function NewProgrammePage() {
     setError('')
 
     try {
-      const res = await fetch('/api/programs/create', {
+      const res = await fetch('/api/programmes/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          coachId,
-          programName: data.programName,
-          knowledgebase: data.knowledgebase,
-        }),
+        body: JSON.stringify(
+          programmePayloadFromForm(data.programName, data.knowledgebase, data.whatsappGroupId)
+        ),
       })
       const result = await res.json()
       if (!res.ok) { setError(result.error || 'Failed to create programme'); return }
-
-      // Link WhatsApp group if provided
-      if (data.whatsappGroupId) {
-        await fetch('/api/programs/update', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            programId: result.programId,
-            whatsappGroupId: data.whatsappGroupId,
-          }),
-        })
-      }
 
       router.push('/dashboard/programs')
     } catch {

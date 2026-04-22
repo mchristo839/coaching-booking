@@ -37,6 +37,93 @@ export const emptyKb = (): Knowledgebase => ({
   customFaqs: [],
 })
 
+// Programme row shape returned by /api/programmes/list — only the fields
+// the form needs to round-trip. Everything else on the row is ignored here.
+export interface ProgrammeRow {
+  id: string
+  programName?: string
+  shortDescription?: string | null
+  specificAgeGroup?: string | null
+  skillLevel?: string | null
+  sessionFrequency?: string | null
+  venueName?: string | null
+  venueAddress?: string | null
+  priceGbp?: number | string | null
+  whatToBring?: string | null
+  cancellationNotice?: string | null
+  botNotes?: string | null
+  whatsappGroupId?: string | null
+  isActive?: boolean
+  createdAt?: string
+  faqs?: Array<{ question: string; answer: string }>
+}
+
+// The `programmes` table has no dedicated columns for medical info or coach
+// bio, so we pack them into `bot_notes` with tagged sections and parse them
+// back on read. The tags are unusual enough to not collide with coach text.
+const MEDICAL_TAG = '__MEDICAL__\n'
+const BIO_TAG = '\n__BIO__\n'
+
+function buildBotNotes(medical: string, bio: string): string | undefined {
+  const m = medical.trim()
+  const b = bio.trim()
+  if (!m && !b) return undefined
+  return `${MEDICAL_TAG}${m}${BIO_TAG}${b}`
+}
+
+function parseBotNotes(notes: string | null | undefined): { medical: string; bio: string } {
+  if (!notes || !notes.startsWith(MEDICAL_TAG)) return { medical: '', bio: '' }
+  const rest = notes.slice(MEDICAL_TAG.length)
+  const idx = rest.indexOf(BIO_TAG)
+  if (idx === -1) return { medical: rest.trim(), bio: '' }
+  return {
+    medical: rest.slice(0, idx).trim(),
+    bio: rest.slice(idx + BIO_TAG.length).trim(),
+  }
+}
+
+export function programmePayloadFromForm(
+  programName: string,
+  kb: Knowledgebase,
+  whatsappGroupId: string
+) {
+  return {
+    programmeName: programName,
+    shortDescription: kb.sport || undefined,
+    specificAgeGroup: kb.ageGroup || undefined,
+    skillLevel: kb.skillLevel || undefined,
+    sessionFrequency: kb.schedule || undefined,
+    venueName: kb.venue || undefined,
+    venueAddress: kb.venueAddress || undefined,
+    priceGbp: kb.priceCents > 0 ? kb.priceCents / 100 : undefined,
+    whatToBring: kb.whatToBring || undefined,
+    cancellationNotice: kb.cancellationPolicy || undefined,
+    botNotes: buildBotNotes(kb.medicalInfo, kb.coachBio),
+    whatsappGroupId: whatsappGroupId || undefined,
+    faqs: kb.customFaqs
+      .filter((f) => f.q.trim() && f.a.trim())
+      .map((f) => ({ question: f.q.trim(), answer: f.a.trim() })),
+  }
+}
+
+export function kbFromProgrammeRow(row: ProgrammeRow): Knowledgebase {
+  const { medical, bio } = parseBotNotes(row.botNotes)
+  return {
+    sport: row.shortDescription || '',
+    venue: row.venueName || '',
+    venueAddress: row.venueAddress || '',
+    ageGroup: row.specificAgeGroup || '',
+    skillLevel: row.skillLevel || 'Beginner',
+    schedule: row.sessionFrequency || '',
+    priceCents: row.priceGbp ? Math.round(Number(row.priceGbp) * 100) : 0,
+    whatToBring: row.whatToBring || '',
+    cancellationPolicy: row.cancellationNotice || '',
+    medicalInfo: medical,
+    coachBio: bio,
+    customFaqs: (row.faqs || []).map((f) => ({ q: f.question, a: f.answer })),
+  }
+}
+
 interface ProgrammeFormProps {
   mode: 'create' | 'edit'
   initialName?: string
