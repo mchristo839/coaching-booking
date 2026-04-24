@@ -342,11 +342,14 @@ export async function POST(request: NextRequest) {
     // ─── @mention check: only respond if bot is @mentioned ───
     // Configured groups should not be spammed by the bot on every message.
     // Unlinked/no-kb paths above are exempt (coach needs to see the setup prompt).
+    // If BOT_JID isn't configured, fall back to replying to all messages —
+    // otherwise an unset env var silently silences the bot.
     const mentionedJids: string[] = data?.message?.extendedTextMessage?.contextInfo?.mentionedJid || []
     const mentioned = isBotMentioned(messageText, mentionedJids)
+    const mentionFilterActive = Boolean(BOT_JID)
 
     // Still log the message for audit trail, but don't reply
-    if (!mentioned) {
+    if (mentionFilterActive && !mentioned) {
       console.log(`[LOG] Not mentioned, skipping reply in ${groupJid}`)
       await safeLogConversation({
         programmeId: program.id,
