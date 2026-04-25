@@ -24,9 +24,9 @@ export interface HealthResponse {
 // ─── Individual checks ───
 
 async function checkEvolutionApi(): Promise<CheckResult> {
-  const url = process.env.EVOLUTION_API_URL || 'http://161.97.176.176:8080'
-  const instance = process.env.EVOLUTION_INSTANCE || 'paul-bot'
-  const apiKey = process.env.EVOLUTION_API_KEY || ''
+  const url = (process.env.EVOLUTION_API_URL || 'http://161.97.176.176:8080').trim()
+  const instance = (process.env.EVOLUTION_INSTANCE || 'paul-bot').trim()
+  const apiKey = (process.env.EVOLUTION_API_KEY || '').trim()
 
   try {
     const start = Date.now()

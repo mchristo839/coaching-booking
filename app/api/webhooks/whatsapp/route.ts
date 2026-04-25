@@ -339,30 +339,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ─── @mention check: only respond if bot is @mentioned ───
-    // Configured groups should not be spammed by the bot on every message.
-    // Unlinked/no-kb paths above are exempt (coach needs to see the setup prompt).
-    // If BOT_JID isn't configured, fall back to replying to all messages —
-    // otherwise an unset env var silently silences the bot.
-    const mentionedJids: string[] = data?.message?.extendedTextMessage?.contextInfo?.mentionedJid || []
-    const mentioned = isBotMentioned(messageText, mentionedJids)
-    const mentionFilterActive = Boolean(BOT_JID)
-
-    // Still log the message for audit trail, but don't reply
-    if (mentionFilterActive && !mentioned) {
-      console.log(`[LOG] Not mentioned, skipping reply in ${groupJid}`)
-      await safeLogConversation({
-        programmeId: program.id,
-        groupJid,
-        senderJid,
-        senderName,
-        messageText,
-        botResponse: null,
-        category,
-        escalated,
-      })
-      return NextResponse.json({ ok: true })
-    }
+    // ─── @mention check (currently disabled) ───
+    // Bot replies to all group messages, per CLAUDE.md ("no @mention filtering yet").
+    // The previous mention-only logic silently dropped messages because:
+    //   1. BOT_JID was set to the phone-based JID (447458164754@s.whatsapp.net) but
+    //      WhatsApp groups address the bot via its LID (e.g. 165722051334265@lid),
+    //      so isBotMentioned returned false for valid mentions.
+    //   2. If BOT_JID was unset, isBotMentioned returned false for everything.
+    // Re-enable once BOT_JID can resolve both JID + LID identities (or we read the
+    // bot's identity from Evolution at startup).
+    void isBotMentioned // kept for future re-enable; silences unused-var lint
+    void BOT_JID
 
     // Strip @number tags from message text before sending to Claude
     const cleanedText = messageText.replace(/@\d+/g, '').trim()
