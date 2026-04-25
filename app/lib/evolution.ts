@@ -1,9 +1,11 @@
 // Evolution API client — sends WhatsApp messages via the shared paul-bot instance
 // SERVER-SIDE ONLY: Never import this in client components.
 
-const EVOLUTION_BASE_URL = process.env.EVOLUTION_API_URL || 'http://35.239.224.242:8080'
-const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || ''
-const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'paul-bot'
+// Trim env vars defensively — a stray trailing newline in the Vercel UI silently
+// produces malformed URLs (the bot looks "down" because every send fails).
+const EVOLUTION_BASE_URL = (process.env.EVOLUTION_API_URL || 'http://35.239.224.242:8080').trim()
+const EVOLUTION_API_KEY = (process.env.EVOLUTION_API_KEY || '').trim()
+const EVOLUTION_INSTANCE = (process.env.EVOLUTION_INSTANCE || 'paul-bot').trim()
 
 export async function sendWhatsAppMessage(groupJid: string, text: string): Promise<void> {
   const url = `${EVOLUTION_BASE_URL}/message/sendText/${EVOLUTION_INSTANCE}`

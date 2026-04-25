@@ -10,9 +10,9 @@ import { getAuthFromRequest } from '@/app/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
-const EVOLUTION_BASE_URL = process.env.EVOLUTION_API_URL || 'http://161.97.176.176:8080'
-const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || ''
-const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'paul-bot'
+const EVOLUTION_BASE_URL = (process.env.EVOLUTION_API_URL || 'http://161.97.176.176:8080').trim()
+const EVOLUTION_API_KEY = (process.env.EVOLUTION_API_KEY || '').trim()
+const EVOLUTION_INSTANCE = (process.env.EVOLUTION_INSTANCE || 'paul-bot').trim()
 
 async function evolutionFetch(path: string): Promise<{ ok: boolean; status: number; body: unknown }> {
   try {
