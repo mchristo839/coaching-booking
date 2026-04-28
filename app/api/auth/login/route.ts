@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
 
     // Sign JWT and set HTTP-only cookie
     const token = await signJwt(provider.id, coach?.id || undefined)
+    const vertical: 'sport' | 'fitness' = (coach as { vertical?: string } | null)?.vertical === 'fitness' ? 'fitness' : 'sport'
     const response = NextResponse.json({
       success: true,
       providerId: provider.id,
@@ -34,6 +35,7 @@ export async function POST(request: NextRequest) {
       name: `${provider.first_name} ${provider.last_name}`.trim(),
       tradingName: provider.trading_name,
       registrationStatus: provider.registration_status,
+      vertical,
     })
     setAuthCookie(response, token)
     return response

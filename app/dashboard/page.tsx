@@ -111,24 +111,46 @@ interface NavItem {
   href: string
   active?: boolean
   requiresAuthority?: boolean
+  fitnessOnly?: boolean      // hide on vertical='sport' (default)
+  labelByVertical?: { sport: string; fitness: string }
 }
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', active: true },
-  { label: 'Control Centre', href: '/dashboard/control-centre', requiresAuthority: true },
-  { label: 'Programmes', href: '/dashboard/programmes' },
-  { label: 'Members', href: '/dashboard/members' },
+  {
+    label: 'Control Centre',
+    href: '/dashboard/control-centre',
+    requiresAuthority: true,
+    labelByVertical: { sport: 'Control Centre', fitness: 'Studio Control' },
+  },
+  {
+    label: 'Programmes',
+    href: '/dashboard/programmes',
+    labelByVertical: { sport: 'Programmes', fitness: 'Classes' },
+  },
+  {
+    label: 'Members',
+    href: '/dashboard/members',
+    labelByVertical: { sport: 'Members', fitness: 'Clients' },
+  },
   { label: 'Referrals', href: '/dashboard/referrals', requiresAuthority: true },
+  { label: 'Feedback', href: '/dashboard/feedback', fitnessOnly: true },
   { label: 'Learning Log', href: '/dashboard/learning' },
   { label: 'Settings', href: '/dashboard/settings' },
 ]
 
-function visibleNavItems(hasAuthority: boolean): NavItem[] {
-  return NAV_ITEMS.filter((item) => !item.requiresAuthority || hasAuthority)
+function visibleNavItems(hasAuthority: boolean, vertical: 'sport' | 'fitness'): NavItem[] {
+  return NAV_ITEMS
+    .filter((item) => !item.requiresAuthority || hasAuthority)
+    .filter((item) => !item.fitnessOnly || vertical === 'fitness')
+    .map((item) => ({
+      ...item,
+      label: item.labelByVertical ? item.labelByVertical[vertical] : item.label,
+    }))
 }
 
-function Sidebar({ onLogout, hasAuthority }: { onLogout: () => void; hasAuthority: boolean }) {
-  const items = visibleNavItems(hasAuthority)
+function Sidebar({ onLogout, hasAuthority, vertical }: { onLogout: () => void; hasAuthority: boolean; vertical: 'sport' | 'fitness' }) {
+  const items = visibleNavItems(hasAuthority, vertical)
   return (
     <aside className="hidden lg:flex lg:flex-col lg:w-56 lg:min-h-screen bg-white border-r border-gray-200 py-6 px-4 fixed left-0 top-0">
       <div className="mb-8">
@@ -159,9 +181,9 @@ function Sidebar({ onLogout, hasAuthority }: { onLogout: () => void; hasAuthorit
   )
 }
 
-function MobileNav({ onLogout, hasAuthority }: { onLogout: () => void; hasAuthority: boolean }) {
+function MobileNav({ onLogout, hasAuthority, vertical }: { onLogout: () => void; hasAuthority: boolean; vertical: 'sport' | 'fitness' }) {
   const [open, setOpen] = useState(false)
-  const items = visibleNavItems(hasAuthority)
+  const items = visibleNavItems(hasAuthority, vertical)
 
   return (
     <div className="lg:hidden">
@@ -225,6 +247,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [hasAuthority, setHasAuthority] = useState(false)
+  const [vertical, setVertical] = useState<'sport' | 'fitness'>(() => {
+    if (typeof window === 'undefined') return 'sport'
+    return (window.localStorage.getItem('coachVertical') === 'fitness' ? 'fitness' : 'sport')
+  })
 
   /* ---------- handlers ---------- */
 
@@ -240,11 +266,19 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(async (coachId: string) => {
     try {
-      const [statsRes, progsRes, authProgsRes] = await Promise.all([
+      const [statsRes, progsRes, authProgsRes, meRes] = await Promise.all([
         fetch(`/api/dashboard/stats?coachId=${encodeURIComponent(coachId)}`),
         fetch('/api/programmes/list'),
         fetch('/api/auth/authorised-programmes', { credentials: 'include' }),
+        fetch('/api/auth/me', { credentials: 'include' }),
       ])
+
+      if (meRes.ok) {
+        const d = await meRes.json()
+        const v: 'sport' | 'fitness' = d.vertical === 'fitness' ? 'fitness' : 'sport'
+        setVertical(v)
+        window.localStorage.setItem('coachVertical', v)
+      }
 
       if (statsRes.ok) {
         const d = await statsRes.json()
@@ -319,8 +353,8 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Sidebar onLogout={handleLogout} hasAuthority={hasAuthority} />
-      <MobileNav onLogout={handleLogout} hasAuthority={hasAuthority} />
+      <Sidebar onLogout={handleLogout} hasAuthority={hasAuthority} vertical={vertical} />
+      <MobileNav onLogout={handleLogout} hasAuthority={hasAuthority} vertical={vertical} />
 
       {/* Main content — offset for sidebar on desktop */}
       <main className="lg:ml-56 px-4 py-6 md:px-8 lg:px-10 max-w-6xl mx-auto">

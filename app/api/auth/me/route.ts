@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
   try {
     const { rows } = await sql`
       SELECT p.id as provider_id, p.email, p.first_name, p.last_name, p.trading_name,
-             c.id as coach_id, c.first_name as coach_first_name, c.last_name as coach_last_name
+             c.id as coach_id, c.first_name as coach_first_name, c.last_name as coach_last_name,
+             c.vertical as vertical
       FROM providers p
       LEFT JOIN coaches_v2 c ON c.id = ${auth.coachId}
       WHERE p.id = ${auth.providerId}
@@ -32,6 +33,7 @@ export async function GET(request: NextRequest) {
       email: user.email,
       name: `${user.first_name} ${user.last_name}`.trim(),
       tradingName: user.trading_name,
+      vertical: (user.vertical || 'sport') as 'sport' | 'fitness',
     })
   } catch (error) {
     console.error('[AUTH-ME] error:', error)

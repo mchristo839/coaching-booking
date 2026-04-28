@@ -519,6 +519,79 @@ export async function POST() {
     // are populated from the first row for backward compatibility.
     await sql`ALTER TABLE programmes ADD COLUMN IF NOT EXISTS session_schedule JSONB`
 
+    // ═══════════════════════════════════════════════════════════
+    // Phase 8: Fitness studio vertical (Paul's brief)
+    // All additive. Existing 'sport' coaches are not affected.
+    // ═══════════════════════════════════════════════════════════
+
+    // Per-coach vertical flag. 'sport' (current behaviour) | 'fitness'.
+    // Drives label translation (Programme→Class, Coach→Trainer, Member→
+    // Client) and gates fitness-only UI panels.
+    await sql`
+      ALTER TABLE coaches_v2 ADD COLUMN IF NOT EXISTS vertical VARCHAR(20)
+        NOT NULL DEFAULT 'sport'
+        CHECK (vertical IN ('sport','fitness'))
+    `
+
+    // session_feedback: completed feedback responses, one row per session
+    // rating. score 1-5, optional written_feedback for low scores.
+    // flagged_for_manager auto-set true when score <= 2 so the manager
+    // dashboard can highlight problems.
+    await sql`
+      CREATE TABLE IF NOT EXISTS session_feedback (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        programme_id UUID NOT NULL REFERENCES programmes(id) ON DELETE CASCADE,
+        client_jid TEXT NOT NULL,
+        client_name TEXT,
+        pt_coach_id UUID REFERENCES coaches_v2(id),
+        pt_name TEXT,
+        score INTEGER CHECK (score >= 1 AND score <= 5),
+        written_feedback TEXT,
+        flagged_for_manager BOOLEAN DEFAULT FALSE,
+        session_date DATE,
+        requested_at TIMESTAMPTZ DEFAULT NOW(),
+        responded_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_session_feedback_programme ON session_feedback(programme_id, created_at DESC)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_session_feedback_flagged ON session_feedback(flagged_for_manager, created_at DESC) WHERE flagged_for_manager = true`
+
+    // pending_feedback: in-flight feedback requests waiting for a reply
+    // from the client. Keyed by client_jid so the webhook can match
+    // incoming 1:1 messages back to the right open request. State machine:
+    //   awaiting_score → awaiting_comment_low (score 1-2)
+    //                  → awaiting_referral_yes_no (score 4-5)
+    //                  → completed
+    // expires_at lets us auto-skip stale requests (default 48h window).
+    await sql`
+      CREATE TABLE IF NOT EXISTS pending_feedback (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        programme_id UUID NOT NULL REFERENCES programmes(id) ON DELETE CASCADE,
+        client_jid TEXT NOT NULL,
+        client_name TEXT,
+        pt_coach_id UUID REFERENCES coaches_v2(id),
+        pt_name TEXT,
+        session_date DATE,
+        prompt_message_id TEXT,
+        state VARCHAR(30) NOT NULL DEFAULT 'awaiting_score'
+          CHECK (state IN ('awaiting_score','awaiting_comment_low','awaiting_referral_yes_no','completed','expired')),
+        refer_a_friend_slug TEXT,
+        feedback_id UUID REFERENCES session_feedback(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '48 hours')
+      )
+    `
+    // Partial index on open states only — webhook lookup is O(1) and the
+    // 'completed'/'expired' rows (which can grow indefinitely) don't pollute
+    // the index.
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_pending_feedback_open
+        ON pending_feedback(client_jid)
+        WHERE state IN ('awaiting_score','awaiting_comment_low','awaiting_referral_yes_no')
+    `
+
     // ── Migrate existing data from old tables ──
     const oldCoachesExist = await sql`
       SELECT EXISTS (

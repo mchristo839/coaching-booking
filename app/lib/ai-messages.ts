@@ -332,3 +332,81 @@ Rules:
 
   return callClaude(systemPrompt, [{ role: 'user', content: parts.join('\n') }], 200)
 }
+
+// ─── Post-session feedback (fitness studio vertical) ───
+// Three short DMs the bot sends to a client after a session. Trigger flow
+// is in app/api/webhooks/whatsapp/route.ts.
+
+export interface FeedbackPromptInput {
+  clientFirstName: string
+  programmeName: string
+  ptName: string | null         // null when no specific PT (e.g. group class)
+  sessionDate: string | null    // 'today' | 'yesterday' | 'on Monday' — formatted upstream
+}
+
+export async function generateFeedbackPrompt(input: FeedbackPromptInput): Promise<string> {
+  const systemPrompt = `You write very short post-session feedback prompts that go via WhatsApp 1:1 to a fitness-studio client.
+
+Rules:
+- 1-2 sentences max. One emoji max.
+- Address the client by first name.
+- Ask them to rate the session 1-5.
+- Make it clear they should reply with just a number.
+- British English.
+- Don't pretend to be human — concise and friendly is enough.`
+
+  const parts = [
+    `Client first name: ${input.clientFirstName}`,
+    `Programme/class: ${input.programmeName}`,
+    input.ptName ? `Trainer: ${input.ptName}` : '',
+    input.sessionDate ? `Session: ${input.sessionDate}` : 'Session: today',
+  ].filter(Boolean)
+
+  return callClaude(systemPrompt, [{ role: 'user', content: parts.join('\n') }], 150)
+}
+
+export interface FeedbackFollowUpInput {
+  clientFirstName: string
+  score: number                   // 1-5
+}
+
+// Sent after the score is recorded. Two flavours: low (1-2) asks for written
+// feedback to flag to the manager; high (4-5) thanks + transitions into the
+// referral pitch. Score 3 gets a plain thank-you with no follow-up.
+export async function generateFeedbackFollowUp(input: FeedbackFollowUpInput): Promise<string> {
+  let intent: string
+  if (input.score <= 2) {
+    intent = 'Acknowledge the low score warmly. Ask if they would like to share any feedback for the manager (confidential). 1-2 sentences. No platitudes.'
+  } else if (input.score >= 4) {
+    intent = 'Thank them. Mention that if they have a friend who would enjoy training there, you have something for them — would they like to hear about it? 1-2 sentences. One emoji max.'
+  } else {
+    intent = 'Plain thank-you for the feedback, one short sentence, no follow-up question.'
+  }
+
+  const systemPrompt = `You write a short WhatsApp 1:1 reply from a fitness-studio bot to a client who has just rated their session.
+
+Rules:
+- 1-2 sentences max. One emoji max.
+- Use the client's first name.
+- British English.
+
+Intent for this reply: ${intent}`
+
+  const parts = [
+    `Client first name: ${input.clientFirstName}`,
+    `Score they gave: ${input.score}/5`,
+  ]
+
+  return callClaude(systemPrompt, [{ role: 'user', content: parts.join('\n') }], 150)
+}
+
+// Sent on referral-handoff after a high score: "yes, send me the link" path.
+// Plain template (no LLM cost) so the link lands intact and consistent.
+export function buildReferralHandoffMessage(referLink: string, clientFirstName: string): string {
+  return `Brilliant ${clientFirstName} — here's your link to share with a friend:\n${referLink}\n\nWhen they sign up through it, you'll both get the bonus.`
+}
+
+// Sent when the client declines the referral pitch. Plain template.
+export function buildReferralDeclineAck(clientFirstName: string): string {
+  return `No worries ${clientFirstName} — thanks again for the feedback. See you at the next session 💪`
+}
