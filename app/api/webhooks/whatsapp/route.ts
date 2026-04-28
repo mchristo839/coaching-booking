@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { findProgramByWhatsAppGroup, safeLogConversation, isMessageProcessed, trackBotReply, type Knowledgebase } from '@/app/lib/db'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId } from '@/app/lib/control-centre-db'
+import { tryHandleFeedbackReply } from '@/app/lib/feedback'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 const BOT_JID = process.env.BOT_JID || ''
@@ -204,14 +205,52 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // Only handle group messages (group JIDs end in @g.us)
-    const groupJid: string = data?.key?.remoteJid || ''
-    if (!groupJid.endsWith('@g.us')) {
+    const remoteJid: string = data?.key?.remoteJid || ''
+    const isGroup = remoteJid.endsWith('@g.us')
+    const messageId: string = data?.key?.id || ''
+
+    // ─── 1:1 feedback reply branch (fitness studio vertical) ───
+    // Self-gating: only fires when the sender has an open pending_feedback
+    // row. For everyone else it returns false instantly and the existing
+    // group-only logic below runs untouched. Wrapped in its own try/catch
+    // so a failure here can never break Paul's group bot.
+    if (!isGroup && remoteJid) {
+      const inboundText: string =
+        data?.message?.conversation ||
+        data?.message?.extendedTextMessage?.text ||
+        ''
+
+      if (inboundText.trim()) {
+        // Dedup check first — same processed_messages table as the group
+        // path, so a duplicate Evolution webhook can't double-process.
+        if (messageId) {
+          const alreadyProcessed = await isMessageProcessed(messageId)
+          if (alreadyProcessed) return NextResponse.json({ ok: true })
+        }
+
+        try {
+          const consumed = await tryHandleFeedbackReply(remoteJid, inboundText)
+          if (consumed) return NextResponse.json({ ok: true })
+        } catch (e) {
+          console.error('[FEEDBACK BRANCH] error, falling through:', e)
+          // Don't return — drop into the standard non-group exit below.
+        }
+      }
+      // Either no in-flight feedback request, no text, or handler errored.
+      // Match pre-existing behaviour: silently drop non-group messages.
+      return NextResponse.json({ ok: true })
+    }
+
+    // Group-only from here. Use groupJid (the remote JID, which is the
+    // group's JID for @g.us messages).
+    const groupJid = remoteJid
+    if (!isGroup) {
+      // Defensive: should be unreachable because the 1:1 branch above
+      // already returned for non-group messages.
       return NextResponse.json({ ok: true })
     }
 
     // Message dedup: Evolution API can fire the same webhook twice
-    const messageId: string = data?.key?.id || ''
     if (messageId) {
       const alreadyProcessed = await isMessageProcessed(messageId)
       if (alreadyProcessed) {

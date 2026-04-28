@@ -35,6 +35,7 @@ export default function LoginPage() {
       localStorage.setItem('coachName', data.name)
       if (data.providerId) localStorage.setItem('providerId', data.providerId)
       if (data.tradingName) localStorage.setItem('tradingName', data.tradingName)
+      localStorage.setItem('coachVertical', data.vertical === 'fitness' ? 'fitness' : 'sport')
 
       const status = data.registrationStatus
       if (status !== 'complete' && status !== 'programme_added') {

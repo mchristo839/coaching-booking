@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import type { Vertical } from '@/app/lib/vertical-labels'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -10,6 +11,9 @@ export default function SettingsPage() {
   const [email, setEmail] = useState('')
   const [mobile, setMobile] = useState('')
   const [tradingName, setTradingName] = useState('')
+  const [vertical, setVertical] = useState<Vertical>('sport')
+  const [savingVertical, setSavingVertical] = useState(false)
+  const [verticalMsg, setVerticalMsg] = useState('')
 
   useEffect(() => {
     const id = localStorage.getItem('coachId')
@@ -19,7 +23,42 @@ export default function SettingsPage() {
     setEmail(localStorage.getItem('coachEmail') || '')
     setMobile(localStorage.getItem('coachMobile') || '')
     setTradingName(localStorage.getItem('tradingName') || '')
+
+    // Pull the vertical from /api/auth/me so we always reflect the DB.
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.vertical === 'fitness' || data?.vertical === 'sport') {
+          setVertical(data.vertical)
+          window.localStorage.setItem('coachVertical', data.vertical)
+        }
+      })
+      .catch(() => { /* silent */ })
   }, [router])
+
+  async function saveVertical(next: Vertical) {
+    if (next === vertical) return
+    setSavingVertical(true)
+    setVerticalMsg('')
+    try {
+      const res = await fetch('/api/coaches/me', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vertical: next }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setVerticalMsg(data.error || 'Failed to save')
+        return
+      }
+      setVertical(next)
+      window.localStorage.setItem('coachVertical', next)
+      setVerticalMsg('Saved. Reload pages to see new labels everywhere.')
+    } finally {
+      setSavingVertical(false)
+    }
+  }
 
   return (
     <div className="min-h-screen px-4 py-6 md:px-8 max-w-2xl mx-auto">
@@ -96,6 +135,46 @@ export default function SettingsPage() {
             <p className="text-sm text-gray-900">{tradingName || '-'}</p>
           </div>
         </div>
+      </div>
+
+      {/* Vertical (sport vs fitness studio) */}
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Vertical</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Choose how the dashboard should speak. Sport uses programmes / coaches /
+          members. Fitness studio uses classes / trainers / clients and unlocks the
+          studio-specific panels (post-session feedback, PT utilisation).
+        </p>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => saveVertical('sport')}
+            disabled={savingVertical}
+            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors disabled:opacity-50 ${
+              vertical === 'sport'
+                ? 'bg-[#3D8B37] text-white border-[#3D8B37]'
+                : 'bg-white text-gray-700 border-gray-300 hover:border-[#3D8B37]'
+            }`}
+          >
+            Grassroots Sport
+          </button>
+          <button
+            type="button"
+            onClick={() => saveVertical('fitness')}
+            disabled={savingVertical}
+            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors disabled:opacity-50 ${
+              vertical === 'fitness'
+                ? 'bg-[#3D8B37] text-white border-[#3D8B37]'
+                : 'bg-white text-gray-700 border-gray-300 hover:border-[#3D8B37]'
+            }`}
+          >
+            Fitness Studio
+          </button>
+        </div>
+        {verticalMsg && (
+          <p className="text-xs text-gray-500 mt-2">{verticalMsg}</p>
+        )}
       </div>
 
       {/* Bot Behaviour */}
