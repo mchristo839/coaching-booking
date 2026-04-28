@@ -112,7 +112,17 @@ export default function PublicReferralPage() {
 
         <form onSubmit={handleSubmit} className="space-y-3 mt-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Your first name *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Child&apos;s first name *</label>
+            <input
+              type="text"
+              value={childName}
+              onChange={(e) => setChildName(e.target.value)}
+              required
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Parent first name *</label>
             <input
               type="text"
               value={friendFirstName}
@@ -122,16 +132,7 @@ export default function PublicReferralPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Your child&apos;s name</label>
-            <input
-              type="text"
-              value={childName}
-              onChange={(e) => setChildName(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mobile / WhatsApp *</label>
             <input
               type="tel"
               value={friendPhone}
@@ -151,7 +152,7 @@ export default function PublicReferralPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Who told you about us?</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Who referred you?</label>
             <input
               type="text"
               value={referredByName}

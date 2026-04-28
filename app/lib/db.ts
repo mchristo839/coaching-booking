@@ -129,15 +129,43 @@ export interface ProgrammeData {
   paymentReminderSchedule?: string
   botNotes?: string
   whatsappGroupId?: string
+  // Phase 7 additions
+  seasonType?: string                  // autumn_winter | spring_summer | full_year | custom
+  seasonStartDate?: string             // ISO date string (YYYY-MM-DD)
+  seasonEndDate?: string
+  skillLevels?: string[]               // multi-select; first value mirrored into skill_level
+  sessionSchedule?: SessionScheduleEntry[]
+}
+
+export interface SessionScheduleEntry {
+  day: string                          // 'Monday' | ... | 'Sunday'
+  startTime: string                    // '17:30'
+  durationMins: number                 // 60, 75, 90, ...
 }
 
 export async function createProgramme(data: ProgrammeData) {
   const days = data.sessionDays ? `{${data.sessionDays.join(',')}}` : null
   const methods = data.paymentMethods ? `{${data.paymentMethods.join(',')}}` : null
+  const skills = data.skillLevels && data.skillLevels.length > 0
+    ? `{${data.skillLevels.join(',')}}`
+    : null
+  // Mirror first selected skill into the legacy single column.
+  const legacySkill = data.skillLevels?.[0] ?? data.skillLevel ?? null
+  const sessionSchedule = data.sessionSchedule && data.sessionSchedule.length > 0
+    ? JSON.stringify(data.sessionSchedule)
+    : null
+  // Mirror first row into legacy single time/duration so older read paths
+  // still work without a code change.
+  const legacyStart = data.sessionStartTime || data.sessionSchedule?.[0]?.startTime || null
+  const legacyDuration = data.sessionDuration
+    || (data.sessionSchedule?.[0]?.durationMins != null
+      ? `${data.sessionSchedule[0].durationMins} mins`
+      : null)
   const { rows } = await sql`
     INSERT INTO programmes (
       coach_id, programme_name, short_description, target_audience, specific_age_group,
-      skill_level, programme_type, session_days, session_start_time, session_duration,
+      skill_level, skill_levels, programme_type, season_type, season_start_date, season_end_date,
+      session_days, session_start_time, session_duration, session_schedule,
       session_frequency, holiday_schedule, cancellation_notice, venue_name, venue_address,
       parking, nearest_transport, indoor_outdoor, bad_weather_policy, max_capacity,
       full_threshold, waitlist_enabled, referral_trigger, referral_incentive, programme_status,
@@ -148,7 +176,8 @@ export async function createProgramme(data: ProgrammeData) {
     )
     VALUES (
       ${data.coachId}, ${data.programmeName}, ${data.shortDescription || null}, ${data.targetAudience || null}, ${data.specificAgeGroup || null},
-      ${data.skillLevel || null}, ${data.programmeType || null}, ${days}, ${data.sessionStartTime || null}, ${data.sessionDuration || null},
+      ${legacySkill}, ${skills}, ${data.programmeType || null}, ${data.seasonType || null}, ${data.seasonStartDate || null}, ${data.seasonEndDate || null},
+      ${days}, ${legacyStart}, ${legacyDuration}, ${sessionSchedule}::jsonb,
       ${data.sessionFrequency || null}, ${data.holidaySchedule || null}, ${data.cancellationNotice || null}, ${data.venueName || null}, ${data.venueAddress || null},
       ${data.parking || null}, ${data.nearestTransport || null}, ${data.indoorOutdoor || null}, ${data.badWeatherPolicy || null}, ${data.maxCapacity || null},
       ${data.fullThreshold || 'at_100'}, ${data.waitlistEnabled ?? true}, ${data.referralTrigger || null}, ${data.referralIncentive || null}, ${data.programmeStatus || 'open'},

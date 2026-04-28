@@ -494,6 +494,31 @@ export async function POST() {
     // Track which nudge was last sent (pre_session | session_day | post_session | lapsed_check | null)
     await sql`ALTER TABLE referrals ADD COLUMN IF NOT EXISTS last_nudge_step TEXT`
 
+    // ═══════════════════════════════════════════════════════════
+    // Phase 7: Programme builder upgrades (prospect demo feedback)
+    // ═══════════════════════════════════════════════════════════
+
+    // Item 1 — Seasonal start/end. season_type values:
+    //   'autumn_winter' | 'spring_summer' | 'full_year' | 'custom'
+    // For 'custom', dates come from season_start_date / season_end_date.
+    // For the first three, the form maps to canonical dates client-side
+    // (Sept-Mar, Apr-Aug, Jan-Dec). We persist both the label and the
+    // dates so reads don't need to recompute.
+    await sql`ALTER TABLE programmes ADD COLUMN IF NOT EXISTS season_type VARCHAR(30)`
+    await sql`ALTER TABLE programmes ADD COLUMN IF NOT EXISTS season_start_date DATE`
+    await sql`ALTER TABLE programmes ADD COLUMN IF NOT EXISTS season_end_date DATE`
+
+    // Item 5 — Skill level multi-select. skill_levels is the new canonical
+    // column; the legacy skill_level scalar is kept and populated with the
+    // first selected value for backward compatibility.
+    await sql`ALTER TABLE programmes ADD COLUMN IF NOT EXISTS skill_levels TEXT[]`
+
+    // Item 2 — Per-day session times. JSONB array of
+    //   [{ day: 'Monday', startTime: '17:30', durationMins: 60 }, ...]
+    // The legacy session_start_time / session_duration columns remain and
+    // are populated from the first row for backward compatibility.
+    await sql`ALTER TABLE programmes ADD COLUMN IF NOT EXISTS session_schedule JSONB`
+
     // ── Migrate existing data from old tables ──
     const oldCoachesExist = await sql`
       SELECT EXISTS (
