@@ -79,6 +79,12 @@ export async function POST(request: NextRequest) {
       kitDetails: rest.kitDetails || null,
       paymentReminderSchedule: rest.paymentReminderSchedule || null,
       trialInstructions: rest.trialInstructions || null,
+      // Phase 7
+      seasonType: rest.seasonType || null,
+      seasonStartDate: rest.seasonStartDate || null,
+      seasonEndDate: rest.seasonEndDate || null,
+      skillLevels: Array.isArray(rest.skillLevels) ? rest.skillLevels.filter(Boolean) : undefined,
+      sessionSchedule: Array.isArray(rest.sessionSchedule) ? rest.sessionSchedule : undefined,
     }
 
     const programme = await createProgramme(programmeData)

@@ -59,14 +59,29 @@ You should see a log line like:
 crontab -e
 ```
 
-Add these two lines:
+Add these lines:
 
 ```cron
 */5 * * * * /opt/mca/mca-health-check.sh
 0 4 * * * /opt/mca/mca-cleanup.sh
+0 * * * * /opt/mca/mca-referral-nudges.sh
+0 16 * * * /opt/mca/mca-session-reminders.sh
 ```
 
-Health check runs every 5 minutes. Cleanup runs daily at 04:00 UTC.
+Health check every 5 minutes. Cleanup daily at 04:00 UTC. Referral nudges
+hourly. Session reminders daily at 16:00 UTC (≈17:00 BST) — fires the
+day-before message to each coach with attendance from the latest poll. The
+session-reminders endpoint is idempotent within a 23h window, so a
+duplicate run won't double-send.
+
+Don't forget to copy the new scripts into place before adding the cron lines:
+
+```bash
+cp mca-referral-nudges.sh /opt/mca/
+cp mca-session-reminders.sh /opt/mca/
+chmod +x /opt/mca/mca-referral-nudges.sh
+chmod +x /opt/mca/mca-session-reminders.sh
+```
 
 ## 5. Verify cron is running
 

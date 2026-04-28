@@ -70,16 +70,27 @@ interface Programme {
   faqs?: Faq[]
 }
 
+interface SessionSchedRow {
+  day: string
+  startTime: string
+  durationMins: number
+}
+
 interface FormData {
   programmeName: string
   shortDescription: string
   targetAudience: string
   specificAgeGroup: string
   skillLevel: string
+  skillLevels: string[]                  // Phase 7 — multi-select
   programmeType: string
+  seasonType: string                     // Phase 7 — autumn_winter | spring_summer | full_year | custom
+  seasonStartDate: string                // ISO date 'YYYY-MM-DD'
+  seasonEndDate: string
   sessionDays: string[]
   sessionStartTime: string
   sessionDuration: string
+  sessionSchedule: SessionSchedRow[]     // Phase 7 — per-day times
   sessionFrequency: string
   holidaySchedule: string
   cancellationNotice: string
@@ -125,10 +136,15 @@ const emptyForm = (): FormData => ({
   targetAudience: '',
   specificAgeGroup: '',
   skillLevel: '',
+  skillLevels: [],
   programmeType: '',
+  seasonType: '',
+  seasonStartDate: '',
+  seasonEndDate: '',
   sessionDays: [],
   sessionStartTime: '',
   sessionDuration: '',
+  sessionSchedule: [],
   sessionFrequency: '',
   holidaySchedule: '',
   cancellationNotice: '',
@@ -315,11 +331,33 @@ function ProgrammesPageInner() {
   }
 
   function toggleDay(day: string) {
+    setForm((prev) => {
+      const present = prev.sessionDays.includes(day)
+      const newDays = present
+        ? prev.sessionDays.filter((d) => d !== day)
+        : [...prev.sessionDays, day]
+      // Keep sessionSchedule in sync — drop rows for removed days, append rows
+      // for new days using the legacy time/duration as the default seed.
+      let newSchedule = prev.sessionSchedule.filter((r) => newDays.includes(r.day))
+      if (!present) {
+        const seedTime = prev.sessionStartTime
+          || prev.sessionSchedule[0]?.startTime
+          || ''
+        const seedMins = prev.sessionSchedule[0]?.durationMins
+          || parseInt(prev.sessionDuration, 10)
+          || 60
+        newSchedule = [...newSchedule, { day, startTime: seedTime, durationMins: seedMins }]
+      }
+      return { ...prev, sessionDays: newDays, sessionSchedule: newSchedule }
+    })
+  }
+
+  function updateScheduleRow(day: string, patch: Partial<SessionSchedRow>) {
     setForm((prev) => ({
       ...prev,
-      sessionDays: prev.sessionDays.includes(day)
-        ? prev.sessionDays.filter((d) => d !== day)
-        : [...prev.sessionDays, day],
+      sessionSchedule: prev.sessionSchedule.map((r) =>
+        r.day === day ? { ...r, ...patch } : r
+      ),
     }))
   }
 
@@ -361,10 +399,43 @@ function ProgrammesPageInner() {
       targetAudience: get('targetAudience', 'target_audience'),
       specificAgeGroup: get('specificAgeGroup', 'specific_age_group'),
       skillLevel: get('skillLevel', 'skill_level'),
+      skillLevels: (() => {
+        const arr = getArr('skillLevels', 'skill_levels')
+        if (arr.length > 0) return arr
+        const single = get('skillLevel', 'skill_level')
+        return single ? [single] : []
+      })(),
       programmeType: get('programmeType', 'programme_type'),
+      seasonType: get('seasonType', 'season_type'),
+      seasonStartDate: ((): string => {
+        const v = (p.seasonStartDate || p.season_start_date) as string | Date | undefined
+        if (!v) return ''
+        return typeof v === 'string' ? v.slice(0, 10) : new Date(v).toISOString().slice(0, 10)
+      })(),
+      seasonEndDate: ((): string => {
+        const v = (p.seasonEndDate || p.season_end_date) as string | Date | undefined
+        if (!v) return ''
+        return typeof v === 'string' ? v.slice(0, 10) : new Date(v).toISOString().slice(0, 10)
+      })(),
       sessionDays: getArr('sessionDays', 'session_days'),
       sessionStartTime: get('sessionStartTime', 'session_start_time'),
       sessionDuration: get('sessionDuration', 'session_duration'),
+      sessionSchedule: ((): SessionSchedRow[] => {
+        const raw = (p.sessionSchedule || p.session_schedule) as unknown
+        let parsed: SessionSchedRow[] = []
+        if (Array.isArray(raw)) parsed = raw as SessionSchedRow[]
+        else if (typeof raw === 'string') {
+          try { parsed = JSON.parse(raw) as SessionSchedRow[] } catch { parsed = [] }
+        }
+        if (parsed.length > 0) return parsed
+        // Backfill from legacy single time/duration when sessionSchedule isn't
+        // populated yet, so the new per-day UI shows something sensible.
+        const days = (p.sessionDays || p.session_days || []) as string[]
+        const legacyTime = (p.sessionStartTime || p.session_start_time || '') as string
+        const legacyDuration = (p.sessionDuration || p.session_duration || '') as string
+        const mins = parseInt(legacyDuration, 10) || 60
+        return days.map((d) => ({ day: d, startTime: legacyTime, durationMins: mins }))
+      })(),
       sessionFrequency: get('sessionFrequency', 'session_frequency'),
       holidaySchedule: get('holidaySchedule', 'holiday_schedule'),
       cancellationNotice: get('cancellationNotice', 'cancellation_notice'),
@@ -418,7 +489,9 @@ function ProgrammesPageInner() {
   /* ---------- Section completeness ---------- */
 
   const sectionAComplete = !!form.programmeName
-  const sectionBComplete = form.sessionDays.length > 0 && !!form.sessionStartTime
+  const sectionBComplete = form.sessionDays.length > 0
+    && form.sessionSchedule.length === form.sessionDays.length
+    && form.sessionSchedule.every((r) => !!r.startTime)
   const sectionCComplete = !!form.venueName && !!form.venueAddress
   const sectionDComplete = !!form.maxCapacity
   const sectionEComplete = !!form.whatToBring
@@ -500,11 +573,16 @@ function ProgrammesPageInner() {
       shortDescription: form.shortDescription || undefined,
       targetAudience: form.targetAudience || undefined,
       specificAgeGroup: form.specificAgeGroup || undefined,
-      skillLevel: form.skillLevel || undefined,
+      skillLevel: form.skillLevels[0] || form.skillLevel || undefined,
+      skillLevels: form.skillLevels.length > 0 ? form.skillLevels : undefined,
       programmeType: form.programmeType || undefined,
+      seasonType: form.seasonType || undefined,
+      seasonStartDate: form.seasonStartDate || undefined,
+      seasonEndDate: form.seasonEndDate || undefined,
       sessionDays: form.sessionDays.length > 0 ? form.sessionDays : undefined,
       sessionStartTime: form.sessionStartTime || undefined,
       sessionDuration: form.sessionDuration || undefined,
+      sessionSchedule: form.sessionSchedule.length > 0 ? form.sessionSchedule : undefined,
       sessionFrequency: form.sessionFrequency || undefined,
       holidaySchedule: form.holidaySchedule || undefined,
       cancellationNotice: form.cancellationNotice || undefined,
@@ -583,11 +661,16 @@ function ProgrammesPageInner() {
       shortDescription: form.shortDescription,
       targetAudience: form.targetAudience,
       specificAgeGroup: form.specificAgeGroup,
-      skillLevel: form.skillLevel,
+      skillLevel: form.skillLevels[0] || form.skillLevel,
+      skillLevels: form.skillLevels,
       programmeType: form.programmeType,
+      seasonType: form.seasonType,
+      seasonStartDate: form.seasonStartDate,
+      seasonEndDate: form.seasonEndDate,
       sessionDays: form.sessionDays,
       sessionStartTime: form.sessionStartTime,
       sessionDuration: form.sessionDuration,
+      sessionSchedule: form.sessionSchedule,
       sessionFrequency: form.sessionFrequency,
       holidaySchedule: form.holidaySchedule,
       cancellationNotice: form.cancellationNotice,
@@ -879,18 +962,39 @@ function ProgrammesPageInner() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Skill Level</label>
-            <select
-              value={form.skillLevel}
-              onChange={(e) => updateField('skillLevel', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
-            >
-              <option value="">Select...</option>
-              <option value="Complete beginners welcome">Complete beginners welcome</option>
-              <option value="Some experience helpful">Some experience helpful</option>
-              <option value="Intermediate">Intermediate</option>
-              <option value="Advanced/competitive">Advanced/competitive</option>
-              <option value="All levels welcome">All levels welcome</option>
-            </select>
+            <p className="text-xs text-gray-400 mb-2">Tick all that apply — coaches often run beginner and intermediate streams in the same programme.</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                'Complete beginners welcome',
+                'Some experience helpful',
+                'Intermediate',
+                'Advanced/competitive',
+                'All levels welcome',
+              ].map((level) => {
+                const checked = form.skillLevels.includes(level)
+                return (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => {
+                      setForm((prev) => ({
+                        ...prev,
+                        skillLevels: checked
+                          ? prev.skillLevels.filter((l) => l !== level)
+                          : [...prev.skillLevels, level],
+                      }))
+                    }}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                      checked
+                        ? 'bg-[#3D8B37] text-white border-[#3D8B37]'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-[#3D8B37]'
+                    }`}
+                  >
+                    {level}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </Section>
 
@@ -911,6 +1015,46 @@ function ProgrammesPageInner() {
               <option value="Block">Block</option>
             </select>
           </div>
+          {form.programmeType === 'Seasonal' && (
+            <div className="ml-2 pl-4 border-l-2 border-[#3D8B37]/30 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Season</label>
+                <select
+                  value={form.seasonType}
+                  onChange={(e) => updateField('seasonType', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                >
+                  <option value="">Select...</option>
+                  <option value="autumn_winter">Autumn / Winter (Sept–Mar)</option>
+                  <option value="spring_summer">Spring / Summer (Apr–Aug)</option>
+                  <option value="full_year">Full year</option>
+                  <option value="custom">Custom dates</option>
+                </select>
+              </div>
+              {form.seasonType === 'custom' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Season start</label>
+                    <input
+                      type="date"
+                      value={form.seasonStartDate}
+                      onChange={(e) => updateField('seasonStartDate', e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Season end</label>
+                    <input
+                      type="date"
+                      value={form.seasonEndDate}
+                      onChange={(e) => updateField('seasonEndDate', e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Session Day(s)</label>
             <div className="flex flex-wrap gap-2">
@@ -930,46 +1074,59 @@ function ProgrammesPageInner() {
               ))}
             </div>
           </div>
+          {/* Per-day session times. When 0 days selected, prompt the coach;
+              when 1 day, this collapses to a single row; when 2+, one row per
+              day so coaches with split schedules (e.g. Mon 17:00 / Wed 18:30)
+              can capture each one. */}
+          {form.sessionDays.length === 0 ? (
+            <p className="text-xs text-gray-400">Pick a session day above to set start time and duration.</p>
+          ) : (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Session times</label>
+              {form.sessionDays.map((day) => {
+                const row = form.sessionSchedule.find((r) => r.day === day)
+                  || { day, startTime: '', durationMins: 60 }
+                return (
+                  <div key={day} className="grid grid-cols-12 gap-2 items-center">
+                    <div className="col-span-3 sm:col-span-2 text-sm font-medium text-gray-700">{day}</div>
+                    <div className="col-span-4 sm:col-span-5">
+                      <input
+                        type="time"
+                        value={row.startTime}
+                        onChange={(e) => updateScheduleRow(day, { startTime: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                      />
+                    </div>
+                    <div className="col-span-5 sm:col-span-5">
+                      <select
+                        value={row.durationMins}
+                        onChange={(e) => updateScheduleRow(day, { durationMins: parseInt(e.target.value, 10) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                      >
+                        <option value={30}>30 mins</option>
+                        <option value={45}>45 mins</option>
+                        <option value={60}>60 mins</option>
+                        <option value={75}>75 mins</option>
+                        <option value={90}>90 mins</option>
+                        <option value={120}>2 hours</option>
+                        <option value={150}>2.5 hours</option>
+                      </select>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Session Start Time</label>
-              <input
-                type="time"
-                value={form.sessionStartTime}
-                onChange={(e) => updateField('sessionStartTime', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Session Duration</label>
-              <select
-                value={form.sessionDuration}
-                onChange={(e) => updateField('sessionDuration', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
-              >
-                <option value="">Select...</option>
-                <option value="30 mins">30 mins</option>
-                <option value="45 mins">45 mins</option>
-                <option value="60 mins">60 mins</option>
-                <option value="75 mins">75 mins</option>
-                <option value="90 mins">90 mins</option>
-                <option value="2 hours">2 hours</option>
-                <option value="2+ hours">2+ hours</option>
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Session Frequency</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">How often does the pattern repeat?</label>
               <select
                 value={form.sessionFrequency}
                 onChange={(e) => updateField('sessionFrequency', e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
               >
                 <option value="">Select...</option>
-                <option value="Once a week">Once a week</option>
-                <option value="Twice a week">Twice a week</option>
-                <option value="Three times a week">Three times a week</option>
+                <option value="Weekly">Weekly</option>
                 <option value="Fortnightly">Fortnightly</option>
                 <option value="Monthly">Monthly</option>
                 <option value="Variable">Variable</option>
@@ -983,10 +1140,10 @@ function ProgrammesPageInner() {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
               >
                 <option value="">Select...</option>
-                <option value="Sessions pause">Sessions pause during holidays</option>
-                <option value="Reduced schedule">Reduced schedule</option>
-                <option value="Continue as normal">Continue as normal</option>
-                <option value="Holiday camps instead">Holiday camps instead</option>
+                <option value="Sessions pause">Yes — sessions pause</option>
+                <option value="Reduced schedule">Reduced</option>
+                <option value="Continue as normal">No — continues as normal</option>
+                <option value="Holiday camps instead">Holiday camps run instead</option>
               </select>
             </div>
           </div>
@@ -1010,9 +1167,9 @@ function ProgrammesPageInner() {
             >
               <option value="">Select...</option>
               <option value="Same day">Same day</option>
-              <option value="24 hours">24 hours</option>
-              <option value="48 hours">48 hours</option>
-              <option value="72 hours">72 hours</option>
+              <option value="24 hours">24h</option>
+              <option value="48 hours">48h</option>
+              <option value="72 hours">72h</option>
               <option value="1 week">1 week</option>
             </select>
           </div>

@@ -284,3 +284,51 @@ Intent for this message: ${intents[step]}`
 
   return callClaude(systemPrompt, [{ role: 'user', content: parts.join('\n') }], 200)
 }
+
+// ─── Day-before session reminder ───
+// Sent direct to the coach (not the group) the day before each scheduled
+// training/fixture, with a quick attendance summary from the latest poll.
+
+export interface SessionReminderInput {
+  coachFirstName: string
+  programmeName: string
+  sessionTitle: string | null              // 'Training' | 'Match vs ...'
+  startsAtLocal: string                    // 'Tomorrow at 17:30' (formatted upstream)
+  venue: string | null
+  attendance: {
+    yes: number
+    no: number
+    maybe: number
+    pending: number                        // members who haven't replied
+    pollQuestion: string | null            // null when no recent poll
+  }
+}
+
+export async function generateSessionReminder(input: SessionReminderInput): Promise<string> {
+  const systemPrompt = `You write short heads-up messages from an AI assistant to a youth-sports coach.
+
+Rules:
+- Warm, brief, addressed to the coach by first name.
+- 2-3 sentences max. One emoji max.
+- British English.
+- Lead with the session, then attendance.
+- If there's no poll data, don't pretend there is — say "no poll yet for this session" or similar.
+- Never make up numbers.`
+
+  const a = input.attendance
+  const hasPoll = !!a.pollQuestion && (a.yes + a.no + a.maybe + a.pending) > 0
+  const attendanceLine = hasPoll
+    ? `Latest poll "${a.pollQuestion}": ${a.yes} yes, ${a.no} no, ${a.maybe} maybe, ${a.pending} not yet replied.`
+    : 'No poll has been sent for this session yet.'
+
+  const parts = [
+    `Coach first name: ${input.coachFirstName}`,
+    `Programme: ${input.programmeName}`,
+    `Session: ${input.sessionTitle || 'Training'}`,
+    `When: ${input.startsAtLocal}`,
+    input.venue ? `Venue: ${input.venue}` : '',
+    attendanceLine,
+  ].filter(Boolean)
+
+  return callClaude(systemPrompt, [{ role: 'user', content: parts.join('\n') }], 200)
+}

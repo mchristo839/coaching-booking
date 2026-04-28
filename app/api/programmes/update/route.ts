@@ -41,6 +41,7 @@ export async function PATCH(request: NextRequest) {
       specificAgeGroup: 'specific_age_group',
       skillLevel: 'skill_level',
       programmeType: 'programme_type',
+      seasonType: 'season_type',
       sessionStartTime: 'session_start_time',
       sessionDuration: 'session_duration',
       sessionFrequency: 'session_frequency',
@@ -98,6 +99,33 @@ export async function PATCH(request: NextRequest) {
     if (fields.paymentMethods !== undefined && Array.isArray(fields.paymentMethods) && fields.paymentMethods.length > 0) {
       const methods = `{${fields.paymentMethods.join(',')}}`
       await sql.query('UPDATE programmes SET payment_methods = $1, updated_at = NOW() WHERE id = $2', [methods, programmeId])
+    }
+    // Phase 7: seasonal start/end dates (DATE type — pass null on empty string)
+    if (fields.seasonStartDate !== undefined) {
+      await sql.query('UPDATE programmes SET season_start_date = $1, updated_at = NOW() WHERE id = $2', [fields.seasonStartDate || null, programmeId])
+    }
+    if (fields.seasonEndDate !== undefined) {
+      await sql.query('UPDATE programmes SET season_end_date = $1, updated_at = NOW() WHERE id = $2', [fields.seasonEndDate || null, programmeId])
+    }
+    // Phase 7: skill levels multi (TEXT[]) — also mirror first into legacy skill_level
+    if (fields.skillLevels !== undefined && Array.isArray(fields.skillLevels)) {
+      const cleaned = fields.skillLevels.filter(Boolean)
+      const arr = cleaned.length > 0 ? `{${cleaned.join(',')}}` : null
+      await sql.query('UPDATE programmes SET skill_levels = $1, skill_level = $2, updated_at = NOW() WHERE id = $3',
+        [arr, cleaned[0] || null, programmeId])
+    }
+    // Phase 7: per-day session schedule (JSONB) — also mirror first row into legacy
+    if (fields.sessionSchedule !== undefined) {
+      const schedule = Array.isArray(fields.sessionSchedule) && fields.sessionSchedule.length > 0
+        ? JSON.stringify(fields.sessionSchedule)
+        : null
+      await sql.query('UPDATE programmes SET session_schedule = $1::jsonb, updated_at = NOW() WHERE id = $2',
+        [schedule, programmeId])
+      const first = Array.isArray(fields.sessionSchedule) ? fields.sessionSchedule[0] : null
+      if (first) {
+        await sql.query('UPDATE programmes SET session_start_time = $1, session_duration = $2, updated_at = NOW() WHERE id = $3',
+          [first.startTime || null, first.durationMins ? `${first.durationMins} mins` : null, programmeId])
+      }
     }
 
     // Read back the final state

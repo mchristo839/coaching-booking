@@ -36,6 +36,8 @@ export default function PromotionDetailPage() {
   const [loading, setLoading] = useState(true)
   const [regenerating, setRegenerating] = useState(false)
   const [sending, setSending] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [editedMessage, setEditedMessage] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -52,6 +54,7 @@ export default function PromotionDetailPage() {
       }
       const data = await res.json()
       setPromotion(data.promotion)
+      setEditedMessage(data.promotion?.generated_message || '')
       setTargets(data.targets || [])
     } catch {
       setError('Failed to load promotion')
@@ -78,12 +81,52 @@ export default function PromotionDetailPage() {
         return
       }
       setPromotion((prev) => (prev ? { ...prev, generated_message: data.message } : prev))
+      setEditedMessage(data.message || '')
     } finally {
       setRegenerating(false)
     }
   }
 
+  async function persistEdits(): Promise<boolean> {
+    const body = editedMessage.trim()
+    if (!body) {
+      setError('Message cannot be empty')
+      return false
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/promotions/${id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generated_message: body }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Failed to save edits')
+        return false
+      }
+      setPromotion((prev) => (prev ? { ...prev, generated_message: body } : prev))
+      return true
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleSave() {
+    const ok = await persistEdits()
+    if (ok) setSuccess('Edits saved.')
+  }
+
   async function handleSend() {
+    // Persist any unsaved edits before sending so the recipients get the
+    // edited copy, not the last-saved AI version.
+    const isDirty = editedMessage !== (promotion?.generated_message || '')
+    if (isDirty) {
+      const ok = await persistEdits()
+      if (!ok) return
+    }
     if (!confirm('Send this message to all target groups now?')) return
     setSending(true)
     setError('')
@@ -151,26 +194,50 @@ export default function PromotionDetailPage() {
           </div>
         </div>
 
-        <div className="bg-gray-50 rounded-lg p-4 whitespace-pre-wrap text-sm text-gray-800 font-mono">
-          {promotion.generated_message || '(no message generated)'}
-        </div>
-
-        {isDraft && (
-          <div className="mt-4 flex gap-2">
-            <button
-              onClick={handleRegenerate}
-              disabled={regenerating}
-              className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
-            >
-              {regenerating ? 'Regenerating...' : 'Regenerate'}
-            </button>
-            <button
-              onClick={handleSend}
-              disabled={sending}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-            >
-              {sending ? 'Sending...' : `Send to ${targets.length} group${targets.length === 1 ? '' : 's'}`}
-            </button>
+        {isDraft ? (
+          <>
+            <textarea
+              value={editedMessage}
+              onChange={(e) => setEditedMessage(e.target.value)}
+              rows={Math.max(8, editedMessage.split('\n').length + 1)}
+              className="w-full bg-gray-50 rounded-lg p-4 text-sm text-gray-800 font-mono border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="(no message generated yet — click Regenerate)"
+            />
+            {(() => {
+              const isDirty = editedMessage !== (promotion.generated_message || '')
+              return (
+                <div className="mt-4 flex gap-2 flex-wrap items-center">
+                  <button
+                    onClick={handleRegenerate}
+                    disabled={regenerating || sending || saving}
+                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
+                  >
+                    {regenerating ? 'Regenerating...' : 'Regenerate'}
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={!isDirty || saving || sending}
+                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
+                  >
+                    {saving ? 'Saving...' : 'Save edits'}
+                  </button>
+                  <button
+                    onClick={handleSend}
+                    disabled={sending || saving}
+                    className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {sending ? 'Sending...' : `Send to ${targets.length} group${targets.length === 1 ? '' : 's'}`}
+                  </button>
+                  {isDirty && (
+                    <span className="text-xs text-amber-600">Unsaved changes — sending will save first</span>
+                  )}
+                </div>
+              )
+            })()}
+          </>
+        ) : (
+          <div className="bg-gray-50 rounded-lg p-4 whitespace-pre-wrap text-sm text-gray-800 font-mono">
+            {promotion.generated_message || '(no message generated)'}
           </div>
         )}
       </div>
