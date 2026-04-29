@@ -60,11 +60,13 @@ export async function createCoach(data: {
   governingBody?: string[]
   firstAid?: string
   publicLiability?: string
+  vertical?: 'sport' | 'fitness'
 }) {
   const gb = data.governingBody ? `{${data.governingBody.join(',')}}` : null
+  const vertical = data.vertical === 'fitness' ? 'fitness' : 'sport'
   const { rows } = await sql`
-    INSERT INTO coaches_v2 (provider_id, first_name, last_name, email, mobile, sport, coaching_level, dbs_status, dbs_issue_date, governing_body, first_aid, public_liability)
-    VALUES (${data.providerId}, ${data.firstName}, ${data.lastName}, ${data.email}, ${data.mobile}, ${data.sport || null}, ${data.coachingLevel || null}, ${data.dbsStatus || null}, ${data.dbsIssueDate || null}, ${gb}, ${data.firstAid || null}, ${data.publicLiability || null})
+    INSERT INTO coaches_v2 (provider_id, first_name, last_name, email, mobile, sport, coaching_level, dbs_status, dbs_issue_date, governing_body, first_aid, public_liability, vertical)
+    VALUES (${data.providerId}, ${data.firstName}, ${data.lastName}, ${data.email}, ${data.mobile}, ${data.sport || null}, ${data.coachingLevel || null}, ${data.dbsStatus || null}, ${data.dbsIssueDate || null}, ${gb}, ${data.firstAid || null}, ${data.publicLiability || null}, ${vertical})
     RETURNING *
   `
   return rows[0]

@@ -526,6 +526,9 @@ export default function RegisterPage() {
           dbsStatus,
           firstAid,
           insurance,
+          // 'Fitness Studio' on the stage-1 picker → vertical='fitness'.
+          // Anything else → 'sport' (default behaviour).
+          vertical: businessType === 'Fitness Studio' ? 'fitness' : 'sport',
         }),
       })
       const data = await res.json()
@@ -632,8 +635,9 @@ export default function RegisterPage() {
 
   // ---- STAGE 1 ----
   function renderStage1() {
-    const cards: { label: string; enabled: boolean }[] = [
-      { label: 'Solo Coach / Instructor', enabled: true },
+    const cards: { label: string; enabled: boolean; description?: string }[] = [
+      { label: 'Solo Coach / Instructor', enabled: true, description: 'Grassroots sport coach' },
+      { label: 'Fitness Studio', enabled: true, description: 'Gym, PT, group classes' },
       { label: 'Sports / Activity Provider', enabled: false },
       { label: 'Sports Club', enabled: false },
     ]
@@ -641,7 +645,7 @@ export default function RegisterPage() {
       <>
         <h2 className="text-xl font-bold text-gray-900 mb-1">What type of coaching do you run?</h2>
         <p className="text-sm text-gray-500 mb-6">Select the option that best describes you.</p>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {cards.map((c) => (
             <button
               key={c.label}
@@ -661,6 +665,9 @@ export default function RegisterPage() {
               )}
             >
               <span className="text-sm font-semibold text-gray-900">{c.label}</span>
+              {c.description && c.enabled && (
+                <span className="block text-xs text-gray-500 mt-1">{c.description}</span>
+              )}
               {!c.enabled && (
                 <span className="block text-xs text-gray-400 mt-1">Coming Soon</span>
               )}

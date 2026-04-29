@@ -16,6 +16,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Provider ID, first name and email are required' }, { status: 400 })
     }
 
+    // Vertical comes from the stage-1 business-type picker. Defaults to
+    // 'sport' if absent or invalid.
+    const vertical: 'sport' | 'fitness' = body.vertical === 'fitness' ? 'fitness' : 'sport'
+
     const coach = await createCoach({
       providerId,
       firstName,
@@ -29,6 +33,7 @@ export async function POST(request: NextRequest) {
       governingBody: body.governingBody || null,
       firstAid: body.firstAid || null,
       publicLiability: body.publicLiability || body.insurance || null,
+      vertical,
     })
 
     await updateProvider(providerId, { registrationStatus: 'coach_added' })
