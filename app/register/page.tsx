@@ -904,16 +904,22 @@ export default function RegisterPage() {
     const showBadWeather = indoorOutdoor === 'Outdoor' || indoorOutdoor === 'Both'
     const showPaymentDetails = paidFree === 'Paid'
 
+    // Fitness vertical reskin: a few labels/placeholders flip when the user
+    // picked 'Fitness Studio' on stage 1. Section headings stay neutral.
+    const isFitness = businessType === 'Fitness Studio'
+    const noun = isFitness ? 'class' : 'programme'
+    const Noun = isFitness ? 'Class' : 'Programme'
+
     return (
       <form onSubmit={submitProgramme} className="space-y-4">
-        <h2 className="text-xl font-bold text-gray-900 mb-1">Programme Details</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-1">{Noun} Details</h2>
         <p className="text-sm text-gray-500 mb-2">This information powers your WhatsApp coaching bot.</p>
 
         {/* 5A */}
-        <SectionHeading>Age Group &amp; Programme Info</SectionHeading>
+        <SectionHeading>Age Group &amp; {Noun} Info</SectionHeading>
 
         <div>
-          <Label htmlFor="progAudience" required>Who is this programme for?</Label>
+          <Label htmlFor="progAudience" required>Who is this {noun} for?</Label>
           <Select id="progAudience" required value={progAudience} onChange={(e) => setProgAudience(e.target.value)}>
             <option value="">-- Select --</option>
             {PROGRAMME_AUDIENCE.map((a) => <option key={a}>{a}</option>)}
@@ -931,20 +937,33 @@ export default function RegisterPage() {
         )}
 
         <div>
-          <Label htmlFor="progName" required>Group / Programme Name</Label>
-          <Input id="progName" required value={progName} onChange={(e) => setProgName(e.target.value)} placeholder="e.g. Saturday Morning Football" />
+          <Label htmlFor="progName" required>{isFitness ? 'Class Name' : 'Group / Programme Name'}</Label>
+          <Input
+            id="progName"
+            required
+            value={progName}
+            onChange={(e) => setProgName(e.target.value)}
+            placeholder={isFitness ? 'e.g. HIIT Mondays' : 'e.g. Saturday Morning Football'}
+          />
         </div>
 
         <div>
           <Label htmlFor="progDescription" required>Short Description</Label>
-          <Textarea id="progDescription" required rows={3} value={progDescription} onChange={(e) => setProgDescription(e.target.value)} placeholder="2-3 sentences about this programme" />
+          <Textarea
+            id="progDescription"
+            required
+            rows={3}
+            value={progDescription}
+            onChange={(e) => setProgDescription(e.target.value)}
+            placeholder={`2-3 sentences about this ${noun}`}
+          />
         </div>
 
         {/* 5B */}
         <SectionHeading>Schedule</SectionHeading>
 
         <div>
-          <Label htmlFor="runType" required>How does this programme run?</Label>
+          <Label htmlFor="runType" required>How does this {noun} run?</Label>
           <Select id="runType" required value={runType} onChange={(e) => setRunType(e.target.value)}>
             <option value="">-- Select --</option>
             {RUN_TYPES.map((r) => <option key={r}>{r}</option>)}
@@ -1078,7 +1097,13 @@ export default function RegisterPage() {
 
         <div>
           <Label htmlFor="whatToBring">What to bring</Label>
-          <Textarea id="whatToBring" rows={2} value={whatToBring} onChange={(e) => setWhatToBring(e.target.value)} placeholder="e.g. Water bottle, shin pads, trainers" />
+          <Textarea
+            id="whatToBring"
+            rows={2}
+            value={whatToBring}
+            onChange={(e) => setWhatToBring(e.target.value)}
+            placeholder={isFitness ? 'e.g. Trainers, water bottle, towel' : 'e.g. Water bottle, shin pads, trainers'}
+          />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -1166,7 +1191,7 @@ export default function RegisterPage() {
         <div className="flex justify-between pt-4">
           <SecondaryButton type="button" onClick={back}>Back</SecondaryButton>
           <PrimaryButton type="submit" disabled={loading}>
-            {loading ? 'Saving...' : 'Save Programme'}
+            {loading ? 'Saving...' : `Save ${Noun}`}
           </PrimaryButton>
         </div>
       </form>
