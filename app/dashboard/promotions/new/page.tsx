@@ -39,6 +39,28 @@ export default function NewPromotionPage() {
   const [sendMode, setSendMode] = useState<'all_groups' | 'selected_groups'>('all_groups')
   const [selectedProgrammeIds, setSelectedProgrammeIds] = useState<string[]>([])
 
+  // Holiday camp: list of bookable days. Each row is one bookable session.
+  interface CampDayRow { date: string; label: string; price_gbp: string; capacity: string }
+  const [campDays, setCampDays] = useState<CampDayRow[]>([
+    { date: '', label: '', price_gbp: '', capacity: '' },
+  ])
+  function updateCampDay(i: number, patch: Partial<CampDayRow>) {
+    setCampDays((prev) => prev.map((row, idx) => (idx === i ? { ...row, ...patch } : row)))
+  }
+  function addCampDay() {
+    setCampDays((prev) => [...prev, { date: '', label: '', price_gbp: '', capacity: '' }])
+  }
+  function removeCampDay(i: number) {
+    setCampDays((prev) => (prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i)))
+  }
+  // Derive a readable label like "Tue 7 Apr" if the coach doesn't override.
+  function deriveLabel(dateStr: string): string {
+    if (!dateStr) return ''
+    const d = new Date(dateStr + 'T00:00:00')
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+  }
+
   useEffect(() => {
     async function load() {
       const res = await fetch('/api/auth/authorised-programmes', { credentials: 'include' })
@@ -76,6 +98,30 @@ export default function NewPromotionPage() {
       return
     }
 
+    // Camp-specific validation: at least one day with a date + price.
+    let cleanCampDays: { date: string; label: string; price_gbp: number; capacity: number | null }[] | null = null
+    if (promotionType === 'holiday_camp') {
+      const rows = campDays
+        .map((r) => ({
+          date: r.date,
+          label: r.label.trim() || deriveLabel(r.date),
+          price_gbp: parseFloat(r.price_gbp),
+          capacity: r.capacity ? parseInt(r.capacity, 10) : null,
+        }))
+        .filter((r) => r.date && !Number.isNaN(r.price_gbp))
+      if (rows.length === 0) {
+        setError('Add at least one camp day with a date and price.')
+        setSaving(false)
+        return
+      }
+      if (!paymentLink.trim()) {
+        setError('Holiday camps need a payment link (Monzo / Revolut / bank link) so the bot can share it after booking.')
+        setSaving(false)
+        return
+      }
+      cleanCampDays = rows
+    }
+
     try {
       const res = await fetch('/api/promotions', {
         method: 'POST',
@@ -93,6 +139,7 @@ export default function NewPromotionPage() {
           paymentLink: paymentLink.trim() || null,
           sendMode,
           programmeIds: sendMode === 'selected_groups' ? selectedProgrammeIds : null,
+          campDays: cleanCampDays,
         }),
       })
       const data = await res.json()
@@ -210,40 +257,123 @@ export default function NewPromotionPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="flex items-center gap-2 text-sm text-gray-700 mb-1">
-                <input
-                  type="checkbox"
-                  checked={isFree}
-                  onChange={(e) => setIsFree(e.target.checked)}
-                  className="w-4 h-4"
-                />
-                Free event
+            {promotionType !== 'holiday_camp' && (
+              <div>
+                <label className="flex items-center gap-2 text-sm text-gray-700 mb-1">
+                  <input
+                    type="checkbox"
+                    checked={isFree}
+                    onChange={(e) => setIsFree(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  Free event
+                </label>
+                {!isFree && (
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={costGbp}
+                    onChange={(e) => setCostGbp(e.target.value)}
+                    placeholder="Cost in £"
+                    className="mt-1 w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                  />
+                )}
+              </div>
+            )}
+            <div className={promotionType === 'holiday_camp' ? 'sm:col-span-2' : ''}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Payment / booking link{promotionType === 'holiday_camp' && ' *'}
               </label>
-              {!isFree && (
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={costGbp}
-                  onChange={(e) => setCostGbp(e.target.value)}
-                  placeholder="Cost in £"
-                  className="mt-1 w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
-                />
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Payment / booking link</label>
               <input
                 type="url"
                 value={paymentLink}
                 onChange={(e) => setPaymentLink(e.target.value)}
-                placeholder="https://..."
+                placeholder={promotionType === 'holiday_camp' ? 'https://monzo.me/yourname or Revolut link' : 'https://...'}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
               />
+              {promotionType === 'holiday_camp' && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Shared with parents after they pick their days. They&apos;ll be asked to use the child&apos;s name as the bank reference.
+                </p>
+              )}
             </div>
           </div>
         </div>
+
+        {promotionType === 'holiday_camp' && (
+          <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Camp days</h2>
+              <button
+                type="button"
+                onClick={addCampDay}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                + Add day
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">
+              Each row is one bookable day. Parents will see these as options (a, b, c…) and pick any combination for each child.
+            </p>
+            <div className="space-y-2">
+              {campDays.map((row, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2 items-start">
+                  <div className="col-span-4">
+                    <input
+                      type="date"
+                      value={row.date}
+                      onChange={(e) => updateCampDay(i, { date: e.target.value })}
+                      className="w-full px-2 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                    />
+                  </div>
+                  <div className="col-span-4">
+                    <input
+                      type="text"
+                      value={row.label}
+                      onChange={(e) => updateCampDay(i, { label: e.target.value })}
+                      placeholder={deriveLabel(row.date) || 'Label (e.g. Tue 7 Apr)'}
+                      className="w-full px-2 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={row.price_gbp}
+                      onChange={(e) => updateCampDay(i, { price_gbp: e.target.value })}
+                      placeholder="£"
+                      className="w-full px-2 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <input
+                      type="number"
+                      min="0"
+                      value={row.capacity}
+                      onChange={(e) => updateCampDay(i, { capacity: e.target.value })}
+                      placeholder="Cap"
+                      className="w-full px-2 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                    />
+                  </div>
+                  <div className="col-span-1 flex items-center justify-end">
+                    {campDays.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeCampDay(i)}
+                        className="text-gray-400 hover:text-red-600 text-lg px-1"
+                        title="Remove this day"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
           <h2 className="text-lg font-semibold text-gray-900">Send to</h2>

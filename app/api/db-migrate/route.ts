@@ -592,6 +592,62 @@ export async function POST() {
         WHERE state IN ('awaiting_score','awaiting_comment_low','awaiting_referral_yes_no')
     `
 
+    // ═══════════════════════════════════════════════════════════
+    // Holiday camp bookings — WhatsApp-native flow
+    // ═══════════════════════════════════════════════════════════
+    // Extends the existing holiday_camp promotion_type with a per-child
+    // booking state machine. Parent receives a 1:1 invite per child, replies
+    // with day selection, gets a confirmation + payment instructions, then
+    // self-reports "PAID" once they've sent money externally (Monzo/bank).
+    // Coach reconciles in the dashboard.
+
+    // camp_days lives as JSONB on the promotion itself — array of
+    // {date, label, price_gbp, capacity}. Keeps the schema flat for v1.
+    await sql`ALTER TABLE promotions ADD COLUMN IF NOT EXISTS camp_days JSONB`
+
+    // One row per child-per-camp. Holds both the conversation state and the
+    // final booking record. parent_jid is the WhatsApp identity that drives
+    // 1:1 message matching.
+    await sql`
+      CREATE TABLE IF NOT EXISTS camp_bookings (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        promotion_id UUID NOT NULL REFERENCES promotions(id) ON DELETE CASCADE,
+        member_id UUID REFERENCES members(id) ON DELETE SET NULL,
+        parent_jid TEXT NOT NULL,
+        parent_name TEXT,
+        child_name TEXT,
+        days_selected JSONB,
+        total_gbp NUMERIC(10,2),
+        state VARCHAR(40) NOT NULL DEFAULT 'awaiting_day_selection'
+          CHECK (state IN (
+            'awaiting_day_selection',
+            'awaiting_payment_confirmation',
+            'paid_self_reported',
+            'confirmed',
+            'cancelled',
+            'expired'
+          )),
+        prompt_message_id TEXT,
+        expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '14 days'),
+        payment_self_reported_at TIMESTAMPTZ,
+        payment_confirmed_at TIMESTAMPTZ,
+        confirmed_by UUID REFERENCES coaches_v2(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    // Partial index on open conversation states — webhook lookup is O(1)
+    // and confirmed/cancelled/expired rows stay out of the hot path.
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_camp_bookings_open
+        ON camp_bookings(parent_jid)
+        WHERE state IN ('awaiting_day_selection','awaiting_payment_confirmation')
+    `
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_camp_bookings_promotion
+        ON camp_bookings(promotion_id, created_at DESC)
+    `
+
     // ── Migrate existing data from old tables ──
     const oldCoachesExist = await sql`
       SELECT EXISTS (
