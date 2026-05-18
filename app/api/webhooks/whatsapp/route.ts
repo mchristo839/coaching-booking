@@ -3,6 +3,7 @@ import { findProgramByWhatsAppGroup, safeLogConversation, isMessageProcessed, tr
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId } from '@/app/lib/control-centre-db'
 import { tryHandleFeedbackReply } from '@/app/lib/feedback'
+import { tryHandleCampBookingReply } from '@/app/lib/camp-booking'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 const BOT_JID = process.env.BOT_JID || ''
@@ -209,11 +210,12 @@ export async function POST(request: NextRequest) {
     const isGroup = remoteJid.endsWith('@g.us')
     const messageId: string = data?.key?.id || ''
 
-    // ─── 1:1 feedback reply branch (fitness studio vertical) ───
-    // Self-gating: only fires when the sender has an open pending_feedback
-    // row. For everyone else it returns false instantly and the existing
-    // group-only logic below runs untouched. Wrapped in its own try/catch
-    // so a failure here can never break Paul's group bot.
+    // ─── 1:1 reply branches (holiday camp + fitness feedback) ───
+    // Both branches are self-gating: they only fire when the sender has an
+    // open booking/feedback row. For everyone else they return false in
+    // microseconds and the existing group-only logic below runs untouched.
+    // Each branch has its own try/catch so a failure here can never break
+    // Paul's group bot.
     if (!isGroup && remoteJid) {
       const inboundText: string =
         data?.message?.conversation ||
@@ -228,6 +230,16 @@ export async function POST(request: NextRequest) {
           if (alreadyProcessed) return NextResponse.json({ ok: true })
         }
 
+        // Camp-booking branch first — money is involved, and a parent who
+        // is also in the feedback flow (vanishingly rare) should be treated
+        // as transacting on the camp first.
+        try {
+          const consumed = await tryHandleCampBookingReply(remoteJid, inboundText)
+          if (consumed) return NextResponse.json({ ok: true })
+        } catch (e) {
+          console.error('[CAMP BRANCH] error, falling through:', e)
+        }
+
         try {
           const consumed = await tryHandleFeedbackReply(remoteJid, inboundText)
           if (consumed) return NextResponse.json({ ok: true })
@@ -236,7 +248,7 @@ export async function POST(request: NextRequest) {
           // Don't return — drop into the standard non-group exit below.
         }
       }
-      // Either no in-flight feedback request, no text, or handler errored.
+      // Either no in-flight 1:1 conversation, no text, or handler errored.
       // Match pre-existing behaviour: silently drop non-group messages.
       return NextResponse.json({ ok: true })
     }

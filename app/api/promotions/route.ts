@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
     const {
       promotionType, title, detail, startAt, endAt, venue,
       costGbp, isFree, paymentLink, sendMode, programmeIds,
+      campDays,
     } = body
 
     if (!promotionType || !detail) {
@@ -34,6 +35,37 @@ export async function POST(request: NextRequest) {
         { error: 'promotionType and detail are required' },
         { status: 400 }
       )
+    }
+
+    // Camp-specific validation.
+    let cleanCampDays: { date: string; label: string; price_gbp: number; capacity: number | null }[] | null = null
+    if (promotionType === 'holiday_camp') {
+      if (!Array.isArray(campDays) || campDays.length === 0) {
+        return NextResponse.json(
+          { error: 'Holiday camp promotions need at least one day in campDays' },
+          { status: 400 }
+        )
+      }
+      if (!paymentLink) {
+        return NextResponse.json(
+          { error: 'Holiday camp promotions need a paymentLink' },
+          { status: 400 }
+        )
+      }
+      cleanCampDays = campDays
+        .filter((d: { date?: string; price_gbp?: number }) => d && d.date && typeof d.price_gbp === 'number')
+        .map((d: { date: string; label?: string; price_gbp: number; capacity?: number | null }) => ({
+          date: d.date,
+          label: d.label || d.date,
+          price_gbp: Number(d.price_gbp),
+          capacity: d.capacity != null ? Number(d.capacity) : null,
+        }))
+      if (cleanCampDays.length === 0) {
+        return NextResponse.json(
+          { error: 'No valid camp days provided' },
+          { status: 400 }
+        )
+      }
     }
 
     // Resolve programme IDs — if "all_groups", use the coach's authorised programmes
@@ -107,6 +139,7 @@ export async function POST(request: NextRequest) {
       generatedMessage,
       slug,
       programmeIds: resolvedProgrammeIds,
+      campDays: cleanCampDays,
     })
 
     return NextResponse.json({ promotion })
