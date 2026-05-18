@@ -494,6 +494,15 @@ export async function POST() {
     // Track which nudge was last sent (pre_session | session_day | post_session | lapsed_check | null)
     await sql`ALTER TABLE referrals ADD COLUMN IF NOT EXISTS last_nudge_step TEXT`
 
+    // Resolved referrer attribution. The referee picks a parent from the
+    // programme's member roster on the landing page; we store the FK +
+    // flip referrer_resolved=true. referred_by_name remains as a fallback
+    // for legacy rows + "Other / not on list" submissions, but new rows
+    // should resolve through referrer_member_id when possible.
+    await sql`ALTER TABLE referrals ADD COLUMN IF NOT EXISTS referrer_member_id UUID REFERENCES members(id) ON DELETE SET NULL`
+    await sql`ALTER TABLE referrals ADD COLUMN IF NOT EXISTS referrer_resolved BOOLEAN NOT NULL DEFAULT FALSE`
+    await sql`CREATE INDEX IF NOT EXISTS idx_referrals_referrer_member ON referrals(referrer_member_id) WHERE referrer_member_id IS NOT NULL`
+
     // ═══════════════════════════════════════════════════════════
     // Phase 7: Programme builder upgrades (prospect demo feedback)
     // ═══════════════════════════════════════════════════════════

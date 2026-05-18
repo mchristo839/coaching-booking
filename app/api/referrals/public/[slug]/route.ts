@@ -10,6 +10,7 @@ import {
   getReferralContext,
   setReferralFirstSession,
   logNotification,
+  getMemberForProgramme,
 } from '@/app/lib/control-centre-db'
 import { generateReferralConfirmation } from '@/app/lib/ai-messages'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
@@ -40,7 +41,14 @@ export async function POST(
 ) {
   try {
     const body = await request.json()
-    const { friendFirstName, childName, friendEmail, friendPhone, referredByName } = body
+    const {
+      friendFirstName,
+      childName,
+      friendEmail,
+      friendPhone,
+      referredByName,
+      referrerMemberId,
+    } = body
 
     if (!friendFirstName || !friendPhone) {
       return NextResponse.json(
@@ -62,15 +70,38 @@ export async function POST(
     if (targets.length === 0) {
       return NextResponse.json({ error: 'No programme linked' }, { status: 400 })
     }
+    const programmeId = targets[0].programme_id
+
+    // Resolve the referrer member if one was picked from the dropdown.
+    // Verify the member genuinely belongs to this programme — otherwise
+    // ignore the input (defence against arbitrary UUID injection from the
+    // form) and fall through to the free-text fallback.
+    let resolvedMemberId: string | null = null
+    let resolvedMemberName: string | null = null
+    if (referrerMemberId && typeof referrerMemberId === 'string') {
+      const member = await getMemberForProgramme(referrerMemberId, programmeId)
+      if (member) {
+        resolvedMemberId = member.id
+        resolvedMemberName = member.parent_name || null
+      }
+    }
+
+    // Store the human-readable name for backwards compat with existing
+    // notification logic. Prefer the resolved member's name when we have
+    // one (authoritative) over the typed free-text.
+    const storedReferredByName =
+      resolvedMemberName ||
+      (referredByName ? String(referredByName).trim() : null)
 
     const referral = await createReferral({
       promotionId: promotion.id,
-      programmeId: targets[0].programme_id,
+      programmeId,
       friendFirstName: String(friendFirstName).trim(),
       childName: childName ? String(childName).trim() : null,
       friendEmail: friendEmail ? String(friendEmail).trim() : null,
       friendPhone: String(friendPhone).trim(),
-      referredByName: referredByName ? String(referredByName).trim() : null,
+      referredByName: storedReferredByName,
+      referrerMemberId: resolvedMemberId,
     })
 
     // Seed first_session_at from the promotion's start_at if set

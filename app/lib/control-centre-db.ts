@@ -405,22 +405,65 @@ export interface ReferralCreateInput {
   friendEmail?: string | null
   friendPhone: string
   referredByName?: string | null
+  referrerMemberId?: string | null
 }
 
 export async function createReferral(input: ReferralCreateInput) {
+  const resolved = !!input.referrerMemberId
   const { rows } = await sql`
     INSERT INTO referrals (
       promotion_id, programme_id, friend_first_name, child_name,
-      friend_email, friend_phone, referred_by_name
+      friend_email, friend_phone, referred_by_name,
+      referrer_member_id, referrer_resolved
     )
     VALUES (
       ${input.promotionId}, ${input.programmeId}, ${input.friendFirstName},
       ${input.childName ?? null}, ${input.friendEmail ?? null},
-      ${input.friendPhone}, ${input.referredByName ?? null}
+      ${input.friendPhone}, ${input.referredByName ?? null},
+      ${input.referrerMemberId ?? null}, ${resolved}
     )
     RETURNING *
   `
   return rows[0]
+}
+
+// Safe public listing for the /refer/[slug] dropdown. Returns only what the
+// landing page needs to disambiguate referrers — first name + last initial,
+// keyed by member_id. No phone, no email, no child names exposed.
+export interface ReferrerCandidate {
+  id: string
+  display_name: string  // "Sarah B."
+}
+export async function listReferrerCandidatesForProgramme(programmeId: string): Promise<ReferrerCandidate[]> {
+  const { rows } = await sql`
+    SELECT id, parent_name
+    FROM members
+    WHERE programme_id = ${programmeId}
+      AND status = 'active'
+      AND parent_name IS NOT NULL
+      AND parent_name <> ''
+    ORDER BY parent_name ASC
+  `
+  return rows
+    .map((r) => {
+      const parts = String(r.parent_name).trim().split(/\s+/)
+      const first = parts[0]
+      const lastInitial = parts.length > 1 ? `${parts[parts.length - 1][0]}.` : ''
+      return { id: r.id as string, display_name: lastInitial ? `${first} ${lastInitial}` : first }
+    })
+    .filter((c) => c.display_name.length > 0)
+}
+
+// Verify a member_id genuinely belongs to a programme — defence against a
+// malicious POST passing an arbitrary UUID. Returns the resolved row or null.
+export async function getMemberForProgramme(memberId: string, programmeId: string) {
+  const { rows } = await sql`
+    SELECT id, parent_name, parent_phone, parent_whatsapp_id
+    FROM members
+    WHERE id = ${memberId} AND programme_id = ${programmeId}
+    LIMIT 1
+  `
+  return rows[0] || null
 }
 
 export async function listReferralsForCoach(coachId: string) {
