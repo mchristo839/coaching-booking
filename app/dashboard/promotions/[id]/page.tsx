@@ -4,6 +4,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
+interface CampDay {
+  date: string
+  label: string
+  price_gbp: number
+  capacity?: number | null
+}
+
 interface Promotion {
   id: string
   promotion_type: string
@@ -13,6 +20,8 @@ interface Promotion {
   status: string
   slug: string | null
   send_mode: string
+  payment_link: string | null
+  camp_days: CampDay[] | null
   created_at: string
   sent_at: string | null
 }
@@ -24,6 +33,26 @@ interface Target {
   whatsapp_group_id: string | null
   send_status: string
   error: string | null
+}
+
+interface CampBooking {
+  id: string
+  parent_jid: string
+  parent_name: string | null
+  child_name: string | null
+  days_selected: number[] | null
+  total_gbp: string | null
+  state:
+    | 'awaiting_day_selection'
+    | 'awaiting_payment_confirmation'
+    | 'paid_self_reported'
+    | 'confirmed'
+    | 'cancelled'
+    | 'expired'
+  payment_self_reported_at: string | null
+  payment_confirmed_at: string | null
+  parent_phone: string | null
+  created_at: string
 }
 
 export default function PromotionDetailPage() {
@@ -40,6 +69,12 @@ export default function PromotionDetailPage() {
   const [editedMessage, setEditedMessage] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  // Holiday camp state (only meaningful when promotion_type === 'holiday_camp')
+  const [bookings, setBookings] = useState<CampBooking[]>([])
+  const [bookingsLoading, setBookingsLoading] = useState(false)
+  const [sendingCohort, setSendingCohort] = useState(false)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -66,6 +101,65 @@ export default function PromotionDetailPage() {
   useEffect(() => {
     load()
   }, [load])
+
+  const loadBookings = useCallback(async () => {
+    setBookingsLoading(true)
+    try {
+      const res = await fetch(`/api/promotions/${id}/bookings`, { credentials: 'include' })
+      if (!res.ok) return
+      const data = await res.json()
+      setBookings(data.bookings || [])
+    } finally {
+      setBookingsLoading(false)
+    }
+  }, [id])
+
+  useEffect(() => {
+    if (promotion?.promotion_type === 'holiday_camp') {
+      loadBookings()
+    }
+  }, [promotion?.promotion_type, loadBookings])
+
+  async function handleSendCohort() {
+    if (!confirm('Send the camp invite to every parent on the cohort? Each child gets one WhatsApp message.')) return
+    setSendingCohort(true)
+    setError('')
+    setSuccess('')
+    try {
+      const res = await fetch(`/api/promotions/${id}/send-camp-cohort`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Failed to send camp cohort')
+        return
+      }
+      setSuccess(`Sent ${data.sent} invite${data.sent === 1 ? '' : 's'}. ${data.skipped} skipped, ${data.failed} failed.`)
+      await loadBookings()
+    } finally {
+      setSendingCohort(false)
+    }
+  }
+
+  async function handleConfirmBooking(bookingId: string) {
+    setConfirmingId(bookingId)
+    setError('')
+    try {
+      const res = await fetch(`/api/promotions/${id}/bookings/${bookingId}/confirm`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || 'Failed to confirm booking')
+        return
+      }
+      await loadBookings()
+    } finally {
+      setConfirmingId(null)
+    }
+  }
 
   async function handleRegenerate() {
     setRegenerating(true)
@@ -259,6 +353,109 @@ export default function PromotionDetailPage() {
           ))}
         </ul>
       </div>
+
+      {promotion.promotion_type === 'holiday_camp' && (
+        <div className="bg-white rounded-xl shadow-sm p-5 mt-6">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="font-semibold text-gray-900">Camp bookings</h2>
+            <button
+              onClick={handleSendCohort}
+              disabled={sendingCohort}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {sendingCohort ? 'Sending invites…' : 'Send invites to cohort'}
+            </button>
+          </div>
+
+          {promotion.camp_days && promotion.camp_days.length > 0 && (
+            <div className="text-xs text-gray-500 mb-4">
+              Days:{' '}
+              {promotion.camp_days.map((d, i) => (
+                <span key={i} className="mr-2">
+                  <span className="font-mono">{String.fromCharCode(97 + i)}</span> = {d.label} (£{Number(d.price_gbp).toFixed(2)})
+                </span>
+              ))}
+            </div>
+          )}
+
+          {bookingsLoading ? (
+            <p className="text-sm text-gray-500">Loading bookings…</p>
+          ) : bookings.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              No bookings yet. Click &quot;Send invites to cohort&quot; to message every parent in the targeted programmes.
+            </p>
+          ) : (
+            <div className="overflow-x-auto -mx-5">
+              <table className="w-full text-sm">
+                <thead className="text-xs text-gray-500 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-5 py-2 font-medium">Child</th>
+                    <th className="text-left px-2 py-2 font-medium">Parent</th>
+                    <th className="text-left px-2 py-2 font-medium">Days</th>
+                    <th className="text-right px-2 py-2 font-medium">Total</th>
+                    <th className="text-left px-2 py-2 font-medium">Status</th>
+                    <th className="text-right px-5 py-2 font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bookings.map((b) => {
+                    const daysStr = b.days_selected && b.days_selected.length > 0
+                      ? b.days_selected
+                          .map((i) => promotion.camp_days?.[i]?.label || String.fromCharCode(97 + i))
+                          .join(', ')
+                      : '—'
+                    const total = b.total_gbp ? `£${Number(b.total_gbp).toFixed(2)}` : '—'
+                    return (
+                      <tr key={b.id} className="border-b border-gray-100">
+                        <td className="px-5 py-2 text-gray-900">{b.child_name || '—'}</td>
+                        <td className="px-2 py-2 text-gray-700">
+                          <div>{b.parent_name || '—'}</div>
+                          {b.parent_phone && (
+                            <div className="text-xs text-gray-400">{b.parent_phone}</div>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-gray-700">{daysStr}</td>
+                        <td className="px-2 py-2 text-right text-gray-900 font-medium">{total}</td>
+                        <td className="px-2 py-2">
+                          <StateBadge state={b.state} />
+                        </td>
+                        <td className="px-5 py-2 text-right">
+                          {b.state === 'paid_self_reported' ? (
+                            <button
+                              onClick={() => handleConfirmBooking(b.id)}
+                              disabled={confirmingId === b.id}
+                              className="bg-green-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50"
+                            >
+                              {confirmingId === b.id ? 'Confirming…' : 'Confirm payment'}
+                            </button>
+                          ) : b.state === 'confirmed' ? (
+                            <span className="text-xs text-green-700">✓ Confirmed</span>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
+}
+
+function StateBadge({ state }: { state: CampBooking['state'] }) {
+  const map: Record<CampBooking['state'], { label: string; cls: string }> = {
+    awaiting_day_selection: { label: 'Awaiting days', cls: 'bg-gray-100 text-gray-600' },
+    awaiting_payment_confirmation: { label: 'Awaiting payment', cls: 'bg-yellow-100 text-yellow-700' },
+    paid_self_reported: { label: 'Self-reported paid', cls: 'bg-blue-100 text-blue-700' },
+    confirmed: { label: 'Confirmed', cls: 'bg-green-100 text-green-700' },
+    cancelled: { label: 'Cancelled', cls: 'bg-red-100 text-red-700' },
+    expired: { label: 'Expired', cls: 'bg-gray-100 text-gray-500' },
+  }
+  const { label, cls } = map[state]
+  return <span className={`text-xs px-2 py-1 rounded ${cls}`}>{label}</span>
 }

@@ -7,6 +7,13 @@ import { sql } from '@vercel/postgres'
 
 // ─── Promotions ───
 
+export interface CampDayInput {
+  date: string         // 'YYYY-MM-DD'
+  label: string        // 'Tue 7 Apr'
+  price_gbp: number
+  capacity?: number | null
+}
+
 export interface PromotionCreateInput {
   createdBy: string
   promotionType: 'social_event' | 'refer_a_friend' | 'holiday_camp' | 'other'
@@ -22,20 +29,24 @@ export interface PromotionCreateInput {
   generatedMessage?: string | null
   slug?: string | null
   programmeIds: string[]
+  campDays?: CampDayInput[] | null
 }
 
 export async function createPromotion(input: PromotionCreateInput) {
+  const campDaysJson = input.campDays && input.campDays.length > 0
+    ? JSON.stringify(input.campDays)
+    : null
   const { rows } = await sql`
     INSERT INTO promotions (
       created_by, promotion_type, title, detail, start_at, end_at,
-      venue, cost_gbp, is_free, payment_link, send_mode, generated_message, slug
+      venue, cost_gbp, is_free, payment_link, send_mode, generated_message, slug, camp_days
     )
     VALUES (
       ${input.createdBy}, ${input.promotionType}, ${input.title ?? null}, ${input.detail},
       ${input.startAt ?? null}, ${input.endAt ?? null},
       ${input.venue ?? null}, ${input.costGbp ?? null}, ${input.isFree ?? false},
       ${input.paymentLink ?? null}, ${input.sendMode}, ${input.generatedMessage ?? null},
-      ${input.slug ?? null}
+      ${input.slug ?? null}, ${campDaysJson}::jsonb
     )
     RETURNING *
   `

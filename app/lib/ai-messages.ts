@@ -433,3 +433,150 @@ export function buildReferralCreditIssuedMessage(input: {
     : `You now have 1 free class credit to use on a future booking.`
   return `Thanks for the referral ${input.referrerFirstName}! ${subject} came along and earned you a free class 🙌\n\n${balanceLine}`
 }
+
+// ─── Holiday camp bookings (WhatsApp-native flow) ───
+
+interface CampDayLite {
+  date: string         // 'YYYY-MM-DD'
+  label: string        // 'Tue 7 Apr'
+  price_gbp: number
+  capacity?: number | null
+}
+
+// Outbound invite addressed to one parent for one child. Lettered list so
+// parents can reply with letters, day labels, dates, "all", etc — the
+// parser handles all of it.
+export interface CampInviteInput {
+  parentFirstName: string
+  childName: string
+  campTitle: string | null
+  campDetail: string
+  dayList: CampDayLite[]
+  coachName: string
+  paymentLink?: string | null
+}
+
+export async function generateCampInviteMessage(input: CampInviteInput): Promise<string> {
+  const systemPrompt = `You write short, warm WhatsApp messages for a sports/fitness coach inviting a parent to book their child onto a holiday camp.
+
+Rules:
+- Coach voice, not corporate. Greet the parent by first name.
+- 2-3 short paragraphs max. Mention the child by name.
+- List the available days with letter labels (a, b, c, ...) so the parent can reply with letters (e.g. "a, b" or "Tue & Wed") to pick which ones they want.
+- Ask them to reply with their day selection. Mention they can pick any combination, or reply "all" for every day.
+- Do not mention payment yet — payment instructions come AFTER they've picked days.
+- One emoji max. British English.`
+
+  const lettered = input.dayList
+    .map((d, i) => `${String.fromCharCode(97 + i)}) ${d.label} — £${Number(d.price_gbp).toFixed(2)}`)
+    .join('\n')
+
+  const parts = [
+    `Parent first name: ${input.parentFirstName || 'there'}`,
+    `Child name: ${input.childName}`,
+    `Coach: ${input.coachName}`,
+    `Camp title: ${input.campTitle || '(no title)'}`,
+    `Camp details: ${input.campDetail}`,
+    `Available days:\n${lettered}`,
+  ]
+
+  return callClaude(systemPrompt, [{ role: 'user', content: `Write the WhatsApp invite now.\n\n${parts.join('\n')}` }], 350)
+}
+
+// Free-text → array of day-list indices (0-based). Uses Claude in
+// JSON-only mode. Examples it should handle:
+//   "a, b"          → [0,1]
+//   "Tuesday & Wednesday" → [0,1]   (if those map to a, b)
+//   "7 and 8"       → [0,1]
+//   "all"           → [0,1,2,...]
+//   "just Wednesday" → [1]
+//   "thx" / random → null
+// Returns null on unparseable.
+export async function parseCampDaySelection(
+  reply: string,
+  dayList: CampDayLite[]
+): Promise<number[] | null> {
+  const lettered = dayList
+    .map((d, i) => `  ${String.fromCharCode(97 + i)} (index ${i}) = ${d.label} on ${d.date}`)
+    .join('\n')
+
+  const systemPrompt = `You parse a parent's WhatsApp reply selecting which holiday-camp days they want.
+
+You will be given:
+- The list of available days with letter labels and 0-based indices.
+- The parent's reply text.
+
+Return ONLY a single JSON object on one line, no prose, no markdown, no code fences. Schema:
+  {"indices":[0,1]}   — the 0-based indices of the days they picked
+  {"indices":[]}      — if the reply is unparseable or doesn't pick any days
+
+Interpretation rules:
+- "all", "every day", "the lot", "yes all of them" → all indices
+- Letter references ("a", "b and c") → corresponding indices
+- Day-of-week references ("Tuesday", "Tue") → match against the label
+- Date references ("7th", "the 7th", "April 7") → match against the date or label
+- "just X" / "only X" / "X only" → just that one index
+- Random non-selection text ("ok", "thanks", "?", "hi") → empty array
+- Be liberal: accept misspellings, mixed formats, ranges ("a to c" → 0,1,2)
+- Never invent indices outside the provided range.`
+
+  const userMsg = `Available days:\n${lettered}\n\nParent's reply: "${reply}"\n\nReturn JSON now.`
+
+  const raw = await callClaude(systemPrompt, [{ role: 'user', content: userMsg }], 100)
+  // Extract the first JSON object — be tolerant if the model wrapped it.
+  const match = raw.match(/\{[^}]*"indices"\s*:\s*\[[^\]]*\][^}]*\}/)
+  if (!match) return null
+  try {
+    const parsed = JSON.parse(match[0])
+    if (!Array.isArray(parsed.indices)) return null
+    const indices = parsed.indices
+      .map((x: unknown) => (typeof x === 'number' ? Math.floor(x) : parseInt(String(x), 10)))
+      .filter((n: number) => Number.isInteger(n) && n >= 0 && n < dayList.length)
+    return indices.length > 0 ? indices : null
+  } catch {
+    return null
+  }
+}
+
+// Plain template (no LLM cost) — payment instructions need to land
+// verbatim with the link intact, no creative liberties.
+export function buildCampPaymentInstructions(input: {
+  parentFirstName: string
+  childName: string
+  selectedDays: CampDayLite[]
+  total: number
+  paymentLink: string | null
+  paymentReference: string
+}): string {
+  const daysLine = input.selectedDays.map((d) => d.label).join(', ')
+  const greeting = input.parentFirstName ? `Brilliant ${input.parentFirstName}` : 'Brilliant'
+  const lines: string[] = []
+  lines.push(`${greeting} — ${input.childName} is booked in for: ${daysLine}.`)
+  lines.push('')
+  lines.push(`Total: £${input.total.toFixed(2)}`)
+  if (input.paymentLink) {
+    lines.push(`Pay here: ${input.paymentLink}`)
+  }
+  lines.push(`Please use reference: ${input.paymentReference}`)
+  lines.push('')
+  lines.push(`Once you've paid, reply "PAID" and I'll let the coach know 👍`)
+  return lines.join('\n')
+}
+
+// Sent after parent replies "PAID". Plain template.
+export function buildCampPaidAck(input: {
+  parentFirstName: string
+  childName: string
+  total: number
+}): string {
+  const name = input.parentFirstName ? ` ${input.parentFirstName}` : ''
+  return `Thanks${name} — I've flagged £${input.total.toFixed(2)} for ${input.childName} as paid. The coach will confirm receipt against the bank shortly.`
+}
+
+// Sent when we can't parse the parent's day-selection reply.
+export function buildCampDayUnparseableNudge(childName: string, dayList: CampDayLite[]): string {
+  const lettered = dayList
+    .map((d, i) => `${String.fromCharCode(97 + i)}) ${d.label}`)
+    .join('\n')
+  return `Sorry, didn't catch which days you'd like for ${childName}. Please reply with the letters (e.g. "a, b") or day names from the list below — or "all" for every day.\n\n${lettered}`
+}
