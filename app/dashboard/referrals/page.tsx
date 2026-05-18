@@ -24,6 +24,27 @@ interface Referral {
   programme_name: string
 }
 
+interface CampaignSummary {
+  promotion_id: string
+  title: string | null
+  status: string
+  created_at: string
+  programme_name: string | null
+  leads_total: number
+  attended: number
+  converted: number
+  credits_issued: number
+}
+
+// Pipeline column order — drives the grouped view below the campaigns.
+const PIPELINE: Array<{ status: string; label: string }> = [
+  { status: 'referral_pending', label: 'Pending' },
+  { status: 'confirmed', label: 'Confirmed' },
+  { status: 'attended', label: 'Attended' },
+  { status: 'converted', label: 'Converted' },
+  { status: 'lapsed', label: 'Lapsed' },
+]
+
 const STATUS_COLOURS: Record<string, string> = {
   referral_pending: 'bg-yellow-100 text-yellow-700',
   confirmed: 'bg-blue-100 text-blue-700',
@@ -48,6 +69,7 @@ function isTodayAction(r: Referral): boolean {
 export default function ReferralsPage() {
   const router = useRouter()
   const [referrals, setReferrals] = useState<Referral[]>([])
+  const [campaigns, setCampaigns] = useState<CampaignSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [toast, setToast] = useState<string>('')
@@ -57,6 +79,7 @@ export default function ReferralsPage() {
     if (res.status === 401) { router.push('/auth/login'); return }
     const data = await res.json()
     setReferrals(data.referrals || [])
+    setCampaigns(data.campaigns || [])
     setLoading(false)
   }, [router])
 
@@ -157,88 +180,157 @@ export default function ReferralsPage() {
         collects submissions.
       </p>
 
-      <div className="space-y-3">
-        {referrals.map((r) => {
-          const showIssueCredit = r.status === 'attended' && r.referrer_reward_status === 'notified' && r.referrer_resolved
-          const referrerLabel = r.referrer_parent_name || r.referred_by_name
-          return (
-            <div key={r.id} className="bg-white rounded-xl shadow-sm p-4">
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <h3 className="font-semibold text-gray-900">
-                    {r.friend_first_name}
-                    {r.child_name && <span className="text-gray-500 font-normal"> · child: {r.child_name}</span>}
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {r.programme_name}{r.promotion_title ? ` · ${r.promotion_title}` : ''}
-                  </p>
+      {campaigns.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
+          <h2 className="font-semibold text-gray-900 mb-3 text-sm">Active campaigns</h2>
+          <div className="space-y-3">
+            {campaigns.map((c) => {
+              const conversionRate = c.attended > 0
+                ? Math.round((c.converted / c.attended) * 100)
+                : 0
+              return (
+                <div key={c.promotion_id} className="border border-gray-100 rounded-lg p-3">
+                  <div className="flex justify-between items-start gap-3 mb-2">
+                    <div className="min-w-0">
+                      <div className="font-medium text-gray-900 text-sm truncate">
+                        {c.title || 'Untitled campaign'}
+                      </div>
+                      <div className="text-xs text-gray-500 truncate">
+                        {c.programme_name || '—'} · launched {new Date(c.created_at).toLocaleDateString('en-GB')}
+                      </div>
+                    </div>
+                    <span className={`text-[10px] px-2 py-0.5 rounded shrink-0 ${
+                      c.status === 'sent' ? 'bg-green-100 text-green-700' :
+                      c.status === 'draft' ? 'bg-gray-100 text-gray-600' :
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {c.status}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1 text-center mt-2">
+                    <div>
+                      <div className="text-base font-semibold text-gray-900">{c.leads_total}</div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-wide">Leads</div>
+                    </div>
+                    <div>
+                      <div className="text-base font-semibold text-gray-900">{c.attended}</div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-wide">Attended</div>
+                    </div>
+                    <div>
+                      <div className="text-base font-semibold text-gray-900">{c.converted}</div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-wide">Converted</div>
+                    </div>
+                    <div>
+                      <div className="text-base font-semibold text-gray-900">{conversionRate}%</div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-wide">Conv rate</div>
+                    </div>
+                    <div>
+                      <div className="text-base font-semibold text-gray-900">{c.credits_issued}</div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-wide">Credits</div>
+                    </div>
+                  </div>
                 </div>
-                <span className={`text-xs px-2 py-1 rounded ${STATUS_COLOURS[r.status] || 'bg-gray-100'}`}>
-                  {r.status.replace('_', ' ')}
-                </span>
-              </div>
-              <div className="text-sm text-gray-700 space-y-1">
-                <p>📞 {r.friend_phone}</p>
-                {r.friend_email && <p>✉️ {r.friend_email}</p>}
-                {referrerLabel && (
-                  <p className="text-xs text-gray-500">
-                    Referred by: {referrerLabel}
-                    {!r.referrer_resolved && <span className="ml-1 text-amber-600">(unresolved)</span>}
-                    {r.referrer_resolved && r.referrer_credits_balance != null && (
-                      <span className="ml-1 text-gray-400">· {r.referrer_credits_balance} credit{r.referrer_credits_balance === 1 ? '' : 's'} on file</span>
-                    )}
-                  </p>
-                )}
-              </div>
-              <div className="mt-3 flex gap-2 flex-wrap">
-                {r.status === 'referral_pending' && (
-                  <button
-                    onClick={() => updateStatus(r.id, 'confirmed')}
-                    disabled={busyId === r.id}
-                    className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    Confirm
-                  </button>
-                )}
-                {(r.status === 'referral_pending' || r.status === 'confirmed') && (
-                  <button
-                    onClick={() => updateStatus(r.id, 'attended')}
-                    disabled={busyId === r.id}
-                    className="text-xs bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 disabled:opacity-50"
-                  >
-                    Mark attended
-                  </button>
-                )}
-                {showIssueCredit && (
-                  <button
-                    onClick={() => issueCredit(r.id)}
-                    disabled={busyId === r.id}
-                    className="text-xs bg-amber-500 text-white px-3 py-1 rounded hover:bg-amber-600 disabled:opacity-50 font-medium"
-                  >
-                    Issue credit to {r.referrer_parent_name?.split(/\s+/)[0] || 'referrer'}
-                  </button>
-                )}
-                {r.referrer_reward_status === 'honoured' && (
-                  <span className="text-xs text-green-700 px-2 py-1">✓ Credit issued</span>
-                )}
-                {r.status === 'attended' && (
-                  <button
-                    onClick={() => updateStatus(r.id, 'converted')}
-                    disabled={busyId === r.id}
-                    className="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 disabled:opacity-50"
-                  >
-                    Mark converted
-                  </button>
-                )}
-                {r.status !== 'lapsed' && r.status !== 'converted' && (
-                  <button
-                    onClick={() => updateStatus(r.id, 'lapsed')}
-                    disabled={busyId === r.id}
-                    className="text-xs bg-gray-400 text-white px-3 py-1 rounded hover:bg-gray-500 disabled:opacity-50"
-                  >
-                    Mark lapsed
-                  </button>
-                )}
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-6">
+        {PIPELINE.map(({ status, label }) => {
+          const bucket = referrals.filter((r) => r.status === status)
+          if (bucket.length === 0) return null
+          return (
+            <div key={status}>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                {label} ({bucket.length})
+              </h3>
+              <div className="space-y-3">
+                {bucket.map((r) => {
+                  const showIssueCredit = r.status === 'attended' && r.referrer_reward_status === 'notified' && r.referrer_resolved
+                  const referrerLabel = r.referrer_parent_name || r.referred_by_name
+                  return (
+                    <div key={r.id} className="bg-white rounded-xl shadow-sm p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h4 className="font-semibold text-gray-900">
+                            {r.friend_first_name}
+                            {r.child_name && <span className="text-gray-500 font-normal"> · child: {r.child_name}</span>}
+                          </h4>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {r.programme_name}{r.promotion_title ? ` · ${r.promotion_title}` : ''}
+                          </p>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded ${STATUS_COLOURS[r.status] || 'bg-gray-100'}`}>
+                          {r.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-700 space-y-1">
+                        <p>📞 {r.friend_phone}</p>
+                        {r.friend_email && <p>✉️ {r.friend_email}</p>}
+                        {referrerLabel && (
+                          <p className="text-xs text-gray-500">
+                            Referred by: {referrerLabel}
+                            {!r.referrer_resolved && <span className="ml-1 text-amber-600">(unresolved)</span>}
+                            {r.referrer_resolved && r.referrer_credits_balance != null && (
+                              <span className="ml-1 text-gray-400">· {r.referrer_credits_balance} credit{r.referrer_credits_balance === 1 ? '' : 's'} on file</span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                      <div className="mt-3 flex gap-2 flex-wrap">
+                        {r.status === 'referral_pending' && (
+                          <button
+                            onClick={() => updateStatus(r.id, 'confirmed')}
+                            disabled={busyId === r.id}
+                            className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            Confirm
+                          </button>
+                        )}
+                        {(r.status === 'referral_pending' || r.status === 'confirmed') && (
+                          <button
+                            onClick={() => updateStatus(r.id, 'attended')}
+                            disabled={busyId === r.id}
+                            className="text-xs bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 disabled:opacity-50"
+                          >
+                            Mark attended
+                          </button>
+                        )}
+                        {showIssueCredit && (
+                          <button
+                            onClick={() => issueCredit(r.id)}
+                            disabled={busyId === r.id}
+                            className="text-xs bg-amber-500 text-white px-3 py-1 rounded hover:bg-amber-600 disabled:opacity-50 font-medium"
+                          >
+                            Issue credit to {r.referrer_parent_name?.split(/\s+/)[0] || 'referrer'}
+                          </button>
+                        )}
+                        {r.referrer_reward_status === 'honoured' && (
+                          <span className="text-xs text-green-700 px-2 py-1">✓ Credit issued</span>
+                        )}
+                        {r.status === 'attended' && (
+                          <button
+                            onClick={() => updateStatus(r.id, 'converted')}
+                            disabled={busyId === r.id}
+                            className="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 disabled:opacity-50"
+                          >
+                            Mark converted
+                          </button>
+                        )}
+                        {r.status !== 'lapsed' && r.status !== 'converted' && (
+                          <button
+                            onClick={() => updateStatus(r.id, 'lapsed')}
+                            disabled={busyId === r.id}
+                            className="text-xs bg-gray-400 text-white px-3 py-1 rounded hover:bg-gray-500 disabled:opacity-50"
+                          >
+                            Mark lapsed
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )

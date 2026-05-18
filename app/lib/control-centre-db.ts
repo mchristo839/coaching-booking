@@ -623,6 +623,46 @@ export async function issueReferralCreditByCoach(
   }
 }
 
+// Campaign-level rollups for the Referrals tab "Active Campaigns" panel
+// (spec §6.1 / §6.2). One row per refer-a-friend promotion the coach owns,
+// with submitted / attended / converted / credit counts in a single query
+// so the dashboard avoids N+1.
+export interface ReferralCampaignSummary {
+  promotion_id: string
+  title: string | null
+  status: string
+  created_at: string
+  programme_name: string | null
+  leads_total: number
+  attended: number
+  converted: number
+  credits_issued: number
+}
+export async function listReferralCampaignsForCoach(coachId: string): Promise<ReferralCampaignSummary[]> {
+  const { rows } = await sql`
+    SELECT
+      pr.id          as promotion_id,
+      pr.title       as title,
+      pr.status      as status,
+      pr.created_at  as created_at,
+      pm.programme_name as programme_name,
+      COUNT(r.id)::int                                                       as leads_total,
+      COUNT(r.id) FILTER (WHERE r.status IN ('attended','converted'))::int   as attended,
+      COUNT(r.id) FILTER (WHERE r.status = 'converted')::int                 as converted,
+      COUNT(r.id) FILTER (WHERE r.referrer_reward_status = 'honoured')::int  as credits_issued
+    FROM promotions pr
+    LEFT JOIN promotion_targets pt ON pt.promotion_id = pr.id
+    LEFT JOIN programmes pm ON pm.id = pt.programme_id
+    LEFT JOIN referrals r ON r.promotion_id = pr.id
+    WHERE pr.created_by = ${coachId}
+      AND pr.promotion_type = 'refer_a_friend'
+    GROUP BY pr.id, pr.title, pr.status, pr.created_at, pm.programme_name
+    ORDER BY pr.created_at DESC
+    LIMIT 50
+  `
+  return rows as ReferralCampaignSummary[]
+}
+
 // Look up a member's credit balance + contact info for the credit-issued
 // WhatsApp notification.
 export async function getMemberCreditContext(memberId: string) {
