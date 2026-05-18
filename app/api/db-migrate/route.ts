@@ -592,6 +592,18 @@ export async function POST() {
         WHERE state IN ('awaiting_score','awaiting_comment_low','awaiting_referral_yes_no')
     `
 
+    // Strip stray leading/trailing asterisks + whitespace from whatsapp_group_id.
+    // Coaches sometimes copy the bot's "paste this group ID: *<jid>*" message
+    // verbatim, leaving asterisks in the dashboard field that break the
+    // exact-match lookup in findProgrammeByWhatsAppGroup. Idempotent: only
+    // touches rows that need it; clamps to NULL when nothing remains.
+    await sql`
+      UPDATE programmes
+      SET whatsapp_group_id = NULLIF(REGEXP_REPLACE(whatsapp_group_id, '(^[*[:space:]]+|[*[:space:]]+$)', '', 'g'), '')
+      WHERE whatsapp_group_id IS NOT NULL
+        AND whatsapp_group_id ~ '(^[*[:space:]]|[*[:space:]]$)'
+    `
+
     // ═══════════════════════════════════════════════════════════
     // Holiday camp bookings — WhatsApp-native flow
     // ═══════════════════════════════════════════════════════════

@@ -145,6 +145,17 @@ export interface SessionScheduleEntry {
   durationMins: number                 // 60, 75, 90, ...
 }
 
+// The bot's "Unlinked group" reply wraps the JID in WhatsApp bold-markdown
+// asterisks (e.g. `*120363…@g.us*`). Coaches have copy-pasted that whole
+// rendered string into the dashboard field, leaving stray asterisks/spaces
+// that prevent the equality check in findProgrammeByWhatsAppGroup from ever
+// matching. Trim them defensively at both create and update boundaries.
+function normaliseWhatsappGroupId(input: string | null | undefined): string | null {
+  if (!input) return null
+  const cleaned = input.replace(/^[*\s]+|[*\s]+$/g, '')
+  return cleaned.length > 0 ? cleaned : null
+}
+
 export async function createProgramme(data: ProgrammeData) {
   const days = data.sessionDays ? `{${data.sessionDays.join(',')}}` : null
   const methods = data.paymentMethods ? `{${data.paymentMethods.join(',')}}` : null
@@ -186,7 +197,7 @@ export async function createProgramme(data: ProgrammeData) {
       ${data.trialAvailable || null}, ${data.trialInstructions || null}, ${data.whatToBring || null}, ${data.equipmentProvided || null}, ${data.kitRequired || null},
       ${data.kitDetails || null}, ${data.paidOrFree || 'paid'}, ${data.paymentModel || null}, ${data.priceGbp || null}, ${data.priceIncludes || null},
       ${data.siblingDiscount || null}, ${data.refundPolicy || null}, ${data.refundDetails || null}, ${methods}, ${data.paymentReminderSchedule || null},
-      ${data.botNotes || null}, ${data.whatsappGroupId || null}
+      ${data.botNotes || null}, ${normaliseWhatsappGroupId(data.whatsappGroupId)}
     )
     RETURNING *
   `
@@ -246,7 +257,12 @@ export async function updateProgramme(programmeId: string, fields: Partial<Progr
   }
   if (fields.paymentReminderSchedule !== undefined) updates.push(sql`UPDATE programmes SET payment_reminder_schedule = ${v(fields.paymentReminderSchedule)}, updated_at = NOW() WHERE id = ${programmeId}`)
   if (fields.botNotes !== undefined) updates.push(sql`UPDATE programmes SET bot_notes = ${v(fields.botNotes)}, updated_at = NOW() WHERE id = ${programmeId}`)
-  if (fields.whatsappGroupId !== undefined && fields.whatsappGroupId) updates.push(sql`UPDATE programmes SET whatsapp_group_id = ${fields.whatsappGroupId}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.whatsappGroupId !== undefined) {
+    const normalised = normaliseWhatsappGroupId(fields.whatsappGroupId)
+    if (normalised) {
+      updates.push(sql`UPDATE programmes SET whatsapp_group_id = ${normalised}, updated_at = NOW() WHERE id = ${programmeId}`)
+    }
+  }
 
   // Run all updates in parallel
   await Promise.all(updates)
