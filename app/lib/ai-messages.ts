@@ -246,7 +246,13 @@ Rules:
   return callClaude(systemPrompt, [{ role: 'user', content: parts.join('\n') }], 200)
 }
 
-export type NudgeStep = 'pre_session' | 'session_day' | 'post_session' | 'lapsed_check'
+export type NudgeStep =
+  | 'pre_session'
+  | 'session_day'
+  | 'post_session'           // T+24h post-attend conversion CTA
+  | 'conversion_followup'    // T+72h post-attend second nudge
+  | 'conversion_final'       // T+7d post-attend final nudge (caller flips status to lapsed)
+  | 'lapsed_check'           // legacy: 7d after creation when never attended
 
 /**
  * Nudge messages at various points in the referral journey.
@@ -258,7 +264,9 @@ export async function generateReferralNudge(
   const intents: Record<NudgeStep, string> = {
     pre_session: 'Friendly reminder that their first session is tomorrow. Include what to bring if obvious.',
     session_day: 'Quick "see you today" with venue and time. One sentence + emoji.',
-    post_session: 'Hope they enjoyed their first session. Invite them to come back next time or ask for feedback.',
+    post_session: 'They came along to their first session yesterday and had a great time. Invite them to book their next session and secure the spot. Mention a booking link will follow.',
+    conversion_followup: 'Three days since their first session and they haven\'t booked yet. Gentle nudge that spots are limited and to secure their place. Friendly, not pushy.',
+    conversion_final: 'A week since their first session — last chance to book before we close their slot. Warm tone, not aggressive. Short.',
     lapsed_check: "Gentle check-in after 7 days of no response — would they still like to come along? Don't be pushy.",
   }
 

@@ -152,6 +152,48 @@ export async function POST(
       // Don't fail the submission if confirmation fails
     }
 
+    // ─── Coach notification (AC-R05) ───
+    // Fire a WhatsApp DM to the coach so they know a new lead came in
+    // without having to refresh the dashboard. Best-effort, never blocks
+    // the form submission response.
+    try {
+      const ctx = await getReferralContext(referral.id)
+      if (ctx && ctx.coach_mobile) {
+        const coachDigits = String(ctx.coach_mobile).replace(/\D/g, '')
+        if (coachDigits) {
+          const coachJid = `${coachDigits}@s.whatsapp.net`
+          const refereeLabel = ctx.child_name
+            ? `${ctx.child_name} (referred by ${ctx.referred_by_name || 'someone'})`
+            : `${ctx.friend_first_name} (referred by ${ctx.referred_by_name || 'someone'})`
+          const sessionLine = ctx.first_session_at
+            ? `\nFirst session: ${new Date(ctx.first_session_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`
+            : ''
+          const coachMessage = `📥 New referral for ${ctx.programme_name}: ${refereeLabel}.${sessionLine}\n\nOpen the Referrals tab to review.`
+          try {
+            await sendWhatsAppMessage(coachJid, coachMessage)
+            await logNotification({
+              eventType: 'referral_coach_notice',
+              programmeId: ctx.programme_id,
+              recipientType: 'coach',
+              recipientJid: coachJid,
+              status: 'sent',
+            })
+          } catch (e) {
+            await logNotification({
+              eventType: 'referral_coach_notice',
+              programmeId: ctx.programme_id,
+              recipientType: 'coach',
+              recipientJid: coachJid,
+              status: 'failed',
+              error: e instanceof Error ? e.message : String(e),
+            })
+          }
+        }
+      }
+    } catch (notifyErr) {
+      console.error('[REFERRALS coach notification] error:', notifyErr)
+    }
+
     return NextResponse.json({ success: true, referralId: referral.id })
   } catch (error) {
     console.error('[REFERRALS POST] error:', error)

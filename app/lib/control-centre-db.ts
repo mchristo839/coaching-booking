@@ -651,7 +651,9 @@ export async function getReferralContext(referralId: string) {
   const { rows } = await sql`
     SELECT r.*,
            p.programme_name, p.venue_name, p.session_days, p.session_start_time,
-           c.first_name as coach_first_name, c.last_name as coach_last_name
+           c.id as coach_id,
+           c.first_name as coach_first_name, c.last_name as coach_last_name,
+           c.mobile as coach_mobile
     FROM referrals r
     JOIN programmes p ON p.id = r.programme_id
     JOIN coaches_v2 c ON c.id = p.coach_id
