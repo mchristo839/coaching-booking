@@ -467,11 +467,23 @@ export async function getMemberForProgramme(memberId: string, programmeId: strin
 }
 
 export async function listReferralsForCoach(coachId: string) {
+  // Includes the new attribution + reward fields so the dashboard can
+  // render the one-tap actions without a second round-trip.
   const { rows } = await sql`
-    SELECT r.*, pr.title as promotion_title, pm.programme_name
+    SELECT r.id, r.status, r.friend_first_name, r.child_name,
+           r.friend_phone, r.friend_email,
+           r.referred_by_name, r.referrer_member_id, r.referrer_resolved,
+           r.referrer_reward_status, r.referee_reward_status,
+           r.first_session_at, r.attended_at, r.converted_at, r.created_at,
+           r.promotion_id, r.programme_id,
+           pr.title as promotion_title,
+           pm.programme_name,
+           rm.parent_name as referrer_parent_name,
+           rm.referral_credits_balance as referrer_credits_balance
     FROM referrals r
     JOIN promotions pr ON pr.id = r.promotion_id
     JOIN programmes pm ON pm.id = r.programme_id
+    LEFT JOIN members rm ON rm.id = r.referrer_member_id
     WHERE pr.created_by = ${coachId}
     ORDER BY r.created_at DESC
     LIMIT 100
@@ -485,12 +497,143 @@ export async function updateReferralStatus(
 ) {
   const now = new Date().toISOString()
   if (status === 'attended') {
-    await sql`UPDATE referrals SET status = ${status}, attended_at = ${now} WHERE id = ${id}`
+    // Side-effect per spec §4.2: when the referee attends, the referrer
+    // reward enters the 'notified' state (coach gets the dashboard prompt
+    // to issue the credit). We don't auto-issue the credit — issuance is
+    // an explicit coach tap so they can verify attendance against memory.
+    await sql`
+      UPDATE referrals
+      SET status = ${status},
+          attended_at = ${now},
+          referrer_reward_status = CASE
+            WHEN referrer_reward_status = 'pending' THEN 'notified'
+            ELSE referrer_reward_status
+          END
+      WHERE id = ${id}
+    `
   } else if (status === 'converted') {
     await sql`UPDATE referrals SET status = ${status}, converted_at = ${now} WHERE id = ${id}`
   } else {
     await sql`UPDATE referrals SET status = ${status} WHERE id = ${id}`
   }
+}
+
+// ─── Referral credit issuance ───
+// Issues +1 free-class credit to the referrer (a member) and records an
+// audit entry. Idempotent: re-issuing on a row already 'honoured' is a no-op
+// and returns the current balance. Returns the reason code so the caller
+// can show the right toast.
+export async function issueReferralCreditByCoach(
+  referralId: string,
+  coachId: string
+): Promise<{
+  issued: boolean
+  balance: number
+  reason: string
+  memberId: string | null
+  refereeChildName: string | null
+  refereeFriendFirstName: string | null
+}> {
+  // Load the referral + verify ownership through the promotion.
+  const { rows: refRows } = await sql`
+    SELECT r.id, r.referrer_member_id, r.referrer_reward_status, r.status,
+           r.friend_first_name, r.child_name, pr.created_by
+    FROM referrals r
+    JOIN promotions pr ON pr.id = r.promotion_id
+    WHERE r.id = ${referralId}
+    LIMIT 1
+  `
+  const ref = refRows[0]
+  const baseFail = {
+    refereeChildName: null as string | null,
+    refereeFriendFirstName: null as string | null,
+  }
+  if (!ref) return { issued: false, balance: 0, reason: 'referral_not_found', memberId: null, ...baseFail }
+  if (ref.created_by !== coachId) return { issued: false, balance: 0, reason: 'forbidden', memberId: null, ...baseFail }
+  if (!ref.referrer_member_id) {
+    return {
+      issued: false, balance: 0, reason: 'referrer_unresolved', memberId: null,
+      refereeChildName: ref.child_name || null,
+      refereeFriendFirstName: ref.friend_first_name || null,
+    }
+  }
+  if (ref.referrer_reward_status === 'honoured') {
+    const { rows: m } = await sql`SELECT referral_credits_balance FROM members WHERE id = ${ref.referrer_member_id}`
+    return {
+      issued: false,
+      balance: m[0]?.referral_credits_balance || 0,
+      reason: 'already_honoured',
+      memberId: ref.referrer_member_id,
+      refereeChildName: ref.child_name || null,
+      refereeFriendFirstName: ref.friend_first_name || null,
+    }
+  }
+  if (ref.status !== 'attended' && ref.status !== 'converted') {
+    return {
+      issued: false, balance: 0, reason: 'referee_not_attended', memberId: null,
+      refereeChildName: ref.child_name || null,
+      refereeFriendFirstName: ref.friend_first_name || null,
+    }
+  }
+
+  // Idempotency claim: flip the referral row's status atomically with a
+  // WHERE that only matches if no one has issued yet. rowCount tells us
+  // whether we won the race. If we didn't, return as already_honoured —
+  // no balance bump, no ledger row, no double-credit.
+  const claim = await sql`
+    UPDATE referrals
+    SET referrer_reward_status = 'honoured'
+    WHERE id = ${referralId} AND referrer_reward_status <> 'honoured'
+  `
+  if ((claim.rowCount ?? 0) === 0) {
+    const { rows: m } = await sql`SELECT referral_credits_balance FROM members WHERE id = ${ref.referrer_member_id}`
+    return {
+      issued: false,
+      balance: m[0]?.referral_credits_balance || 0,
+      reason: 'already_honoured',
+      memberId: ref.referrer_member_id,
+      refereeChildName: ref.child_name || null,
+      refereeFriendFirstName: ref.friend_first_name || null,
+    }
+  }
+
+  // We won the claim — safe to bump balance + log.
+  await sql`
+    UPDATE members
+    SET referral_credits_balance = referral_credits_balance + 1
+    WHERE id = ${ref.referrer_member_id}
+  `
+  await sql`
+    INSERT INTO referral_credit_ledger (member_id, referral_id, delta, reason, issued_by, notes)
+    VALUES (
+      ${ref.referrer_member_id}, ${referralId}, 1, 'referral_attended',
+      ${coachId},
+      ${`Credit for referring ${ref.friend_first_name}${ref.child_name ? ' (' + ref.child_name + ')' : ''}`}
+    )
+  `
+
+  const { rows: m } = await sql`SELECT referral_credits_balance FROM members WHERE id = ${ref.referrer_member_id}`
+  return {
+    issued: true,
+    balance: m[0]?.referral_credits_balance || 0,
+    reason: 'ok',
+    memberId: ref.referrer_member_id,
+    refereeChildName: ref.child_name || null,
+    refereeFriendFirstName: ref.friend_first_name || null,
+  }
+}
+
+// Look up a member's credit balance + contact info for the credit-issued
+// WhatsApp notification.
+export async function getMemberCreditContext(memberId: string) {
+  const { rows } = await sql`
+    SELECT id, parent_name, parent_phone, parent_whatsapp_id,
+           referral_credits_balance, programme_id
+    FROM members
+    WHERE id = ${memberId}
+    LIMIT 1
+  `
+  return rows[0] || null
 }
 
 export async function getPromotionBySlug(slug: string) {

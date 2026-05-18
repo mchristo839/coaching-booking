@@ -410,3 +410,18 @@ export function buildReferralHandoffMessage(referLink: string, clientFirstName: 
 export function buildReferralDeclineAck(clientFirstName: string): string {
   return `No worries ${clientFirstName} — thanks again for the feedback. See you at the next session 💪`
 }
+
+// Sent to the referrer when the coach issues a free-class credit because
+// their referred friend's child attended a session. Plain template so the
+// numbers + wording land identical every time.
+export function buildReferralCreditIssuedMessage(input: {
+  referrerFirstName: string
+  refereeChildName: string | null
+  newBalance: number
+}): string {
+  const subject = input.refereeChildName ? input.refereeChildName : 'your friend'
+  const balanceLine = input.newBalance > 1
+    ? `You now have ${input.newBalance} free class credits to use on a future booking.`
+    : `You now have 1 free class credit to use on a future booking.`
+  return `Thanks for the referral ${input.referrerFirstName}! ${subject} came along and earned you a free class 🙌\n\n${balanceLine}`
+}

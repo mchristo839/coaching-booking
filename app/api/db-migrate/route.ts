@@ -503,6 +503,42 @@ export async function POST() {
     await sql`ALTER TABLE referrals ADD COLUMN IF NOT EXISTS referrer_resolved BOOLEAN NOT NULL DEFAULT FALSE`
     await sql`CREATE INDEX IF NOT EXISTS idx_referrals_referrer_member ON referrals(referrer_member_id) WHERE referrer_member_id IS NOT NULL`
 
+    // Reward status state machine on the referral row itself.
+    // referrer_reward_status: pending → notified (when referee attends)
+    //                                → honoured (when coach issues the +1 credit)
+    // referee_reward_status: pending → applied (when first session marked free)
+    //                                → expired
+    await sql`
+      ALTER TABLE referrals ADD COLUMN IF NOT EXISTS referrer_reward_status VARCHAR(20)
+        NOT NULL DEFAULT 'pending'
+        CHECK (referrer_reward_status IN ('pending','notified','honoured'))
+    `
+    await sql`
+      ALTER TABLE referrals ADD COLUMN IF NOT EXISTS referee_reward_status VARCHAR(20)
+        NOT NULL DEFAULT 'pending'
+        CHECK (referee_reward_status IN ('pending','applied','expired'))
+    `
+
+    // Credit balance + lifetime usage on members.parent_name (the "Contacts"
+    // table per Paul's spec §3.3). Coach honours credits manually at MVP.
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS referral_credits_balance INTEGER NOT NULL DEFAULT 0`
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS referral_credits_used INTEGER NOT NULL DEFAULT 0`
+
+    // Audit trail for every credit movement. Append-only; never updated.
+    await sql`
+      CREATE TABLE IF NOT EXISTS referral_credit_ledger (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+        referral_id UUID REFERENCES referrals(id) ON DELETE SET NULL,
+        delta INTEGER NOT NULL,
+        reason VARCHAR(50) NOT NULL,
+        issued_by UUID REFERENCES coaches_v2(id),
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_referral_credit_ledger_member ON referral_credit_ledger(member_id, created_at DESC)`
+
     // ═══════════════════════════════════════════════════════════
     // Phase 7: Programme builder upgrades (prospect demo feedback)
     // ═══════════════════════════════════════════════════════════
