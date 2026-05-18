@@ -10,9 +10,19 @@ import {
   getReferralContext,
   setReferralFirstSession,
   logNotification,
+  getMemberForProgramme,
 } from '@/app/lib/control-centre-db'
 import { generateReferralConfirmation } from '@/app/lib/ai-messages'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
+
+// Spec AC-R11: a campaign is "closed" once promotion.end_at is in the
+// past. New submissions are rejected and the landing page renders a
+// closed message. Promotions without end_at stay open indefinitely.
+function isCampaignClosed(promotion: { end_at?: string | null; status?: string | null }): boolean {
+  if (promotion.status === 'cancelled') return true
+  if (!promotion.end_at) return false
+  return new Date(promotion.end_at).getTime() < Date.now()
+}
 
 export async function GET(
   _request: NextRequest,
@@ -23,14 +33,18 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
+  const closed = isCampaignClosed(promotion)
+
   // Only return safe public fields
   return NextResponse.json({
     title: promotion.title,
     detail: promotion.detail,
     venue: promotion.venue,
     startAt: promotion.start_at,
+    endAt: promotion.end_at,
     isFree: promotion.is_free,
     status: promotion.status,
+    closed,
   })
 }
 
@@ -40,7 +54,14 @@ export async function POST(
 ) {
   try {
     const body = await request.json()
-    const { friendFirstName, childName, friendEmail, friendPhone, referredByName } = body
+    const {
+      friendFirstName,
+      childName,
+      friendEmail,
+      friendPhone,
+      referredByName,
+      referrerMemberId,
+    } = body
 
     if (!friendFirstName || !friendPhone) {
       return NextResponse.json(
@@ -56,21 +77,50 @@ export async function POST(
     if (promotion.status !== 'sent' && promotion.status !== 'draft') {
       return NextResponse.json({ error: 'This referral is no longer active' }, { status: 400 })
     }
+    if (isCampaignClosed(promotion)) {
+      return NextResponse.json(
+        { error: 'This referral campaign has closed and is no longer accepting submissions.' },
+        { status: 400 }
+      )
+    }
 
     // Use the first linked programme as the referral's programme
     const targets = await getPromotionTargets(promotion.id)
     if (targets.length === 0) {
       return NextResponse.json({ error: 'No programme linked' }, { status: 400 })
     }
+    const programmeId = targets[0].programme_id
+
+    // Resolve the referrer member if one was picked from the dropdown.
+    // Verify the member genuinely belongs to this programme — otherwise
+    // ignore the input (defence against arbitrary UUID injection from the
+    // form) and fall through to the free-text fallback.
+    let resolvedMemberId: string | null = null
+    let resolvedMemberName: string | null = null
+    if (referrerMemberId && typeof referrerMemberId === 'string') {
+      const member = await getMemberForProgramme(referrerMemberId, programmeId)
+      if (member) {
+        resolvedMemberId = member.id
+        resolvedMemberName = member.parent_name || null
+      }
+    }
+
+    // Store the human-readable name for backwards compat with existing
+    // notification logic. Prefer the resolved member's name when we have
+    // one (authoritative) over the typed free-text.
+    const storedReferredByName =
+      resolvedMemberName ||
+      (referredByName ? String(referredByName).trim() : null)
 
     const referral = await createReferral({
       promotionId: promotion.id,
-      programmeId: targets[0].programme_id,
+      programmeId,
       friendFirstName: String(friendFirstName).trim(),
       childName: childName ? String(childName).trim() : null,
       friendEmail: friendEmail ? String(friendEmail).trim() : null,
       friendPhone: String(friendPhone).trim(),
-      referredByName: referredByName ? String(referredByName).trim() : null,
+      referredByName: storedReferredByName,
+      referrerMemberId: resolvedMemberId,
     })
 
     // Seed first_session_at from the promotion's start_at if set
@@ -119,6 +169,48 @@ export async function POST(
     } catch (confirmErr) {
       console.error('[REFERRALS confirmation] error:', confirmErr)
       // Don't fail the submission if confirmation fails
+    }
+
+    // ─── Coach notification (AC-R05) ───
+    // Fire a WhatsApp DM to the coach so they know a new lead came in
+    // without having to refresh the dashboard. Best-effort, never blocks
+    // the form submission response.
+    try {
+      const ctx = await getReferralContext(referral.id)
+      if (ctx && ctx.coach_mobile) {
+        const coachDigits = String(ctx.coach_mobile).replace(/\D/g, '')
+        if (coachDigits) {
+          const coachJid = `${coachDigits}@s.whatsapp.net`
+          const refereeLabel = ctx.child_name
+            ? `${ctx.child_name} (referred by ${ctx.referred_by_name || 'someone'})`
+            : `${ctx.friend_first_name} (referred by ${ctx.referred_by_name || 'someone'})`
+          const sessionLine = ctx.first_session_at
+            ? `\nFirst session: ${new Date(ctx.first_session_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`
+            : ''
+          const coachMessage = `📥 New referral for ${ctx.programme_name}: ${refereeLabel}.${sessionLine}\n\nOpen the Referrals tab to review.`
+          try {
+            await sendWhatsAppMessage(coachJid, coachMessage)
+            await logNotification({
+              eventType: 'referral_coach_notice',
+              programmeId: ctx.programme_id,
+              recipientType: 'coach',
+              recipientJid: coachJid,
+              status: 'sent',
+            })
+          } catch (e) {
+            await logNotification({
+              eventType: 'referral_coach_notice',
+              programmeId: ctx.programme_id,
+              recipientType: 'coach',
+              recipientJid: coachJid,
+              status: 'failed',
+              error: e instanceof Error ? e.message : String(e),
+            })
+          }
+        }
+      }
+    } catch (notifyErr) {
+      console.error('[REFERRALS coach notification] error:', notifyErr)
     }
 
     return NextResponse.json({ success: true, referralId: referral.id })

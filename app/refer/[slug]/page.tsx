@@ -8,14 +8,25 @@ interface PromotionPublic {
   detail: string
   venue: string | null
   startAt: string | null
+  endAt: string | null
   isFree: boolean
   status: string
+  closed?: boolean
 }
+
+interface ReferrerContact {
+  id: string
+  display_name: string
+}
+
+const OTHER_REFERRER = '__other__'
 
 export default function PublicReferralPage() {
   const params = useParams()
   const slug = params.slug as string
   const [promotion, setPromotion] = useState<PromotionPublic | null>(null)
+  const [contacts, setContacts] = useState<ReferrerContact[]>([])
+  const [contactsLoaded, setContactsLoaded] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -25,6 +36,9 @@ export default function PublicReferralPage() {
   const [childName, setChildName] = useState('')
   const [friendEmail, setFriendEmail] = useState('')
   const [friendPhone, setFriendPhone] = useState('')
+  // Selected dropdown value: a member id, '__other__', or '' (unset).
+  const [referrerSelection, setReferrerSelection] = useState('')
+  // Free-text fallback shown when 'Other' is picked or no contacts loaded.
   const [referredByName, setReferredByName] = useState('')
 
   const load = useCallback(async () => {
@@ -43,19 +57,50 @@ export default function PublicReferralPage() {
     }
   }, [slug])
 
+  const loadContacts = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/referrals/public/${slug}/contacts`)
+      if (res.ok) {
+        const data = await res.json()
+        setContacts(Array.isArray(data.contacts) ? data.contacts : [])
+      }
+    } catch {
+      // Silent — page degrades to free-text input on failure (AC-R02).
+    } finally {
+      setContactsLoaded(true)
+    }
+  }, [slug])
+
   useEffect(() => { load() }, [load])
+  useEffect(() => { loadContacts() }, [loadContacts])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     setError('')
 
+    // Resolve the dropdown selection into the two server fields. When the
+    // user picked a real contact, send the member id; otherwise send the
+    // free-text fallback. Server treats either as valid and verifies the
+    // member id belongs to this programme.
+    const dropdownAvailable = contacts.length > 0
+    const usingDropdown = dropdownAvailable && referrerSelection && referrerSelection !== OTHER_REFERRER
+    const referrerMemberId = usingDropdown ? referrerSelection : null
+    const referredByNameToSend = usingDropdown
+      ? null
+      : (referredByName.trim() || null)
+
     try {
       const res = await fetch(`/api/referrals/public/${slug}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          friendFirstName, childName, friendEmail, friendPhone, referredByName,
+          friendFirstName,
+          childName,
+          friendEmail,
+          friendPhone,
+          referredByName: referredByNameToSend,
+          referrerMemberId,
         }),
       })
       const data = await res.json()
@@ -88,6 +133,22 @@ export default function PublicReferralPage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-4">You&apos;re in!</h1>
           <p className="text-gray-600">
             We&apos;ve got your details. The coach will be in touch shortly with the session info.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Spec AC-R11: campaign closed after end_at. Render a friendly closed
+  // state instead of the form — no submissions accepted, no broken UX.
+  if (promotion.closed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 py-12">
+        <div className="bg-white rounded-xl shadow-sm w-full max-w-md p-6 md:p-8 text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">This offer has closed</h1>
+          <p className="text-gray-600">
+            Thanks for your interest in {promotion.title || 'this offer'}. Bookings are no longer open
+            for this campaign — get in touch with the coach directly if you&apos;d still like to come along.
           </p>
         </div>
       </div>
@@ -153,13 +214,42 @@ export default function PublicReferralPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Who referred you?</label>
-            <input
-              type="text"
-              value={referredByName}
-              onChange={(e) => setReferredByName(e.target.value)}
-              placeholder="Parent name"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
-            />
+            {!contactsLoaded ? (
+              <div className="w-full px-4 py-3 border border-gray-200 rounded-lg text-gray-400 bg-gray-50 text-sm">
+                Loading…
+              </div>
+            ) : contacts.length > 0 ? (
+              <>
+                <select
+                  value={referrerSelection}
+                  onChange={(e) => setReferrerSelection(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white"
+                >
+                  <option value="">Pick from list…</option>
+                  {contacts.map((c) => (
+                    <option key={c.id} value={c.id}>{c.display_name}</option>
+                  ))}
+                  <option value={OTHER_REFERRER}>Other / not on this list</option>
+                </select>
+                {referrerSelection === OTHER_REFERRER && (
+                  <input
+                    type="text"
+                    value={referredByName}
+                    onChange={(e) => setReferredByName(e.target.value)}
+                    placeholder="Type the parent's name"
+                    className="mt-2 w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                  />
+                )}
+              </>
+            ) : (
+              <input
+                type="text"
+                value={referredByName}
+                onChange={(e) => setReferredByName(e.target.value)}
+                placeholder="Parent name"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              />
+            )}
           </div>
 
           <button

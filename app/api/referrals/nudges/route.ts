@@ -10,9 +10,11 @@
 // Bearer-token protected.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { sql } from '@vercel/postgres'
 import {
   listReferralsDueForNudge,
   markReferralNudged,
+  updateReferralStatus,
   logNotification,
 } from '@/app/lib/control-centre-db'
 import { generateReferralNudge, type NudgeStep } from '@/app/lib/ai-messages'
@@ -24,7 +26,17 @@ function isAuthorised(request: NextRequest): boolean {
   return request.headers.get('authorization') === `Bearer ${secret}`
 }
 
-const STEP_ORDER: NudgeStep[] = ['pre_session', 'session_day', 'post_session', 'lapsed_check']
+// Strict ordering — chooseStep only considers steps strictly after the
+// last one sent. lapsed_check is a legacy branch for never-attended
+// referrals and sits outside the post-attend conversion ladder.
+const STEP_ORDER: NudgeStep[] = [
+  'pre_session',
+  'session_day',
+  'post_session',
+  'conversion_followup',
+  'conversion_final',
+  'lapsed_check',
+]
 
 /** Decide which nudge step (if any) is due for a given referral now. */
 function chooseStep(r: Record<string, unknown>): NudgeStep | null {
@@ -33,8 +45,12 @@ function chooseStep(r: Record<string, unknown>): NudgeStep | null {
   const firstSession = r.first_session_at
     ? new Date(r.first_session_at as string).getTime()
     : null
+  const attendedAt = r.attended_at
+    ? new Date(r.attended_at as string).getTime()
+    : null
   const lastStep = (r.last_nudge_step as string | null) || null
   const lastStepIdx = lastStep ? STEP_ORDER.indexOf(lastStep as NudgeStep) : -1
+  const status = r.status as string
 
   // Only consider steps strictly after the last one sent
   const after = (step: NudgeStep) => STEP_ORDER.indexOf(step) > lastStepIdx
@@ -49,15 +65,33 @@ function chooseStep(r: Record<string, unknown>): NudgeStep | null {
     if (after('session_day')) return 'session_day'
   }
 
-  // post_session: 24h after first session
-  if (firstSession && now - firstSession >= 24 * 3600 * 1000 && now - firstSession < 72 * 3600 * 1000) {
-    const status = r.status as string
+  // ─── Post-attendance conversion ladder ───
+  // Anchor on attended_at when the coach has marked the lead attended.
+  // Spec §5.1: T+24h CTA, T+72h follow-up, T+7d final (then drop).
+  if (attendedAt && status === 'attended') {
+    const sinceAttend = now - attendedAt
+
+    if (sinceAttend >= 7 * 24 * 3600 * 1000) {
+      if (after('conversion_final')) return 'conversion_final'
+    }
+    if (sinceAttend >= 72 * 3600 * 1000) {
+      if (after('conversion_followup')) return 'conversion_followup'
+    }
+    if (sinceAttend >= 24 * 3600 * 1000) {
+      if (after('post_session')) return 'post_session'
+    }
+  }
+
+  // Legacy: when the lead never got marked attended (e.g. coach forgot),
+  // fall back to a 24h post-first-session CTA on the old timing so we
+  // don't silently drop them. Only fires if attended_at is null.
+  if (!attendedAt && firstSession && now - firstSession >= 24 * 3600 * 1000 && now - firstSession < 72 * 3600 * 1000) {
     if (status !== 'converted' && after('post_session')) return 'post_session'
   }
 
-  // lapsed_check: 7 days after creation, no conversion
-  if (now - created >= 7 * 24 * 3600 * 1000) {
-    const status = r.status as string
+  // lapsed_check: 7 days after creation, never attended, never converted.
+  // Distinct from conversion_final (which fires on attended-but-not-booked).
+  if (!attendedAt && now - created >= 7 * 24 * 3600 * 1000) {
     if (status !== 'converted' && after('lapsed_check')) return 'lapsed_check'
   }
 
@@ -107,6 +141,12 @@ export async function POST(request: NextRequest) {
           recipientJid: jid,
           status: 'sent',
         })
+        // Spec §5.1: after the final conversion nudge, if they still
+        // haven't booked, transition the lead to 'lapsed' so it stops
+        // appearing in active pipelines and the nudge ladder terminates.
+        if (step === 'conversion_final') {
+          await updateReferralStatus(r.id as string, 'lapsed')
+        }
         results.push({ id: r.id as string, step, sent: true })
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
