@@ -15,6 +15,15 @@ import {
 import { generateReferralConfirmation } from '@/app/lib/ai-messages'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 
+// Spec AC-R11: a campaign is "closed" once promotion.end_at is in the
+// past. New submissions are rejected and the landing page renders a
+// closed message. Promotions without end_at stay open indefinitely.
+function isCampaignClosed(promotion: { end_at?: string | null; status?: string | null }): boolean {
+  if (promotion.status === 'cancelled') return true
+  if (!promotion.end_at) return false
+  return new Date(promotion.end_at).getTime() < Date.now()
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: { slug: string } }
@@ -24,14 +33,18 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
+  const closed = isCampaignClosed(promotion)
+
   // Only return safe public fields
   return NextResponse.json({
     title: promotion.title,
     detail: promotion.detail,
     venue: promotion.venue,
     startAt: promotion.start_at,
+    endAt: promotion.end_at,
     isFree: promotion.is_free,
     status: promotion.status,
+    closed,
   })
 }
 
@@ -63,6 +76,12 @@ export async function POST(
     }
     if (promotion.status !== 'sent' && promotion.status !== 'draft') {
       return NextResponse.json({ error: 'This referral is no longer active' }, { status: 400 })
+    }
+    if (isCampaignClosed(promotion)) {
+      return NextResponse.json(
+        { error: 'This referral campaign has closed and is no longer accepting submissions.' },
+        { status: 400 }
+      )
     }
 
     // Use the first linked programme as the referral's programme

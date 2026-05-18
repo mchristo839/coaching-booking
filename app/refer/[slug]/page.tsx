@@ -8,8 +8,10 @@ interface PromotionPublic {
   detail: string
   venue: string | null
   startAt: string | null
+  endAt: string | null
   isFree: boolean
   status: string
+  closed?: boolean
 }
 
 interface ReferrerContact {
@@ -131,6 +133,22 @@ export default function PublicReferralPage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-4">You&apos;re in!</h1>
           <p className="text-gray-600">
             We&apos;ve got your details. The coach will be in touch shortly with the session info.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Spec AC-R11: campaign closed after end_at. Render a friendly closed
+  // state instead of the form — no submissions accepted, no broken UX.
+  if (promotion.closed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 py-12">
+        <div className="bg-white rounded-xl shadow-sm w-full max-w-md p-6 md:p-8 text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">This offer has closed</h1>
+          <p className="text-gray-600">
+            Thanks for your interest in {promotion.title || 'this offer'}. Bookings are no longer open
+            for this campaign — get in touch with the coach directly if you&apos;d still like to come along.
           </p>
         </div>
       </div>
