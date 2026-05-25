@@ -3,7 +3,7 @@
 // Decides which programmes a coach/GM/admin can act on.
 // SERVER-SIDE ONLY.
 
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 
 export type Role = 'coach_owner' | 'coach_assigned' | 'club_gm' | 'club_admin'
 

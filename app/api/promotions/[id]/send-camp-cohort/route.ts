@@ -6,7 +6,7 @@
 // this promotion. Re-runnable after adding more parents to the cohort.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 import { getAuthFromRequest } from '@/app/lib/auth'
 import { getPromotion, getPromotionTargets } from '@/app/lib/control-centre-db'
 import { requireAuthorityOver, PermissionError } from '@/app/lib/permissions'

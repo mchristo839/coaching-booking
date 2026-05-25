@@ -2,7 +2,7 @@
 // Telegram alert dispatcher with dedup via alert_log table.
 // Never throws — logging failure must not break the caller.
 
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 
 type Severity = 'info' | 'warn' | 'critical'
 

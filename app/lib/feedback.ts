@@ -2,7 +2,7 @@
 // Server-side helpers for the post-session feedback flow (fitness vertical).
 // SERVER-SIDE ONLY — uses sql template tag.
 
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 import {
   generateFeedbackFollowUp,

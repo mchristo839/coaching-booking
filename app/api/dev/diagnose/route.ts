@@ -3,7 +3,7 @@
 // Bearer token protected. Read-only.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 
 function isAuthorised(request: NextRequest): boolean {
   const secret = process.env.HEALTH_CHECK_SECRET

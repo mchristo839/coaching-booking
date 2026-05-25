@@ -3,7 +3,7 @@
 // and message dedup all work in production. Protected by HEALTH_CHECK_SECRET.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 import { safeLogConversation, trackBotReply, isMessageProcessed } from '@/app/lib/db'
 
 function isAuthorised(request: NextRequest): boolean {

@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthFromRequest } from '@/app/lib/auth'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 import {
   normalizeUkPhoneToJid,
   createPendingFeedback,

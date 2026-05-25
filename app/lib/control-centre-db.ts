@@ -3,7 +3,7 @@
 // Kept in a separate file so it's easy to see what's new vs legacy db.ts.
 // SERVER-SIDE ONLY.
 
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 
 // ─── Promotions ───
 

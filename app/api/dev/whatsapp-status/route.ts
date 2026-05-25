@@ -5,7 +5,7 @@
 // Auth: any logged-in coach. Read-only.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 import { getAuthFromRequest } from '@/app/lib/auth'
 
 export const dynamic = 'force-dynamic'

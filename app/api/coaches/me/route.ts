@@ -3,7 +3,7 @@
 // flag, but the shape is open so future per-coach prefs can land here.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 import { getAuthFromRequest } from '@/app/lib/auth'
 
 const VALID_VERTICALS = new Set(['sport', 'fitness'])

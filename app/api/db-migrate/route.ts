@@ -3,7 +3,7 @@
 // Contains both V2 schema (providers/coaches_v2/programmes) and
 // Week 1 operational tables (conversations, bot_replies, etc).
 import { NextResponse } from 'next/server'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 
 export async function POST() {
   try {

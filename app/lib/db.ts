@@ -2,7 +2,7 @@
 // SERVER-SIDE ONLY: Never import this in client components.
 // All client components call fetch('/api/...') instead.
 
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 
 // ─── Providers ───
 

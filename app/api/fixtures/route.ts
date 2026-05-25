@@ -14,7 +14,7 @@ import {
 } from '@/app/lib/control-centre-db'
 import { generateFixtureMessage } from '@/app/lib/ai-messages'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 
 export async function POST(request: NextRequest) {
   const auth = await getAuthFromRequest(request)

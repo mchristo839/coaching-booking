@@ -1,7 +1,7 @@
 // app/lib/health-checks.ts
 // Shared health check logic — used by both /api/health and /api/cron/health-check.
 
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 
 // ─── Anthropic ping cache (avoid API cost on every check) ───
 

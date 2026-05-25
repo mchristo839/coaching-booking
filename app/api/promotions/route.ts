@@ -7,7 +7,7 @@ import { getAuthFromRequest } from '@/app/lib/auth'
 import { getAuthorisedProgrammes, requireAuthorityOver, PermissionError } from '@/app/lib/permissions'
 import { createPromotion, listPromotionsForCoach } from '@/app/lib/control-centre-db'
 import { generatePromotionMessage } from '@/app/lib/ai-messages'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 
 function randomSlug(len = 8): string {
   const chars = 'abcdefghjkmnpqrstuvwxyz23456789'

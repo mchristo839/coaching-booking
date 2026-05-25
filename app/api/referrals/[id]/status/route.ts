@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthFromRequest } from '@/app/lib/auth'
 import { updateReferralStatus } from '@/app/lib/control-centre-db'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 
 const VALID = ['confirmed', 'attended', 'converted', 'lapsed']
 

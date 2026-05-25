@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthFromRequest } from '@/app/lib/auth'
 import { getPromotion, getPromotionTargets, updatePromotionMessage } from '@/app/lib/control-centre-db'
 import { generatePromotionMessage } from '@/app/lib/ai-messages'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 
 export async function POST(
   request: NextRequest,

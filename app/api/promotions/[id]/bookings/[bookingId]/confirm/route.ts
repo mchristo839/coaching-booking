@@ -3,7 +3,7 @@
 // (Coach has reconciled with their actual bank/Monzo alert.)
 
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 import { getAuthFromRequest } from '@/app/lib/auth'
 import { getPromotion } from '@/app/lib/control-centre-db'
 import { confirmCampBookingPayment } from '@/app/lib/camp-booking'

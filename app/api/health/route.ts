@@ -4,7 +4,7 @@
 // when status changes (with 2-consecutive-failure flap protection).
 
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 import { runHealthChecks } from '@/app/lib/health-checks'
 import { sendTelegramAlert } from '@/app/lib/alerts'
 
