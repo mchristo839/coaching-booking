@@ -82,3 +82,4 @@ const sqlFn = sqlTaggedTemplate as SqlCallable
 sqlFn.query = sqlQuery
 
 export const sql = sqlFn
+// trigger redeploy to flush warm function-instance pg.Pool with stale POSTGRES_URL
