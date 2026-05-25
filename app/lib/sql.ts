@@ -83,3 +83,4 @@ sqlFn.query = sqlQuery
 
 export const sql = sqlFn
 // trigger redeploy to flush warm function-instance pg.Pool with stale POSTGRES_URL
+// flush warm function instances after Neon delete
