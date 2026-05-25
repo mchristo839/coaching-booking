@@ -31,12 +31,21 @@ function getPool(): Pool {
       'POSTGRES_URL (or POSTGRES_URL_NON_POOLING / DATABASE_URL) env var is not set'
     )
   }
-  // ssl: { rejectUnauthorized: false } accepts self-signed certs (our
-  // Contabo Postgres uses a self-signed cert). For Neon / public CA-signed
-  // Postgres this still works — the lib won't reject a valid cert just
-  // because we relaxed verification. Tighten later by pinning the CA bundle.
+  // Parse the URL manually so our explicit ssl config wins over any
+  // sslmode parameter in the connection string. With connectionString +
+  // sslmode=require, pg sometimes applies its own SSL config that rejects
+  // self-signed certs even when we pass rejectUnauthorized:false. Building
+  // the config object ourselves removes that ambiguity.
+  const url = new URL(POSTGRES_URL)
   pool = new Pool({
-    connectionString: POSTGRES_URL,
+    host: url.hostname,
+    port: url.port ? parseInt(url.port, 10) : 5432,
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    database: url.pathname.replace(/^\//, '') || 'postgres',
+    // rejectUnauthorized:false → accept self-signed (Contabo) AND
+    // continue accepting public-CA certs (Neon etc). Tighten later by
+    // pinning the CA bundle.
     ssl: { rejectUnauthorized: false },
     max: 10,
     idleTimeoutMillis: 30_000,
