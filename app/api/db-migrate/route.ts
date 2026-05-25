@@ -281,15 +281,19 @@ export async function POST() {
       )
     `
 
-    // Tester flags on coaches (old table, still used by current auth)
-    await sql`
-      ALTER TABLE coaches
-      ADD COLUMN IF NOT EXISTS invite_code TEXT
+    // Tester flags on coaches (legacy table). Only applied if the table
+    // actually exists — fresh Contabo deploys have no legacy `coaches`
+    // table, and ALTER TABLE on a missing table errors regardless of the
+    // IF NOT EXISTS on the column.
+    const { rows: legacyCoachesCheck } = await sql`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables WHERE table_name = 'coaches'
+      ) AS exists
     `
-    await sql`
-      ALTER TABLE coaches
-      ADD COLUMN IF NOT EXISTS is_tester BOOLEAN DEFAULT FALSE
-    `
+    if (legacyCoachesCheck[0]?.exists) {
+      await sql`ALTER TABLE coaches ADD COLUMN IF NOT EXISTS invite_code TEXT`
+      await sql`ALTER TABLE coaches ADD COLUMN IF NOT EXISTS is_tester BOOLEAN DEFAULT FALSE`
+    }
 
     // ═══════════════════════════════════════════════════════════
     // Coach Control Centre — Phase 1: Permissions
