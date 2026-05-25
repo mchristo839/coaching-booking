@@ -6,7 +6,7 @@
 //                          → confirmed (coach reconciles)
 // Mirrors the pending_feedback pattern. SERVER-SIDE ONLY.
 
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 import {
   parseCampDaySelection,

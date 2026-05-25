@@ -13,7 +13,7 @@
 // cron is safe to re-run within a day.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 import { expandSeries } from '@/app/lib/schedule'
 import { getPollTally, logNotification } from '@/app/lib/control-centre-db'
 import { generateSessionReminder } from '@/app/lib/ai-messages'

@@ -4,7 +4,7 @@
 // Bearer-token protected.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 
 const MARIO_COACH_V2_ID = '8053f174-c741-4034-ae89-42c38a99ad98'
 

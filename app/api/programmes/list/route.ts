@@ -3,7 +3,7 @@ export const revalidate = 0
 export const fetchCache = 'force-no-store'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 import { getAuthFromRequest } from '@/app/lib/auth'
 import { findCoachByProviderId } from '@/app/lib/db'
 

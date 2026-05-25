@@ -8,7 +8,7 @@ import { requireAuthorityOver, PermissionError } from '@/app/lib/permissions'
 import { createException, getSeries } from '@/app/lib/control-centre-db'
 import { generateCancellationMessage } from '@/app/lib/ai-messages'
 import { notifyCascade } from '@/app/lib/notify'
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 
 export async function POST(request: NextRequest) {
   const auth = await getAuthFromRequest(request)

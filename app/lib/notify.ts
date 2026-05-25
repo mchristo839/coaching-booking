@@ -3,7 +3,7 @@
 // Rule: internal notifications (coach/GM/admin) fire FIRST and succeed
 // before any external message goes to the group.
 
-import { sql } from '@vercel/postgres'
+import { sql } from '@/app/lib/sql'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 import { logNotification } from '@/app/lib/control-centre-db'
 
