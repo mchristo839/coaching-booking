@@ -709,6 +709,147 @@ export async function POST() {
         ON camp_bookings(promotion_id, created_at DESC)
     `
 
+    // ═══════════════════════════════════════════════════════════
+    // Native bookable calendar (Paul's spec Flow 2 + Flow 12)
+    // ═══════════════════════════════════════════════════════════
+    // Five tables, all additive + idempotent:
+    //   pt_availability        — weekly PT availability declarations
+    //   calendar_slots         — derived bookable time slots
+    //   pt_sessions            — booked private sessions
+    //   pt_booking_state       — in-flight WhatsApp booking conversation state
+    //   pt_availability_prompts — weekly prompt tracker for Flow 12 follow-up PR
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS pt_availability (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        coach_id UUID NOT NULL REFERENCES coaches_v2(id) ON DELETE CASCADE,
+        week_commencing DATE NOT NULL,
+        day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+        start_time TIME NOT NULL,
+        end_time TIME NOT NULL CHECK (end_time > start_time),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_pt_availability_coach_week ON pt_availability(coach_id, week_commencing)`
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS calendar_slots (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        coach_id UUID NOT NULL REFERENCES coaches_v2(id) ON DELETE CASCADE,
+        slot_date DATE NOT NULL,
+        start_time TIME NOT NULL,
+        end_time TIME NOT NULL,
+        duration_min INTEGER NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'available'
+          CHECK (status IN ('available','held','booked','cancelled')),
+        held_by_member_id UUID REFERENCES members(id) ON DELETE SET NULL,
+        hold_expiry TIMESTAMPTZ,
+        booked_by_member_id UUID REFERENCES members(id) ON DELETE SET NULL,
+        pt_session_id UUID,
+        price_gbp NUMERIC(10,2),
+        recurring BOOLEAN DEFAULT FALSE,
+        series_id TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_slots_dedup ON calendar_slots(coach_id, slot_date, start_time)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_calendar_slots_available ON calendar_slots(coach_id, slot_date, start_time) WHERE status = 'available'`
+    await sql`CREATE INDEX IF NOT EXISTS idx_calendar_slots_held_expiry ON calendar_slots(hold_expiry) WHERE status = 'held'`
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS pt_sessions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        coach_id UUID NOT NULL REFERENCES coaches_v2(id),
+        member_id UUID NOT NULL REFERENCES members(id),
+        slot_id UUID REFERENCES calendar_slots(id) ON DELETE SET NULL,
+        session_date DATE NOT NULL,
+        start_time TIME NOT NULL,
+        end_time TIME NOT NULL,
+        duration_min INTEGER NOT NULL,
+        price_gbp NUMERIC(10,2),
+        status VARCHAR(30) NOT NULL DEFAULT 'booked'
+          CHECK (status IN ('booked','completed','cancelled','no_show')),
+        payment_status VARCHAR(20) DEFAULT 'pending'
+          CHECK (payment_status IN ('pending','self_reported','confirmed','refunded')),
+        payment_link_used TEXT,
+        payment_self_reported_at TIMESTAMPTZ,
+        payment_confirmed_at TIMESTAMPTZ,
+        feedback_score INTEGER CHECK (feedback_score BETWEEN 1 AND 5),
+        notes TEXT,
+        cancelled_at TIMESTAMPTZ,
+        cancelled_by_member BOOLEAN,
+        cancellation_fee_gbp NUMERIC(10,2),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_pt_sessions_coach_date ON pt_sessions(coach_id, session_date DESC)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_pt_sessions_member ON pt_sessions(member_id, session_date DESC)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_pt_sessions_payment ON pt_sessions(payment_status, session_date) WHERE payment_status IN ('pending','self_reported')`
+
+    // Now that pt_sessions exists, retro-add the FK from calendar_slots
+    await sql`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'calendar_slots_pt_session_id_fkey'
+        ) THEN
+          ALTER TABLE calendar_slots
+            ADD CONSTRAINT calendar_slots_pt_session_id_fkey
+            FOREIGN KEY (pt_session_id) REFERENCES pt_sessions(id) ON DELETE SET NULL;
+        END IF;
+      END $$;
+    `
+
+    // In-flight conversation state — mirrors the pending_feedback / camp_bookings
+    // self-gating pattern. Webhook lookup is O(1) via the partial index.
+    await sql`
+      CREATE TABLE IF NOT EXISTS pt_booking_state (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        member_jid TEXT NOT NULL,
+        member_id UUID REFERENCES members(id) ON DELETE CASCADE,
+        state VARCHAR(40) NOT NULL DEFAULT 'awaiting_pt_choice'
+          CHECK (state IN (
+            'awaiting_pt_choice',
+            'awaiting_slot_choice',
+            'awaiting_payment_confirmation',
+            'completed',
+            'cancelled',
+            'expired'
+          )),
+        coach_id UUID REFERENCES coaches_v2(id),
+        pt_options JSONB,
+        slot_options JSONB,
+        chosen_slot_id UUID REFERENCES calendar_slots(id) ON DELETE SET NULL,
+        expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '1 hour'),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_pt_booking_state_open ON pt_booking_state(member_jid)
+        WHERE state IN ('awaiting_pt_choice','awaiting_slot_choice','awaiting_payment_confirmation')
+    `
+
+    // Weekly PT availability prompt tracker — used by Flow 12 (separate PR)
+    await sql`
+      CREATE TABLE IF NOT EXISTS pt_availability_prompts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        coach_id UUID NOT NULL REFERENCES coaches_v2(id) ON DELETE CASCADE,
+        week_commencing DATE NOT NULL,
+        state VARCHAR(20) NOT NULL DEFAULT 'awaiting_reply'
+          CHECK (state IN ('awaiting_reply','received','reminded','escalated')),
+        prompted_at TIMESTAMPTZ DEFAULT NOW(),
+        responded_at TIMESTAMPTZ,
+        raw_response TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(coach_id, week_commencing)
+      )
+    `
+
     // ── Migrate existing data from old tables ──
     const oldCoachesExist = await sql`
       SELECT EXISTS (
