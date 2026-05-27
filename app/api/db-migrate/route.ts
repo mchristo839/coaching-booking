@@ -1013,6 +1013,49 @@ export async function POST() {
     await sql`CREATE INDEX IF NOT EXISTS idx_prospects_chase ON prospects(last_step_at DESC) WHERE status = 'enquiry_new'`
     await sql`CREATE INDEX IF NOT EXISTS idx_prospects_status ON prospects(status, created_at DESC)`
 
+    // ═══════════════════════════════════════════════════════════
+    // Phase 5 — Flow 9 post-trial conversion + Flow 7 payment chase
+    // ═══════════════════════════════════════════════════════════
+
+    // Flow 9 state: tracks the conversion follow-up ladder after a trial
+    // session completes. One row per trial pt_session.
+    await sql`
+      CREATE TABLE IF NOT EXISTS post_trial_state (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        pt_session_id UUID NOT NULL REFERENCES pt_sessions(id) ON DELETE CASCADE,
+        member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+        last_step VARCHAR(20),  -- thanks_feedback | offer | followup_48h | final_7d | lapsed
+        last_step_at TIMESTAMPTZ,
+        feedback_score INTEGER,
+        offer_sent BOOLEAN DEFAULT FALSE,
+        converted_at TIMESTAMPTZ,
+        status VARCHAR(20) NOT NULL DEFAULT 'in_progress'
+          CHECK (status IN ('in_progress','converted','dropped','manager_review')),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (pt_session_id)
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_post_trial_in_progress ON post_trial_state(updated_at DESC) WHERE status = 'in_progress'`
+
+    // Flow 7 payment chase log — tracks chase steps per pt_session or membership
+    // (NOT a state machine; we recompute steps each cron run from timestamps).
+    // We just log what we've fired so we don't double-send.
+    await sql`
+      CREATE TABLE IF NOT EXISTS payment_chase_log (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        target_type VARCHAR(20) NOT NULL CHECK (target_type IN ('pt_session','membership')),
+        target_id UUID NOT NULL,
+        member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+        last_step VARCHAR(20),  -- failed_notice | reminder_24h | reminder_48h | escalation | suspension
+        last_step_at TIMESTAMPTZ,
+        resolved_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (target_type, target_id)
+      )
+    `
+
     // ── Migrate existing data from old tables ──
     const oldCoachesExist = await sql`
       SELECT EXISTS (
