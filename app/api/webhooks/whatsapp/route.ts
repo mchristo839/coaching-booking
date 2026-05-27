@@ -5,6 +5,7 @@ import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId } from 
 import { tryHandleFeedbackReply } from '@/app/lib/feedback'
 import { tryHandleCampBookingReply } from '@/app/lib/camp-booking'
 import { tryHandlePtBookingReply } from '@/app/lib/calendar'
+import { tryHandleCancellationReply } from '@/app/lib/cancellation'
 import { resolveSender, classifyIntent, logInboxInteraction } from '@/app/lib/inbox-agent'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
@@ -263,6 +264,16 @@ export async function POST(request: NextRequest) {
             }
           } catch (e) {
             console.error('[PT-BOOKING BRANCH] error, falling through:', e)
+          }
+        }
+
+        if (!consumedBy) {
+          try {
+            if (await tryHandleCancellationReply(remoteJid, inboundText)) {
+              consumedBy = 'cancellation'
+            }
+          } catch (e) {
+            console.error('[CANCELLATION BRANCH] error, falling through:', e)
           }
         }
 
