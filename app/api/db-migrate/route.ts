@@ -884,6 +884,109 @@ export async function POST() {
     await sql`CREATE INDEX IF NOT EXISTS idx_inbox_log_coach ON inbox_log(coach_id, received_at DESC) WHERE coach_id IS NOT NULL`
     await sql`CREATE INDEX IF NOT EXISTS idx_inbox_log_escalated ON inbox_log(received_at DESC) WHERE escalated = true`
 
+    // ═══════════════════════════════════════════════════════════
+    // Phase 3 flow polish — cancellation, waitlist, memberships,
+    // lapsed re-engagement, post-trial trigger
+    // ═══════════════════════════════════════════════════════════
+
+    // Cancellation policy on coaches_v2 (per-coach defaults).
+    await sql`ALTER TABLE coaches_v2 ADD COLUMN IF NOT EXISTS cancellation_policy_hours INTEGER DEFAULT 24`
+    await sql`ALTER TABLE coaches_v2 ADD COLUMN IF NOT EXISTS late_cancel_fee_pct INTEGER DEFAULT 50 CHECK (late_cancel_fee_pct BETWEEN 0 AND 100)`
+
+    // is_trial on pt_sessions — drives Flow 9 (post-trial conversion).
+    // Set true when a session is the member's first taster session.
+    await sql`ALTER TABLE pt_sessions ADD COLUMN IF NOT EXISTS is_trial BOOLEAN DEFAULT FALSE`
+    await sql`CREATE INDEX IF NOT EXISTS idx_pt_sessions_trial ON pt_sessions(is_trial, session_date DESC) WHERE is_trial = true`
+
+    // ── Flow 6 cancellation state (1:1 conversation state machine) ──
+    await sql`
+      CREATE TABLE IF NOT EXISTS cancellation_state (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        member_jid TEXT NOT NULL,
+        member_id UUID REFERENCES members(id) ON DELETE CASCADE,
+        state VARCHAR(40) NOT NULL DEFAULT 'awaiting_session_choice'
+          CHECK (state IN ('awaiting_session_choice','awaiting_confirm','completed','cancelled','expired')),
+        session_options JSONB,  -- array of pt_session_id offered
+        chosen_session_id UUID REFERENCES pt_sessions(id) ON DELETE SET NULL,
+        expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '30 minutes'),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_cancellation_state_open ON cancellation_state(member_jid)
+        WHERE state IN ('awaiting_session_choice','awaiting_confirm')
+    `
+
+    // ── Flow 10 waitlist ──
+    // Generic: applies to PT slots today; can extend to class sessions later.
+    // When a calendar_slot frees, the cron picks the oldest open waitlist
+    // entry whose target matches and notifies them.
+    await sql`
+      CREATE TABLE IF NOT EXISTS waitlist (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        coach_id UUID NOT NULL REFERENCES coaches_v2(id) ON DELETE CASCADE,
+        member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+        member_jid TEXT NOT NULL,
+        target_type VARCHAR(20) NOT NULL DEFAULT 'pt_slot'
+          CHECK (target_type IN ('pt_slot','class_session')),
+        target_label TEXT,
+        preferred_day_of_week SMALLINT CHECK (preferred_day_of_week BETWEEN 0 AND 6),
+        preferred_time_window TEXT,
+        status VARCHAR(20) NOT NULL DEFAULT 'waiting'
+          CHECK (status IN ('waiting','notified','converted','expired','cancelled')),
+        notified_slot_id UUID REFERENCES calendar_slots(id) ON DELETE SET NULL,
+        notified_at TIMESTAMPTZ,
+        hold_expires_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_waitlist_waiting ON waitlist(coach_id, created_at ASC) WHERE status = 'waiting'`
+    await sql`CREATE INDEX IF NOT EXISTS idx_waitlist_notified ON waitlist(hold_expires_at) WHERE status = 'notified'`
+
+    // ── Flow 11 memberships ──
+    await sql`
+      CREATE TABLE IF NOT EXISTS memberships (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+        coach_id UUID REFERENCES coaches_v2(id) ON DELETE SET NULL,
+        plan_name VARCHAR(100),
+        price_gbp NUMERIC(10,2),
+        billing_period VARCHAR(20) DEFAULT 'monthly'
+          CHECK (billing_period IN ('monthly','quarterly','annual','one_off')),
+        started_at DATE NOT NULL,
+        expires_at DATE NOT NULL,
+        auto_renew BOOLEAN DEFAULT FALSE,
+        status VARCHAR(20) NOT NULL DEFAULT 'active'
+          CHECK (status IN ('active','grace_period','lapsed','cancelled','renewed')),
+        last_renewal_step VARCHAR(20),
+        last_renewal_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_memberships_expiry ON memberships(expires_at) WHERE status IN ('active','grace_period')`
+    await sql`CREATE INDEX IF NOT EXISTS idx_memberships_member ON memberships(member_id, status)`
+
+    // ── Flow 8 lapsed re-engagement log ──
+    await sql`
+      CREATE TABLE IF NOT EXISTS lapsed_reengagement_log (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+        coach_id UUID REFERENCES coaches_v2(id) ON DELETE SET NULL,
+        last_step VARCHAR(20),  -- day_14 | day_21 | day_30 | day_45 | day_90 | opted_out
+        last_step_at TIMESTAMPTZ,
+        last_session_at DATE,
+        status VARCHAR(20) NOT NULL DEFAULT 'in_progress'
+          CHECK (status IN ('in_progress','reactivated','opted_out','complete')),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (member_id)
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_lapsed_in_progress ON lapsed_reengagement_log(updated_at DESC) WHERE status = 'in_progress'`
+
     // ── Migrate existing data from old tables ──
     const oldCoachesExist = await sql`
       SELECT EXISTS (
