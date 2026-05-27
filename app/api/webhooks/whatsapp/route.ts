@@ -6,6 +6,7 @@ import { tryHandleFeedbackReply } from '@/app/lib/feedback'
 import { tryHandleCampBookingReply } from '@/app/lib/camp-booking'
 import { tryHandlePtBookingReply } from '@/app/lib/calendar'
 import { tryHandleCancellationReply } from '@/app/lib/cancellation'
+import { tryHandleEnquiryMessage } from '@/app/lib/enquiry-chase'
 import { resolveSender, classifyIntent, logInboxInteraction } from '@/app/lib/inbox-agent'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
@@ -284,6 +285,19 @@ export async function POST(request: NextRequest) {
             }
           } catch (e) {
             console.error('[FEEDBACK BRANCH] error, falling through:', e)
+          }
+        }
+
+        // Last 1:1 branch: unknown senders start the new-enquiry chase
+        // ladder (Flow 4). Known members + coaches return false from
+        // tryHandleEnquiryMessage so the standard fallback below still runs.
+        if (!consumedBy) {
+          try {
+            if (await tryHandleEnquiryMessage(remoteJid, inboundText)) {
+              consumedBy = 'enquiry_chase'
+            }
+          } catch (e) {
+            console.error('[ENQUIRY BRANCH] error, falling through:', e)
           }
         }
 

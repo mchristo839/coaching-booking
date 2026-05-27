@@ -987,6 +987,32 @@ export async function POST() {
     `
     await sql`CREATE INDEX IF NOT EXISTS idx_lapsed_in_progress ON lapsed_reengagement_log(updated_at DESC) WHERE status = 'in_progress'`
 
+    // ═══════════════════════════════════════════════════════════
+    // Flow 4 — New Enquiry Chase Sequence
+    // ═══════════════════════════════════════════════════════════
+    // Unknown contact messages the bot → we create a prospects row + start
+    // the 6-step chase ladder. They become a members row when they convert
+    // (Flow 9 takes over via converted_to_member_id).
+    await sql`
+      CREATE TABLE IF NOT EXISTS prospects (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        jid TEXT UNIQUE NOT NULL,
+        phone TEXT,
+        name TEXT,
+        intent_text TEXT,
+        status VARCHAR(20) NOT NULL DEFAULT 'enquiry_new'
+          CHECK (status IN ('enquiry_new','replied','trial_booked','converted','opted_out','lapsed')),
+        chase_step INTEGER NOT NULL DEFAULT 0,
+        last_step_at TIMESTAMPTZ DEFAULT NOW(),
+        source VARCHAR(30) DEFAULT 'whatsapp',
+        converted_to_member_id UUID REFERENCES members(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_prospects_chase ON prospects(last_step_at DESC) WHERE status = 'enquiry_new'`
+    await sql`CREATE INDEX IF NOT EXISTS idx_prospects_status ON prospects(status, created_at DESC)`
+
     // ── Migrate existing data from old tables ──
     const oldCoachesExist = await sql`
       SELECT EXISTS (
