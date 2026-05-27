@@ -4,6 +4,7 @@ import { sendWhatsAppMessage } from '@/app/lib/evolution'
 import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId } from '@/app/lib/control-centre-db'
 import { tryHandleFeedbackReply } from '@/app/lib/feedback'
 import { tryHandleCampBookingReply } from '@/app/lib/camp-booking'
+import { tryHandlePtBookingReply } from '@/app/lib/calendar'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 const BOT_JID = process.env.BOT_JID || ''
@@ -230,14 +231,25 @@ export async function POST(request: NextRequest) {
           if (alreadyProcessed) return NextResponse.json({ ok: true })
         }
 
-        // Camp-booking branch first — money is involved, and a parent who
-        // is also in the feedback flow (vanishingly rare) should be treated
-        // as transacting on the camp first.
+        // Branch order matters when a member is mid-flow on multiple things:
+        //   1. Camp booking (active financial transaction)
+        //   2. PT booking (also financial; can start a new flow from intent keywords)
+        //   3. Feedback (passive follow-up; lowest priority)
+        // Each branch is self-gating (returns false fast when no open state) and
+        // wrapped in its own try/catch so a failure can't take Paul's group bot down.
+
         try {
           const consumed = await tryHandleCampBookingReply(remoteJid, inboundText)
           if (consumed) return NextResponse.json({ ok: true })
         } catch (e) {
           console.error('[CAMP BRANCH] error, falling through:', e)
+        }
+
+        try {
+          const consumed = await tryHandlePtBookingReply(remoteJid, inboundText)
+          if (consumed) return NextResponse.json({ ok: true })
+        } catch (e) {
+          console.error('[PT-BOOKING BRANCH] error, falling through:', e)
         }
 
         try {

@@ -580,3 +580,141 @@ export function buildCampDayUnparseableNudge(childName: string, dayList: CampDay
     .join('\n')
   return `Sorry, didn't catch which days you'd like for ${childName}. Please reply with the letters (e.g. "a, b") or day names from the list below — or "all" for every day.\n\n${lettered}`
 }
+
+// ─── PT booking flow (Paul's spec Flow 2 — Private Lesson Booking) ───
+
+interface PtSlotLite {
+  id: string
+  slot_date: string
+  start_time: string
+  end_time: string
+  duration_min: number
+  price_gbp: string | null
+}
+
+function formatSlotLine(s: PtSlotLite, letter: string): string {
+  const d = new Date(s.slot_date + 'T00:00:00')
+  const datePart = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+  // HH:MM:SS -> friendly 'h:mm am/pm'
+  const [hStr, mStr] = s.start_time.split(':')
+  let h = parseInt(hStr, 10)
+  const m = mStr.padStart(2, '0')
+  const ampm = h >= 12 ? 'pm' : 'am'
+  if (h === 0) h = 12
+  else if (h > 12) h -= 12
+  const timePart = m === '00' ? `${h}${ampm}` : `${h}:${m}${ampm}`
+  const price = s.price_gbp ? ` — £${Number(s.price_gbp).toFixed(2)}` : ''
+  return `${letter}) ${datePart} ${timePart} — ${s.duration_min} min${price}`
+}
+
+// Outbound "here's what's available" message presenting up to 8 slots.
+export function buildPtSlotOfferMessage(input: {
+  memberFirstName: string
+  coachName: string
+  slots: PtSlotLite[]
+}): string {
+  const greeting = input.memberFirstName ? `Hi ${input.memberFirstName} — ` : ''
+  const lettered = input.slots
+    .map((s, i) => formatSlotLine(s, String.fromCharCode(97 + i)))
+    .join('\n')
+  return `${greeting}here's what's available with ${input.coachName} over the next two weeks:\n\n${lettered}\n\nReply with a letter to book (e.g. "a"). Slot is held for you for 15 minutes once you pick.`
+}
+
+// Parse a free-text reply ("a", "the first one", "tuesday at 7", "Monday morning")
+// → slot index. Returns null on unparseable. Uses Claude in JSON-only mode.
+export async function parsePtSlotSelection(
+  reply: string,
+  slots: PtSlotLite[]
+): Promise<number | null> {
+  const lettered = slots
+    .map((s, i) => `  ${String.fromCharCode(97 + i)} (index ${i}) = ${formatSlotLine(s, '').replace(/^\)\s*/, '')}`)
+    .join('\n')
+
+  const systemPrompt = `You parse a client's WhatsApp reply choosing which PT session slot they want.
+
+You will be given the list of offered slots with letter labels and 0-based indices, and the client's reply text.
+
+Return ONLY a single JSON object on one line. Schema:
+  {"index": 0}   — the 0-based index of the chosen slot
+  {"index": null} — if the reply is unparseable or doesn't pick a slot
+
+Interpretation rules:
+- Letter references ("a", "b", "the b one") → matching index
+- Day-of-week references ("Tuesday", "Mon") → match against the label
+- Time references ("7am", "evening", "morning") → match plausibly against the start_time
+- "First / second / third / next one" → ordinal index (0, 1, 2, ...)
+- "Yes" / "ok" / "sure" without a specifier → null (not enough info)
+- Multiple selections ("a and b") → return only the first match
+- Never invent an index outside the provided range.`
+
+  const userMsg = `Available slots:\n${lettered}\n\nClient's reply: "${reply}"\n\nReturn JSON now.`
+
+  const raw = await callClaude(systemPrompt, [{ role: 'user', content: userMsg }], 80)
+  const match = raw.match(/\{[^}]*"index"\s*:\s*(?:null|\d+)[^}]*\}/)
+  if (!match) return null
+  try {
+    const parsed = JSON.parse(match[0]) as { index: number | null }
+    if (parsed.index === null) return null
+    const n = Math.floor(parsed.index)
+    if (!Number.isInteger(n) || n < 0 || n >= slots.length) return null
+    return n
+  } catch {
+    return null
+  }
+}
+
+// Plain template — payment instructions need to land verbatim.
+export function buildPtBookingPaymentInstructions(input: {
+  slot: PtSlotLite
+  paymentLink: string | null
+  holdMinutes: number
+}): string {
+  const d = new Date(input.slot.slot_date + 'T00:00:00')
+  const datePart = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+  const [hStr, mStr] = input.slot.start_time.split(':')
+  let h = parseInt(hStr, 10)
+  const m = mStr.padStart(2, '0')
+  const ampm = h >= 12 ? 'pm' : 'am'
+  if (h === 0) h = 12
+  else if (h > 12) h -= 12
+  const timePart = m === '00' ? `${h}${ampm}` : `${h}:${m}${ampm}`
+  const price = input.slot.price_gbp ? `£${Number(input.slot.price_gbp).toFixed(2)}` : 'the session fee'
+  const lines: string[] = []
+  lines.push(`Booked in pending payment ✓`)
+  lines.push('')
+  lines.push(`${datePart} ${timePart} — ${input.slot.duration_min} min`)
+  lines.push('')
+  if (input.paymentLink) {
+    lines.push(`Pay ${price} here: ${input.paymentLink}`)
+  } else {
+    lines.push(`Send ${price} to the studio's usual payment details.`)
+  }
+  lines.push('')
+  lines.push(`Slot held for ${input.holdMinutes} minutes. Reply "PAID" once you've sent it and I'll lock it in.`)
+  return lines.join('\n')
+}
+
+// Confirmed booking message — sent after successful "PAID" reply.
+export function buildPtBookingConfirmed(input: {
+  slot: PtSlotLite
+  coachName: string
+}): string {
+  const d = new Date(input.slot.slot_date + 'T00:00:00')
+  const datePart = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+  const [hStr, mStr] = input.slot.start_time.split(':')
+  let h = parseInt(hStr, 10)
+  const m = mStr.padStart(2, '0')
+  const ampm = h >= 12 ? 'pm' : 'am'
+  if (h === 0) h = 12
+  else if (h > 12) h -= 12
+  const timePart = m === '00' ? `${h}${ampm}` : `${h}:${m}${ampm}`
+  return `Booked! ✓\n\n${input.coachName} | ${datePart} ${timePart} | ${input.slot.duration_min} min\n\nSee you there 💪`
+}
+
+// Sent when we can't parse the slot selection reply.
+export function buildPtUnparseableNudge(slots: PtSlotLite[]): string {
+  const lettered = slots
+    .map((s, i) => formatSlotLine(s, String.fromCharCode(97 + i)))
+    .join('\n')
+  return `Sorry — didn't catch which slot you'd like. Reply with a single letter (a, b, c…) from this list:\n\n${lettered}`
+}

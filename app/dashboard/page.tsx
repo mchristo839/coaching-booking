@@ -134,6 +134,8 @@ const NAV_ITEMS: NavItem[] = [
     labelByVertical: { sport: 'Members', fitness: 'Clients' },
   },
   { label: 'Referrals', href: '/dashboard/referrals', requiresAuthority: true },
+  { label: 'PT availability', href: '/dashboard/availability', fitnessOnly: true },
+  { label: 'Sessions', href: '/dashboard/sessions', fitnessOnly: true },
   { label: 'Feedback', href: '/dashboard/feedback', fitnessOnly: true },
   { label: 'Learning Log', href: '/dashboard/learning' },
   { label: 'Settings', href: '/dashboard/settings' },
