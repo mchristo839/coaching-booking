@@ -5,6 +5,7 @@ import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId } from 
 import { tryHandleFeedbackReply } from '@/app/lib/feedback'
 import { tryHandleCampBookingReply } from '@/app/lib/camp-booking'
 import { tryHandlePtBookingReply } from '@/app/lib/calendar'
+import { resolveSender, classifyIntent, logInboxInteraction } from '@/app/lib/inbox-agent'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 const BOT_JID = process.env.BOT_JID || ''
@@ -231,6 +232,15 @@ export async function POST(request: NextRequest) {
           if (alreadyProcessed) return NextResponse.json({ ok: true })
         }
 
+        // ─── Inbox Agent — identity + intent classification (observability) ───
+        // Runs in parallel with routing so a slow LLM classify never blocks
+        // the bot's reply path. We capture the promise + log when it resolves
+        // (after the branch runs, so we can record action_taken too).
+        const inboxStart = Date.now()
+        const senderPromise = resolveSender(remoteJid).catch(() => null)
+
+        let consumedBy: string | null = null
+
         // Branch order matters when a member is mid-flow on multiple things:
         //   1. Camp booking (active financial transaction)
         //   2. PT booking (also financial; can start a new flow from intent keywords)
@@ -239,26 +249,65 @@ export async function POST(request: NextRequest) {
         // wrapped in its own try/catch so a failure can't take Paul's group bot down.
 
         try {
-          const consumed = await tryHandleCampBookingReply(remoteJid, inboundText)
-          if (consumed) return NextResponse.json({ ok: true })
+          if (await tryHandleCampBookingReply(remoteJid, inboundText)) {
+            consumedBy = 'camp_booking'
+          }
         } catch (e) {
           console.error('[CAMP BRANCH] error, falling through:', e)
         }
 
-        try {
-          const consumed = await tryHandlePtBookingReply(remoteJid, inboundText)
-          if (consumed) return NextResponse.json({ ok: true })
-        } catch (e) {
-          console.error('[PT-BOOKING BRANCH] error, falling through:', e)
+        if (!consumedBy) {
+          try {
+            if (await tryHandlePtBookingReply(remoteJid, inboundText)) {
+              consumedBy = 'pt_booking'
+            }
+          } catch (e) {
+            console.error('[PT-BOOKING BRANCH] error, falling through:', e)
+          }
         }
 
-        try {
-          const consumed = await tryHandleFeedbackReply(remoteJid, inboundText)
-          if (consumed) return NextResponse.json({ ok: true })
-        } catch (e) {
-          console.error('[FEEDBACK BRANCH] error, falling through:', e)
-          // Don't return — drop into the standard non-group exit below.
+        if (!consumedBy) {
+          try {
+            if (await tryHandleFeedbackReply(remoteJid, inboundText)) {
+              consumedBy = 'feedback'
+            }
+          } catch (e) {
+            console.error('[FEEDBACK BRANCH] error, falling through:', e)
+          }
         }
+
+        // Inbox Agent log — runs after routing so we capture action_taken.
+        // Classification + log are non-blocking; we don't await before
+        // returning the webhook response.
+        ;(async () => {
+          try {
+            const sender = (await senderPromise) || {
+              type: 'unknown' as const,
+              jid: remoteJid,
+              record_id: null,
+              display_name: null,
+              coach_id: null,
+              programme_id: null,
+            }
+            const classification = await classifyIntent(inboundText, sender)
+            await logInboxInteraction({
+              sender,
+              messageText: inboundText,
+              isGroup: false,
+              groupJid: null,
+              classification,
+              actionTaken: consumedBy ? `routed_to_${consumedBy}` : 'no_handler',
+              resolvedBy: consumedBy ? 'bot' : 'unresolved',
+              escalated: classification.sentiment === 'negative',
+              responseTimeMs: Date.now() - inboxStart,
+              messageId: messageId || null,
+            })
+          } catch (e) {
+            console.error('[INBOX log] error:', e)
+          }
+        })()
+
+        if (consumedBy) return NextResponse.json({ ok: true })
       }
       // Either no in-flight 1:1 conversation, no text, or handler errored.
       // Match pre-existing behaviour: silently drop non-group messages.

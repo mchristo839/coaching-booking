@@ -850,6 +850,40 @@ export async function POST() {
       )
     `
 
+    // ═══════════════════════════════════════════════════════════
+    // Inbox Agent — every inbound message logged + classified
+    // ═══════════════════════════════════════════════════════════
+    // The Inbox Agent (Paul's spec) is the orchestration layer above all
+    // flows. inbox_log gives us observability: every inbound message gets
+    // an entry with sender identity, intent classification, and what the
+    // bot did with it. Powers the Inbox dashboard panel + sentiment metrics.
+    await sql`
+      CREATE TABLE IF NOT EXISTS inbox_log (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        received_at TIMESTAMPTZ DEFAULT NOW(),
+        sender_jid TEXT NOT NULL,
+        sender_type VARCHAR(30),  -- 'member' | 'coach' | 'unknown'
+        sender_record_id UUID,    -- member_id or coach_id (loose FK; nullable)
+        coach_id UUID REFERENCES coaches_v2(id) ON DELETE SET NULL,
+        programme_id UUID REFERENCES programmes(id) ON DELETE SET NULL,
+        message_text TEXT,
+        is_group BOOLEAN DEFAULT FALSE,
+        group_jid TEXT,
+        intent VARCHAR(40),       -- booking_request | class_enquiry | cancellation | payment_query | rescheduling | feedback_complaint | referral_interest | faq_general | membership_query | pt_availability | unclassifiable
+        intent_confidence REAL,   -- 0..1 from the classifier
+        sentiment VARCHAR(20),    -- positive | neutral | negative
+        action_taken VARCHAR(60), -- e.g. 'routed_to_pt_booking' / 'bot_replied' / 'escalated_to_manager'
+        resolved_by VARCHAR(20),  -- 'bot' | 'manager' | 'unresolved'
+        escalated BOOLEAN DEFAULT FALSE,
+        response_time_ms INTEGER,
+        message_id TEXT           -- evolution message id for dedup tracing
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_inbox_log_received ON inbox_log(received_at DESC)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_inbox_log_sender ON inbox_log(sender_jid, received_at DESC)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_inbox_log_coach ON inbox_log(coach_id, received_at DESC) WHERE coach_id IS NOT NULL`
+    await sql`CREATE INDEX IF NOT EXISTS idx_inbox_log_escalated ON inbox_log(received_at DESC) WHERE escalated = true`
+
     // ── Migrate existing data from old tables ──
     const oldCoachesExist = await sql`
       SELECT EXISTS (
