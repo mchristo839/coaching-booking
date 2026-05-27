@@ -588,6 +588,48 @@ async function handlePaymentConfirmation(
     slot: slot!,
     coachName,
   }))
+
+  // Best-effort: send a calendar invite by email if we have one on file
+  // for this member. Failures here NEVER block — the WA confirmation
+  // already went, this is gravy.
+  ;(async () => {
+    try {
+      if (!slot || !state.member_id) return
+      const { rows: memberRows } = await sql`
+        SELECT parent_name, parent_email
+        FROM members WHERE id = ${state.member_id} LIMIT 1
+      `
+      const memberEmail = memberRows[0]?.parent_email as string | undefined
+      if (!memberEmail) return
+      const { sendEmail } = await import('@/app/lib/email')
+      const { buildIcs } = await import('@/app/lib/ical')
+      const startIso = `${slot.slot_date}T${slot.start_time.slice(0, 8)}Z`
+      const endIso = `${slot.slot_date}T${slot.end_time.slice(0, 8)}Z`
+      const startAt = new Date(startIso)
+      const endAt = new Date(endIso)
+      const ics = buildIcs({
+        uid: result.pt_session_id!,
+        start: startAt,
+        end: endAt,
+        summary: `PT session with ${coachName}`,
+        description: 'Your private training session at the studio.',
+        organizer_name: coachName,
+      })
+      await sendEmail({
+        to: memberEmail,
+        subject: `Booking confirmed: PT session ${startAt.toLocaleDateString('en-GB')}`,
+        text: `Your session with ${coachName} on ${startAt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })} at ${startAt.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' })} is confirmed.\n\nAdd to your calendar using the attached .ics file.`,
+        attachments: [{
+          filename: 'session.ics',
+          content: Buffer.from(ics, 'utf8').toString('base64'),
+          content_type: 'text/calendar; charset=utf-8; method=REQUEST',
+        }],
+      })
+    } catch (e) {
+      console.error('[PT email] calendar invite send failed:', e)
+    }
+  })()
+
   return true
 }
 
