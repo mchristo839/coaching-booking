@@ -123,14 +123,24 @@ export interface PollCreateInput {
   closesAt?: string | null
   anonymous: boolean
   programmeIds: string[]
+  // Flow 1 additions
+  capacity?: number | null
+  sessionAt?: string | null
+  yesOptionIndex?: number | null
+  paymentLink?: string | null
 }
 
 export async function createPoll(input: PollCreateInput) {
   const { rows } = await sql`
-    INSERT INTO polls (created_by, question, options, response_type, closes_at, anonymous)
+    INSERT INTO polls (
+      created_by, question, options, response_type, closes_at, anonymous,
+      capacity, session_at, yes_option_index, payment_link
+    )
     VALUES (
       ${input.createdBy}, ${input.question}, ${JSON.stringify(input.options)}::jsonb,
-      ${input.responseType}, ${input.closesAt ?? null}, ${input.anonymous}
+      ${input.responseType}, ${input.closesAt ?? null}, ${input.anonymous},
+      ${input.capacity ?? null}, ${input.sessionAt ?? null},
+      ${input.yesOptionIndex ?? 0}, ${input.paymentLink ?? null}
     )
     RETURNING *
   `
@@ -175,21 +185,158 @@ export async function extendPoll(id: string, newCloseAt: string) {
   await sql`UPDATE polls SET closes_at = ${newCloseAt} WHERE id = ${id}`
 }
 
+export interface PollResponseResult {
+  status: 'confirmed' | 'waitlisted' | 'noted' | 'closed'
+  was_yes: boolean
+  capacity: number | null
+  confirmed_count: number
+  remaining: number | null
+  payment_link: string | null
+  poll_question: string
+  yes_option: string | null
+}
+
+// Records a poll vote and applies Flow 1 capacity logic:
+//   - If the vote matches the configured yes_option and capacity is hit,
+//     status='waitlisted' and a waitlist row is created (poll-scoped).
+//   - If the vote is yes and we still have room, status='confirmed' and the
+//     poll's payment_link (if any) goes in the result so the caller can DM it.
+//   - Other votes (no/maybe) return status='noted' for logging only.
+//   - Re-votes by the same sender replace their prior response.
 export async function recordPollResponse(
   pollId: string,
   programmeId: string,
   senderJid: string,
   senderName: string,
   chosenOption: string
-) {
-  // Remove any previous response from this sender to this poll first (single-choice replacement)
-  await sql`
-    DELETE FROM poll_responses WHERE poll_id = ${pollId} AND sender_jid = ${senderJid}
+): Promise<PollResponseResult> {
+  // Load the poll's capacity config
+  const { rows: pollRows } = await sql`
+    SELECT id, question, options, capacity, yes_option_index, payment_link, status,
+           (SELECT coach_id FROM programmes WHERE id = ${programmeId}) as coach_id
+    FROM polls WHERE id = ${pollId} LIMIT 1
   `
+  const poll = pollRows[0] as
+    | {
+        id: string
+        question: string
+        options: unknown
+        capacity: number | null
+        yes_option_index: number | null
+        payment_link: string | null
+        status: string
+        coach_id: string | null
+      }
+    | undefined
+
+  if (!poll) {
+    return {
+      status: 'noted',
+      was_yes: false,
+      capacity: null,
+      confirmed_count: 0,
+      remaining: null,
+      payment_link: null,
+      poll_question: '',
+      yes_option: null,
+    }
+  }
+
+  const optionsArr: string[] = Array.isArray(poll.options)
+    ? (poll.options as string[])
+    : JSON.parse((poll.options as string) || '[]')
+  const yesIdx = poll.yes_option_index ?? 0
+  const yesOption = optionsArr[yesIdx] ?? null
+  const was_yes = !!yesOption && chosenOption.toLowerCase() === yesOption.toLowerCase()
+
+  if (poll.status !== 'active') {
+    return {
+      status: 'closed',
+      was_yes,
+      capacity: poll.capacity,
+      confirmed_count: 0,
+      remaining: null,
+      payment_link: poll.payment_link,
+      poll_question: poll.question,
+      yes_option: yesOption,
+    }
+  }
+
+  // Replace any prior response from this sender
+  await sql`DELETE FROM poll_responses WHERE poll_id = ${pollId} AND sender_jid = ${senderJid}`
+
+  // Capacity check happens BEFORE the insert so the new vote competes
+  // fairly with existing yes-voters. We count current confirmed yes
+  // responses (excluding the now-deleted prior vote from this sender).
+  let confirmedCount = 0
+  if (was_yes && poll.capacity != null) {
+    const { rows: countRows } = await sql`
+      SELECT COUNT(*)::int as n FROM poll_responses
+      WHERE poll_id = ${pollId} AND chosen_option = ${yesOption}
+    `
+    confirmedCount = Number(countRows[0]?.n ?? 0)
+  }
+
+  // At-capacity yes votes get routed to waitlist instead of poll_responses
+  if (was_yes && poll.capacity != null && confirmedCount >= poll.capacity) {
+    if (poll.coach_id) {
+      // Look up the member id from the sender_jid so the waitlist row is
+      // proper. Falls through to a jid-only entry if no member match.
+      const digits = senderJid.replace(/@.*$/, '').replace(/\D/g, '')
+      const { rows: memberRows } = await sql`
+        SELECT id FROM members
+        WHERE parent_whatsapp_id = ${senderJid}
+           OR parent_whatsapp_id = ${digits}
+           OR regexp_replace(COALESCE(parent_phone, ''), '\\D', '', 'g') = ${digits}
+        LIMIT 1
+      `
+      const memberId = (memberRows[0]?.id as string | undefined) || null
+      if (memberId) {
+        await sql`
+          INSERT INTO waitlist (coach_id, member_id, member_jid, target_type, target_label, poll_id)
+          VALUES (
+            ${poll.coach_id}, ${memberId}, ${senderJid},
+            'class_session', ${poll.question}, ${pollId}
+          )
+          ON CONFLICT DO NOTHING
+        `
+      }
+    }
+    return {
+      status: 'waitlisted',
+      was_yes: true,
+      capacity: poll.capacity,
+      confirmed_count: confirmedCount,
+      remaining: 0,
+      payment_link: poll.payment_link,
+      poll_question: poll.question,
+      yes_option: yesOption,
+    }
+  }
+
+  // Normal insert
   await sql`
     INSERT INTO poll_responses (poll_id, programme_id, sender_jid, sender_name, chosen_option)
     VALUES (${pollId}, ${programmeId}, ${senderJid}, ${senderName}, ${chosenOption})
   `
+
+  // If this YES filled the last seat, auto-close the poll (so the bot
+  // doesn't keep accepting votes that'd land in waitlist immediately).
+  const newConfirmedCount = was_yes ? confirmedCount + 1 : confirmedCount
+  if (poll.capacity != null && newConfirmedCount >= poll.capacity) {
+    await sql`UPDATE polls SET status = 'closed', closed_at = NOW() WHERE id = ${pollId} AND status = 'active'`
+  }
+
+  return {
+    status: was_yes ? 'confirmed' : 'noted',
+    was_yes,
+    capacity: poll.capacity,
+    confirmed_count: newConfirmedCount,
+    remaining: poll.capacity != null ? Math.max(0, poll.capacity - newConfirmedCount) : null,
+    payment_link: poll.payment_link,
+    poll_question: poll.question,
+    yes_option: yesOption,
+  }
 }
 
 export async function getPollTally(pollId: string) {

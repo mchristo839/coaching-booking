@@ -23,6 +23,11 @@ export default function NewPollPage() {
   const [anonymous, setAnonymous] = useState(false)
   const [sendMode, setSendMode] = useState<'all_groups' | 'selected_groups'>('all_groups')
   const [selectedProgrammeIds, setSelectedProgrammeIds] = useState<string[]>([])
+  // Flow 1 additions
+  const [capacity, setCapacity] = useState('')
+  const [sessionAt, setSessionAt] = useState('')
+  const [yesOptionIndex, setYesOptionIndex] = useState(0)
+  const [paymentLink, setPaymentLink] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -83,6 +88,10 @@ export default function NewPollPage() {
           anonymous,
           sendMode,
           programmeIds: sendMode === 'selected_groups' ? selectedProgrammeIds : null,
+          capacity: capacity || null,
+          sessionAt: sessionAt || null,
+          yesOptionIndex,
+          paymentLink: paymentLink.trim() || null,
         }),
       })
       const data = await res.json()
@@ -174,6 +183,58 @@ export default function NewPollPage() {
                 <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
                 Anonymous
               </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900">Group session (optional)</h2>
+          <p className="text-xs text-gray-500 -mt-2">
+            For booking-style polls. Cap the seats, link payment, and the bot
+            will auto-waitlist overflow + DM payment links to YES voters.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Capacity</label>
+              <input
+                type="number"
+                min={1}
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+                placeholder="e.g. 12"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Session date/time</label>
+              <input
+                type="datetime-local"
+                value={sessionAt}
+                onChange={(e) => setSessionAt(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Which option means YES?</label>
+              <select
+                value={yesOptionIndex}
+                onChange={(e) => setYesOptionIndex(parseInt(e.target.value, 10))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              >
+                {options.map((opt, i) => (
+                  <option key={i} value={i}>{String.fromCharCode(97 + i)}) {opt || `Option ${i + 1}`}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Payment link (optional)</label>
+              <input
+                type="url"
+                value={paymentLink}
+                onChange={(e) => setPaymentLink(e.target.value)}
+                placeholder="https://..."
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              />
             </div>
           </div>
         </div>

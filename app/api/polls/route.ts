@@ -16,7 +16,19 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { question, options, responseType, closesAt, anonymous, sendMode, programmeIds } = body
+    const {
+      question,
+      options,
+      responseType,
+      closesAt,
+      anonymous,
+      sendMode,
+      programmeIds,
+      capacity,
+      sessionAt,
+      yesOptionIndex,
+      paymentLink,
+    } = body
 
     if (!question || !Array.isArray(options) || options.length < 2 || options.length > 6) {
       return NextResponse.json(
@@ -24,6 +36,13 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const parsedCapacity =
+      capacity != null && capacity !== '' ? Math.max(1, parseInt(String(capacity), 10)) : null
+    const parsedYesIdx =
+      yesOptionIndex != null && yesOptionIndex !== ''
+        ? Math.max(0, Math.min(options.length - 1, parseInt(String(yesOptionIndex), 10)))
+        : 0
 
     const authorisedProgrammes = await getAuthorisedProgrammes(auth.coachId)
     let resolvedProgrammeIds: string[] =
@@ -47,6 +66,10 @@ export async function POST(request: NextRequest) {
       closesAt: closesAt || null,
       anonymous: !!anonymous,
       programmeIds: resolvedProgrammeIds,
+      capacity: parsedCapacity,
+      sessionAt: sessionAt || null,
+      yesOptionIndex: parsedYesIdx,
+      paymentLink: paymentLink || null,
     })
 
     const targets = await getPollTargets(poll.id)

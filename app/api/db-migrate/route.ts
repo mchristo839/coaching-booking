@@ -402,6 +402,25 @@ export async function POST() {
     await sql`CREATE INDEX IF NOT EXISTS idx_poll_targets_wa_msgid ON poll_targets(wa_message_id)`
     await sql`CREATE INDEX IF NOT EXISTS idx_poll_responses_poll ON poll_responses(poll_id)`
 
+    // Flow 1 capacity + waitlist + session reminders.
+    //   capacity            — null = uncapped; >0 caps the "yes" count
+    //   session_at          — when the session is; drives reminders
+    //   yes_option_index    — which option in options[] counts as "I'm coming"
+    //                          (defaults to 0, i.e. the first option)
+    //   payment_link        — free-text URL sent after a Yes response
+    //   reminded_24h_at     — set when T-24h confirmed list pinged the coach
+    //   reminded_2h_at      — set when T-2h final reminder went to attendees
+    await sql`ALTER TABLE polls ADD COLUMN IF NOT EXISTS capacity INTEGER`
+    await sql`ALTER TABLE polls ADD COLUMN IF NOT EXISTS session_at TIMESTAMPTZ`
+    await sql`ALTER TABLE polls ADD COLUMN IF NOT EXISTS yes_option_index INTEGER DEFAULT 0`
+    await sql`ALTER TABLE polls ADD COLUMN IF NOT EXISTS payment_link TEXT`
+    await sql`ALTER TABLE polls ADD COLUMN IF NOT EXISTS reminded_24h_at TIMESTAMPTZ`
+    await sql`ALTER TABLE polls ADD COLUMN IF NOT EXISTS reminded_2h_at TIMESTAMPTZ`
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_polls_session_at
+        ON polls(session_at) WHERE status = 'active' AND session_at IS NOT NULL
+    `
+
     // ═══════════════════════════════════════════════════════════
     // Coach Control Centre — Phase 4: Fixtures
     // ═══════════════════════════════════════════════════════════
@@ -944,6 +963,11 @@ export async function POST() {
     `
     await sql`CREATE INDEX IF NOT EXISTS idx_waitlist_waiting ON waitlist(coach_id, created_at ASC) WHERE status = 'waiting'`
     await sql`CREATE INDEX IF NOT EXISTS idx_waitlist_notified ON waitlist(hold_expires_at) WHERE status = 'notified'`
+    // Optional poll-scoped waitlist entry — populated when a class poll
+    // hits capacity. Lets Flow 6 cancellation auto-notify the right
+    // person when a spot frees on that specific poll.
+    await sql`ALTER TABLE waitlist ADD COLUMN IF NOT EXISTS poll_id UUID REFERENCES polls(id) ON DELETE CASCADE`
+    await sql`CREATE INDEX IF NOT EXISTS idx_waitlist_poll ON waitlist(poll_id, created_at ASC) WHERE poll_id IS NOT NULL AND status = 'waiting'`
 
     // ── Flow 11 memberships ──
     await sql`
