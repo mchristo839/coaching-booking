@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthFromRequest } from '@/app/lib/auth'
 import { getPromotion, getPromotionTargets, updatePromotionMessage } from '@/app/lib/control-centre-db'
 import { generatePromotionMessage } from '@/app/lib/ai-messages'
+import { getPublicAppUrl } from '@/app/lib/urls'
 import { sql } from '@/app/lib/sql'
 
 export async function POST(
@@ -55,7 +56,7 @@ export async function POST(
       programmeName: firstProgrammeName,
       referralLink:
         promotion.promotion_type === 'refer_a_friend' && promotion.slug
-          ? `${process.env.NEXT_PUBLIC_APP_URL || 'https://coaching-booking-v3.vercel.app'}/refer/${promotion.slug}`
+          ? `${getPublicAppUrl()}/refer/${promotion.slug}`
           : null,
     })
 

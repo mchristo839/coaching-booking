@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { getPublicAppUrl } from '@/app/lib/urls'
 
 interface InviteCode {
   code: string
@@ -12,7 +13,7 @@ interface InviteCode {
   created_at: string
 }
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://coaching-booking-v3.vercel.app'
+const APP_URL = getPublicAppUrl()
 
 export default function AdminInvitesPage() {
   const router = useRouter()

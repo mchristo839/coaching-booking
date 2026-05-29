@@ -7,6 +7,7 @@ import { getAuthFromRequest } from '@/app/lib/auth'
 import { getAuthorisedProgrammes, requireAuthorityOver, PermissionError } from '@/app/lib/permissions'
 import { createPromotion, listPromotionsForCoach } from '@/app/lib/control-centre-db'
 import { generatePromotionMessage } from '@/app/lib/ai-messages'
+import { getPublicAppUrl } from '@/app/lib/urls'
 import { sql } from '@/app/lib/sql'
 
 function randomSlug(len = 8): string {
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
         programmeName: firstProg?.programme_name || 'the programme',
         referralLink:
           promotionType === 'refer_a_friend'
-            ? `${process.env.NEXT_PUBLIC_APP_URL || 'https://coaching-booking-v3.vercel.app'}/refer/${slug}`
+            ? `${getPublicAppUrl()}/refer/${slug}`
             : null,
       })
     } catch (e) {
