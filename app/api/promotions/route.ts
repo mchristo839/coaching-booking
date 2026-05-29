@@ -9,11 +9,19 @@ import { createPromotion, listPromotionsForCoach } from '@/app/lib/control-centr
 import { generatePromotionMessage } from '@/app/lib/ai-messages'
 import { getPublicAppUrl } from '@/app/lib/urls'
 import { sql } from '@/app/lib/sql'
+import { randomBytes } from 'crypto'
 
-function randomSlug(len = 8): string {
-  const chars = 'abcdefghjkmnpqrstuvwxyz23456789'
+// Unguessable, URL-safe referral slug.
+// 32-char alphabet (no look-alike l/o) → exactly 5 bits per char, so masking
+// each random byte with & 31 introduces no modulo bias. 16 chars ≈ 80 bits of
+// entropy from a CSPRNG — not enumerable, and deliberately carries no client
+// name or other identifying info (that would make links guessable and leak who
+// the link belongs to).
+function randomSlug(len = 16): string {
+  const chars = 'abcdefghijkmnpqrstuvwxyz23456789'
+  const bytes = randomBytes(len)
   let out = ''
-  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)]
+  for (let i = 0; i < len; i++) out += chars[bytes[i] & 31]
   return out
 }
 
