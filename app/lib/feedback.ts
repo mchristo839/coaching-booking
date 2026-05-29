@@ -9,8 +9,9 @@ import {
   buildReferralHandoffMessage,
   buildReferralDeclineAck,
 } from '@/app/lib/ai-messages'
+import { getPublicAppUrl } from '@/app/lib/urls'
 
-const PUBLIC_APP_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://coaching-booking-v3.vercel.app').trim()
+const PUBLIC_APP_URL = getPublicAppUrl()
 
 // UK-flavoured phone normalization. Best-effort: strips non-digits and
 // canonicalises common UK formats. Anything else is passed through with

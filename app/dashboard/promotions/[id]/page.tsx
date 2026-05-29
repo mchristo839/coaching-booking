@@ -35,6 +35,13 @@ interface Target {
   error: string | null
 }
 
+interface MessageableMember {
+  id: string
+  display_name: string
+  jid: string
+  opted_out: boolean
+}
+
 interface CampBooking {
   id: string
   parent_jid: string
@@ -75,6 +82,12 @@ export default function PromotionDetailPage() {
   const [bookingsLoading, setBookingsLoading] = useState(false)
   const [sendingCohort, setSendingCohort] = useState(false)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
+
+  // Refer-a-friend: DM the link to individual members
+  const [members, setMembers] = useState<MessageableMember[]>([])
+  const [membersLoading, setMembersLoading] = useState(false)
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set())
+  const [sendingDm, setSendingDm] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -119,6 +132,68 @@ export default function PromotionDetailPage() {
       loadBookings()
     }
   }, [promotion?.promotion_type, loadBookings])
+
+  const loadMembers = useCallback(async () => {
+    setMembersLoading(true)
+    try {
+      const res = await fetch(`/api/promotions/${id}/members`, { credentials: 'include' })
+      if (!res.ok) return
+      const data = await res.json()
+      setMembers(data.members || [])
+    } finally {
+      setMembersLoading(false)
+    }
+  }, [id])
+
+  useEffect(() => {
+    if (promotion?.promotion_type === 'refer_a_friend') {
+      loadMembers()
+    }
+  }, [promotion?.promotion_type, loadMembers])
+
+  function toggleMember(memberId: string) {
+    setSelectedMemberIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(memberId)) next.delete(memberId)
+      else next.add(memberId)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    const selectable = members.filter((m) => !m.opted_out).map((m) => m.id)
+    setSelectedMemberIds((prev) =>
+      prev.size === selectable.length ? new Set() : new Set(selectable)
+    )
+  }
+
+  async function handleSendDm() {
+    const ids = Array.from(selectedMemberIds)
+    if (ids.length === 0) return
+    if (!confirm(`DM the referral link to ${ids.length} member${ids.length === 1 ? '' : 's'}? Each message includes a STOP opt-out.`)) return
+    setSendingDm(true)
+    setError('')
+    setSuccess('')
+    try {
+      const res = await fetch(`/api/promotions/${id}/send-dm`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberIds: ids }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Failed to send DMs')
+        return
+      }
+      const skippedNote = data.skipped?.length ? `, ${data.skipped.length} skipped` : ''
+      setSuccess(`DM sent to ${data.sent} member${data.sent === 1 ? '' : 's'}. ${data.failed} failed${skippedNote}.`)
+      setSelectedMemberIds(new Set())
+      await loadMembers()
+    } finally {
+      setSendingDm(false)
+    }
+  }
 
   async function handleSendCohort() {
     if (!confirm('Send the camp invite to every parent on the cohort? Each child gets one WhatsApp message.')) return
@@ -353,6 +428,69 @@ export default function PromotionDetailPage() {
           ))}
         </ul>
       </div>
+
+      {promotion.promotion_type === 'refer_a_friend' && (
+        <div className="bg-white rounded-xl shadow-sm p-5 mt-6">
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <h2 className="font-semibold text-gray-900">Send to individual members</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                DM the referral link straight to members in the group. Each message
+                includes a STOP opt-out, and the link is pre-tagged to the member so
+                their referrals are credited automatically.
+              </p>
+            </div>
+            <button
+              onClick={handleSendDm}
+              disabled={sendingDm || selectedMemberIds.size === 0}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 shrink-0"
+            >
+              {sendingDm ? 'Sending…' : `Send to ${selectedMemberIds.size}`}
+            </button>
+          </div>
+
+          {membersLoading ? (
+            <p className="text-sm text-gray-500">Loading members…</p>
+          ) : members.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              No contactable members yet. Members appear here once they&apos;ve signed up
+              and we have a usable phone number for them.
+            </p>
+          ) : (
+            <>
+              <button
+                onClick={toggleSelectAll}
+                className="text-xs text-blue-600 hover:text-blue-700 mb-2"
+              >
+                {selectedMemberIds.size === members.filter((m) => !m.opted_out).length
+                  ? 'Clear selection'
+                  : 'Select all'}
+              </button>
+              <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
+                {members.map((m) => (
+                  <li key={m.id} className="flex items-center gap-3 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedMemberIds.has(m.id)}
+                      disabled={m.opted_out}
+                      onChange={() => toggleMember(m.id)}
+                      className="h-4 w-4"
+                    />
+                    <span className={`text-sm ${m.opted_out ? 'text-gray-400' : 'text-gray-900'}`}>
+                      {m.display_name}
+                    </span>
+                    {m.opted_out && (
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500">
+                        opted out
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
 
       {promotion.promotion_type === 'holiday_camp' && (
         <div className="bg-white rounded-xl shadow-sm p-5 mt-6">

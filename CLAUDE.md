@@ -117,6 +117,19 @@ docs/                           # Audit reports and task specs
 - Every message + bot response logged to `conversations` table
 - Duplicate webhook calls deduped via `processed_messages` table
 - Duplicate bot replies prevented via `bot_replies` 10-second window check
+- **STOP/UNSUBSCRIBE** in a 1:1 sets `members.marketing_opt_out` (highest-priority 1:1 branch) — member is then excluded from referral DMs
+
+## Referral DMs to individual members
+
+Coaches can DM a refer-a-friend promotion's link to selected members (not just
+the group), from the promotion detail page (`/dashboard/promotions/[id]`).
+
+- `GET /api/promotions/[id]/members` — active, contactable members across the promotion's target programmes (deduped by JID; LID-only members excluded since you can't DM a `@lid`)
+- `POST /api/promotions/[id]/send-dm` — DMs the link to selected member IDs; refer-a-friend only
+- Each DM appends a **"Reply STOP to opt out."** footer and rewrites the link to `/refer/<slug>?ref=<memberId>` so the public page pre-attributes the referral to that member
+- Opt-out (`members.marketing_opt_out` / `marketing_opt_out_at`) is checked before sending and honoured on STOP
+- Sends are paced (~600ms apart) to reduce WhatsApp ban risk on the Baileys stack
+- Compliance: only signed-up members are messaged (PECR soft opt-in), never harvested group rosters
 
 ## PLANNED (not yet implemented)
 

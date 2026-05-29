@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { findProgramByWhatsAppGroup, safeLogConversation, isMessageProcessed, trackBotReply, type Knowledgebase } from '@/app/lib/db'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
-import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId } from '@/app/lib/control-centre-db'
+import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId, optOutMemberByJid } from '@/app/lib/control-centre-db'
 import { tryHandleFeedbackReply } from '@/app/lib/feedback'
 import { tryHandleCampBookingReply } from '@/app/lib/camp-booking'
 import { tryHandlePtBookingReply } from '@/app/lib/calendar'
@@ -233,6 +233,26 @@ export async function POST(request: NextRequest) {
         if (messageId) {
           const alreadyProcessed = await isMessageProcessed(messageId)
           if (alreadyProcessed) return NextResponse.json({ ok: true })
+        }
+
+        // ─── Marketing opt-out (STOP) — highest priority, runs before any flow ───
+        // PECR requires an easy opt-out honoured on every promotional message.
+        // A bare STOP/UNSUBSCRIBE in a 1:1 sets members.marketing_opt_out so we
+        // never DM them a promo again. Wrapped so a failure can't break the bot.
+        const optOutWord = inboundText.trim().toLowerCase().replace(/[.!]+$/, '')
+        if (['stop', 'unsubscribe', 'stop all', 'opt out', 'optout'].includes(optOutWord)) {
+          try {
+            const n = await optOutMemberByJid(remoteJid)
+            if (n > 0) {
+              await sendWhatsAppMessage(
+                remoteJid,
+                "You're unsubscribed — we won't send you any more promotional messages. You can still message here anytime if you need something."
+              )
+            }
+          } catch (e) {
+            console.error('[OPT-OUT BRANCH] error:', e)
+          }
+          return NextResponse.json({ ok: true })
         }
 
         // ─── Inbox Agent — identity + intent classification (observability) ───

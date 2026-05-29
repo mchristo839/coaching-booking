@@ -4,6 +4,7 @@
 // SERVER-SIDE ONLY.
 
 import { sql } from '@/app/lib/sql'
+import { normalizeUkPhoneToJid } from '@/app/lib/feedback'
 
 // ─── Promotions ───
 
@@ -534,7 +535,7 @@ export async function logNotification(input: {
   eventType: string
   triggerUser?: string | null
   programmeId?: string | null
-  recipientType: 'coach' | 'gm' | 'admin' | 'group' | 'parent'
+  recipientType: 'coach' | 'gm' | 'admin' | 'group' | 'parent' | 'member'
   recipientJid?: string | null
   channel?: string
   status: 'sent' | 'failed'
@@ -622,6 +623,91 @@ export async function getMemberForProgramme(memberId: string, programmeId: strin
     LIMIT 1
   `
   return rows[0] || null
+}
+
+// ─── Individual referral DMs (send a referral link to specific members) ───
+
+// Resolve a phone-based WhatsApp JID we can actually DM, or null. A member
+// known only by a LID (`…@lid`) is NOT directly messageable, so we fall back
+// to the stored phone number; if there's no usable number either, return null
+// and the caller skips them.
+export function resolveMemberJid(
+  parentWhatsappId: string | null | undefined,
+  parentPhone: string | null | undefined
+): string | null {
+  const waid = (parentWhatsappId || '').trim()
+  if (waid.endsWith('@s.whatsapp.net')) return waid
+  const phone = (parentPhone || '').trim()
+  if (phone) return normalizeUkPhoneToJid(phone)
+  return null
+}
+
+export interface MessageableMember {
+  id: string
+  display_name: string  // "Sarah B." — same privacy shape as the referrer dropdown
+  jid: string           // phone-based JID we can DM
+  opted_out: boolean
+}
+
+// Active members of a programme we can DM a 1:1 promo to. LID-only members
+// (no resolvable phone) are excluded — you can't start a DM to a @lid.
+// Opted-out members ARE returned (with opted_out=true) so the UI can show and
+// disable them rather than silently dropping people.
+export async function listMessageableMembersForProgramme(
+  programmeId: string
+): Promise<MessageableMember[]> {
+  const { rows } = await sql`
+    SELECT id, parent_name, parent_whatsapp_id, parent_phone, marketing_opt_out
+    FROM members
+    WHERE programme_id = ${programmeId}
+      AND status = 'active'
+    ORDER BY parent_name ASC NULLS LAST
+  `
+  const out: MessageableMember[] = []
+  for (const r of rows) {
+    const jid = resolveMemberJid(r.parent_whatsapp_id, r.parent_phone)
+    if (!jid) continue
+    const parts = String(r.parent_name || '').trim().split(/\s+/).filter(Boolean)
+    const first = parts[0] || 'Member'
+    const lastInitial = parts.length > 1 ? ` ${parts[parts.length - 1][0]}.` : ''
+    out.push({
+      id: r.id as string,
+      display_name: `${first}${lastInitial}`,
+      jid,
+      opted_out: !!r.marketing_opt_out,
+    })
+  }
+  return out
+}
+
+// Mark every member matching an inbound 1:1 JID as opted out of marketing.
+// The inbound remoteJid is phone-based, so we narrow on the last 9 digits
+// (robust across 07.../447... storage) then confirm an exact JID match in JS
+// before flipping the flag. Returns how many rows were updated.
+export async function optOutMemberByJid(jid: string): Promise<number> {
+  const target = jid.endsWith('@s.whatsapp.net') ? jid : normalizeUkPhoneToJid(jid)
+  const digits = target.replace(/@.*$/, '').replace(/\D/g, '')
+  if (digits.length < 6) return 0
+  const last9 = digits.slice(-9)
+  const { rows } = await sql`
+    SELECT id, parent_whatsapp_id, parent_phone
+    FROM members
+    WHERE marketing_opt_out = FALSE
+      AND (
+        regexp_replace(COALESCE(parent_whatsapp_id, ''), '\D', '', 'g') LIKE ${'%' + last9}
+        OR regexp_replace(COALESCE(parent_phone, ''), '\D', '', 'g') LIKE ${'%' + last9}
+      )
+  `
+  const ids = rows
+    .filter((r) => resolveMemberJid(r.parent_whatsapp_id, r.parent_phone) === target)
+    .map((r) => r.id as string)
+  if (ids.length === 0) return 0
+  await sql`
+    UPDATE members
+    SET marketing_opt_out = TRUE, marketing_opt_out_at = NOW()
+    WHERE id = ANY(${ids}::uuid[])
+  `
+  return ids.length
 }
 
 export async function listReferralsForCoach(coachId: string) {

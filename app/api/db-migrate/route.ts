@@ -547,6 +547,13 @@ export async function POST() {
     await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS referral_credits_balance INTEGER NOT NULL DEFAULT 0`
     await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS referral_credits_used INTEGER NOT NULL DEFAULT 0`
 
+    // Marketing opt-out (PECR/GDPR). When a member replies STOP to a 1:1
+    // promotional DM we set this flag and never DM them marketing again.
+    // Defaults to false so existing members remain contactable under the
+    // soft opt-in until they choose to leave.
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS marketing_opt_out BOOLEAN NOT NULL DEFAULT FALSE`
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS marketing_opt_out_at TIMESTAMPTZ`
+
     // Audit trail for every credit movement. Append-only; never updated.
     await sql`
       CREATE TABLE IF NOT EXISTS referral_credit_ledger (
