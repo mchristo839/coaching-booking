@@ -135,8 +135,21 @@ const NAV_ITEMS: NavItem[] = [
   },
   { label: 'Inbox', href: '/dashboard/inbox' },
   { label: 'Referrals', href: '/dashboard/referrals', requiresAuthority: true },
-  { label: 'PT availability', href: '/dashboard/availability', fitnessOnly: true },
-  { label: 'Sessions', href: '/dashboard/sessions', fitnessOnly: true },
+  // Calendar booking (Flow 2 + 12) is useful for sport coaches too — solo PT,
+  // 1:1 skills work, individual goalkeeper coaching, etc. Label-swap so the
+  // sport vertical sees the appropriate noun.
+  {
+    label: '1:1 availability',
+    href: '/dashboard/availability',
+    labelByVertical: { sport: '1:1 availability', fitness: 'PT availability' },
+  },
+  {
+    label: '1:1 Sessions',
+    href: '/dashboard/sessions',
+    labelByVertical: { sport: '1:1 Sessions', fitness: 'PT Sessions' },
+  },
+  // Post-session feedback flow stays fitness-only — designed for studio
+  // 1:1 PT delivery, not grassroots youth sport sessions.
   { label: 'Feedback', href: '/dashboard/feedback', fitnessOnly: true },
   { label: 'Learning Log', href: '/dashboard/learning' },
   { label: 'Settings', href: '/dashboard/settings' },
