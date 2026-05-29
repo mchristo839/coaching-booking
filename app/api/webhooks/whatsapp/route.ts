@@ -455,21 +455,47 @@ export async function POST(request: NextRequest) {
 
       if (chosen) {
         console.log(`[LOG] Poll vote from ${senderName}: ${chosen}`)
-        await recordPollResponse(
+        const result = await recordPollResponse(
           activePoll.id,
           activePoll.programme_id,
           senderJid,
           senderName,
           chosen
         )
+
+        // 1:1 follow-up based on outcome
+        let followUp: string | null = null
+        if (result.status === 'confirmed') {
+          if (result.payment_link) {
+            followUp = `✅ You're in for "${result.poll_question}". To lock your spot please pay here: ${result.payment_link}`
+          } else {
+            followUp = `✅ You're in for "${result.poll_question}". See you there!`
+          }
+        } else if (result.status === 'waitlisted') {
+          followUp = `📋 "${result.poll_question}" is full — I've added you to the waitlist. I'll message you the moment a spot opens up.`
+        } else if (result.status === 'closed') {
+          followUp = `Sorry — "${result.poll_question}" is now closed. I'll let you know when the next one's up.`
+        }
+
+        if (followUp) {
+          // Fire-and-forget 1:1 DM so we don't block the webhook response
+          ;(async () => {
+            try {
+              await sendWhatsAppMessage(senderJid, followUp!)
+            } catch (e) {
+              console.error('[poll follow-up] send failed:', e)
+            }
+          })()
+        }
+
         await safeLogConversation({
           programmeId: program.id,
           groupJid,
           senderJid,
           senderName,
           messageText,
-          botResponse: null,
-          category: 'poll_vote',
+          botResponse: followUp,
+          category: `poll_vote_${result.status}`,
           escalated: false,
         })
         return NextResponse.json({ ok: true })
