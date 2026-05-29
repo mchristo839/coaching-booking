@@ -11,9 +11,10 @@
 // and falls back to the production URL, so links sent to guests are always
 // real, regardless of how the env var happens to be configured.
 
-// Branded production domain. Note: the apex currently 307-redirects to
-// www.mycoachingassistant.com (path preserved), so links resolve either way.
-const PROD_APP_URL = 'https://mycoachingassistant.com'
+// Branded production domain. Use the www host directly — it serves 200, whereas
+// the apex 307-redirects to www. Fewer hops = more reliable link previews in
+// WhatsApp. The apex still resolves if anyone types it manually.
+const PROD_APP_URL = 'https://www.mycoachingassistant.com'
 
 function isLocalUrl(value: string): boolean {
   const v = value.toLowerCase()
