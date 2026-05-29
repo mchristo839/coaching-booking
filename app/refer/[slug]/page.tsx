@@ -40,6 +40,10 @@ export default function PublicReferralPage() {
   const [referrerSelection, setReferrerSelection] = useState('')
   // Free-text fallback shown when 'Other' is picked or no contacts loaded.
   const [referredByName, setReferredByName] = useState('')
+  // ?ref=<memberId> from a link DM'd directly to a member — pre-attributes the
+  // referral to them. Read client-side to avoid a useSearchParams Suspense
+  // boundary. The server still validates the id belongs to this programme.
+  const [refParam, setRefParam] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -74,6 +78,18 @@ export default function PublicReferralPage() {
   useEffect(() => { load() }, [load])
   useEffect(() => { loadContacts() }, [loadContacts])
 
+  useEffect(() => {
+    const r = new URLSearchParams(window.location.search).get('ref')
+    if (r) setRefParam(r)
+  }, [])
+
+  // Pre-select the referrer dropdown when the link carried a valid ?ref.
+  useEffect(() => {
+    if (refParam && contacts.some((c) => c.id === refParam)) {
+      setReferrerSelection(refParam)
+    }
+  }, [refParam, contacts])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
@@ -85,8 +101,12 @@ export default function PublicReferralPage() {
     // member id belongs to this programme.
     const dropdownAvailable = contacts.length > 0
     const usingDropdown = dropdownAvailable && referrerSelection && referrerSelection !== OTHER_REFERRER
-    const referrerMemberId = usingDropdown ? referrerSelection : null
-    const referredByNameToSend = usingDropdown
+    // Priority: an explicit dropdown pick wins; otherwise, if the referrer was
+    // left untouched and the link carried a ?ref, attribute to that member.
+    const referrerMemberId = usingDropdown
+      ? referrerSelection
+      : (referrerSelection === '' && refParam ? refParam : null)
+    const referredByNameToSend = (usingDropdown || referrerMemberId)
       ? null
       : (referredByName.trim() || null)
 
