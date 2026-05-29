@@ -11,7 +11,9 @@
 // and falls back to the production URL, so links sent to guests are always
 // real, regardless of how the env var happens to be configured.
 
-const PROD_APP_URL = 'https://coaching-booking-v3.vercel.app'
+// Branded production domain. Note: the apex currently 307-redirects to
+// www.mycoachingassistant.com (path preserved), so links resolve either way.
+const PROD_APP_URL = 'https://mycoachingassistant.com'
 
 function isLocalUrl(value: string): boolean {
   const v = value.toLowerCase()
