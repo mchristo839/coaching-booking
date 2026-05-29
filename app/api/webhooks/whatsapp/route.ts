@@ -7,6 +7,7 @@ import { tryHandleCampBookingReply } from '@/app/lib/camp-booking'
 import { tryHandlePtBookingReply } from '@/app/lib/calendar'
 import { tryHandleCancellationReply } from '@/app/lib/cancellation'
 import { tryHandleEnquiryMessage } from '@/app/lib/enquiry-chase'
+import { tryHandleOnboardingReply } from '@/app/lib/onboarding'
 import { resolveSender, classifyIntent, logInboxInteraction } from '@/app/lib/inbox-agent'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
@@ -244,6 +245,8 @@ export async function POST(request: NextRequest) {
         let consumedBy: string | null = null
 
         // Branch order matters when a member is mid-flow on multiple things:
+        //   0. Onboarding (highest priority — once intake starts, all replies
+        //      belong to it until completed/abandoned)
         //   1. Camp booking (active financial transaction)
         //   2. PT booking (also financial; can start a new flow from intent keywords)
         //   3. Feedback (passive follow-up; lowest priority)
@@ -251,11 +254,21 @@ export async function POST(request: NextRequest) {
         // wrapped in its own try/catch so a failure can't take Paul's group bot down.
 
         try {
-          if (await tryHandleCampBookingReply(remoteJid, inboundText)) {
-            consumedBy = 'camp_booking'
+          if (await tryHandleOnboardingReply(remoteJid, inboundText)) {
+            consumedBy = 'onboarding'
           }
         } catch (e) {
-          console.error('[CAMP BRANCH] error, falling through:', e)
+          console.error('[ONBOARDING BRANCH] error, falling through:', e)
+        }
+
+        if (!consumedBy) {
+          try {
+            if (await tryHandleCampBookingReply(remoteJid, inboundText)) {
+              consumedBy = 'camp_booking'
+            }
+          } catch (e) {
+            console.error('[CAMP BRANCH] error, falling through:', e)
+          }
         }
 
         if (!consumedBy) {

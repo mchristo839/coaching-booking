@@ -125,6 +125,34 @@ export default function MembersPage() {
     return true
   })
 
+  /* ---------- onboarding trigger ---------- */
+
+  async function startMemberOnboarding(memberId: string) {
+    const track =
+      window.prompt(
+        'Track? Type "pt" for 1:1 (includes emergency contact + health screen) or "class" for group.',
+        'pt'
+      ) || ''
+    const cleaned = track.trim().toLowerCase()
+    if (cleaned !== 'pt' && cleaned !== 'class') return
+    try {
+      const res = await fetch('/api/onboarding/start', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId, track: cleaned }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        window.alert(`Onboarding started — first prompt sent to ${data.jid}.`)
+      } else {
+        window.alert(data.error || 'Failed to start onboarding')
+      }
+    } catch (e) {
+      window.alert(`Failed: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
   /* ---------- loading ---------- */
 
   if (loading) {
@@ -222,6 +250,7 @@ export default function MembersPage() {
                       <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Status</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Joined</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Contact</th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -256,6 +285,16 @@ export default function MembersPage() {
                                 <span className="text-gray-500 text-xs">{m.parent_phone}</span>
                               )}
                             </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => startMemberOnboarding(m.id)}
+                              disabled={!m.parent_whatsapp_id && !m.parent_phone}
+                              className="text-xs font-medium px-2 py-1 rounded border border-[#3D8B37] text-[#3D8B37] hover:bg-[#3D8B37]/5 disabled:opacity-40 disabled:cursor-not-allowed"
+                              title={!m.parent_whatsapp_id && !m.parent_phone ? 'No WhatsApp identity' : 'Send onboarding intake via WhatsApp'}
+                            >
+                              Start onboarding
+                            </button>
                           </td>
                         </tr>
                       )

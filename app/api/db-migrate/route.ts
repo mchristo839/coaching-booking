@@ -1056,6 +1056,73 @@ export async function POST() {
       )
     `
 
+    // ═══════════════════════════════════════════════════════════
+    // Flow 0 — Client onboarding state machine
+    // ═══════════════════════════════════════════════════════════
+    // 8-step intake conversation triggered when a coach (or trigger) marks
+    // a member ready for onboarding. The state machine collects email, DOB,
+    // goals, preferences, schedule windows, then routes to a health screen
+    // (1:1 vs class) and finishes by activating the member.
+    //
+    // We piggy-back on the existing `members` table for the captured fields
+    // (additive cols below), keep a per-member onboarding_state row for the
+    // live conversation, and write a health_screenings record at the end so
+    // the coach has a referenceable safety doc.
+
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS email VARCHAR(255)`
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS dob DATE`
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS goals TEXT`
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS preferences TEXT`
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS preferred_days TEXT`
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS preferred_times TEXT`
+    await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS onboarding_status VARCHAR(30) DEFAULT 'not_started'`
+    await sql`CREATE INDEX IF NOT EXISTS idx_members_onboarding ON members(onboarding_status) WHERE onboarding_status IN ('in_progress','stalled')`
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS health_screenings (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+        coach_id UUID REFERENCES coaches_v2(id) ON DELETE SET NULL,
+        screening_type VARCHAR(20) NOT NULL DEFAULT 'pt'
+          CHECK (screening_type IN ('pt','class')),
+        conditions TEXT,
+        injuries TEXT,
+        medications TEXT,
+        emergency_contact_name VARCHAR(200),
+        emergency_contact_phone VARCHAR(30),
+        gp_clearance_required BOOLEAN DEFAULT FALSE,
+        completed_at TIMESTAMPTZ DEFAULT NOW(),
+        raw_responses JSONB
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_health_screenings_member ON health_screenings(member_id, completed_at DESC)`
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS onboarding_state (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+        coach_id UUID REFERENCES coaches_v2(id) ON DELETE SET NULL,
+        member_jid TEXT NOT NULL,
+        track VARCHAR(20) NOT NULL DEFAULT 'pt'
+          CHECK (track IN ('pt','class')),
+        step VARCHAR(40) NOT NULL DEFAULT 'awaiting_email'
+          CHECK (step IN (
+            'awaiting_email','awaiting_dob','awaiting_goals',
+            'awaiting_preferences','awaiting_schedule',
+            'awaiting_health_conditions','awaiting_health_emergency',
+            'awaiting_confirm','completed','abandoned'
+          )),
+        answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+        last_prompt_at TIMESTAMPTZ,
+        expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '7 days'),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (member_id)
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_onboarding_open ON onboarding_state(member_jid, step) WHERE step NOT IN ('completed','abandoned')`
+    await sql`CREATE INDEX IF NOT EXISTS idx_onboarding_stalled ON onboarding_state(last_prompt_at) WHERE step NOT IN ('completed','abandoned')`
+
     // ── Migrate existing data from old tables ──
     const oldCoachesExist = await sql`
       SELECT EXISTS (
