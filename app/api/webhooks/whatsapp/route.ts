@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 import { findProgramByWhatsAppGroup, safeLogConversation, isMessageProcessed, trackBotReply, type Knowledgebase } from '@/app/lib/db'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId, optOutMemberByJid } from '@/app/lib/control-centre-db'
@@ -12,6 +13,58 @@ import { resolveSender, classifyIntent, logInboxInteraction } from '@/app/lib/in
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 const BOT_JID = process.env.BOT_JID || ''
+
+// Resolve a single selected-option value from a native WhatsApp poll vote
+// back to the original option text.
+//
+// Once Evolution/Baileys decrypts a poll vote, each selected option arrives as
+// the SHA-256 hash of the option's text (that's how WhatsApp poll votes work),
+// NOT the plaintext — though some Evolution configs do send plaintext. The
+// value may also arrive as raw bytes (Uint8Array / number[] / {data:[…]}) or as
+// a hex/base64 string. We normalise the incoming value into candidate forms and
+// match it against each known option's plaintext and SHA-256 (hex + base64).
+// Returns the matched option, or null when nothing matches.
+function resolvePollOption(allOptions: string[], selected: unknown): string | null {
+  const candidates = new Set<string>()
+  const push = (s: string | undefined | null) => {
+    if (s) {
+      candidates.add(s)
+      candidates.add(s.toLowerCase())
+    }
+  }
+
+  if (typeof selected === 'string') {
+    push(selected)
+  } else if (selected && typeof selected === 'object') {
+    const obj = selected as Record<string, unknown>
+    const bytes: number[] | null = Array.isArray(selected)
+      ? (selected as number[])
+      : ArrayBuffer.isView(selected as ArrayBufferView)
+        ? Array.from(selected as unknown as Uint8Array)
+        : Array.isArray(obj.data)
+          ? (obj.data as number[])
+          : null
+    if (bytes) {
+      const buf = Buffer.from(bytes)
+      push(buf.toString('hex'))
+      push(buf.toString('base64'))
+    } else {
+      // Some payloads wrap the value, e.g. { name } / { optionName } / { value }.
+      push((obj.name ?? obj.optionName ?? obj.value) as string | undefined)
+    }
+  }
+
+  if (candidates.size === 0) return null
+
+  for (const opt of allOptions) {
+    if (candidates.has(opt) || candidates.has(opt.toLowerCase())) return opt
+    const digest = createHash('sha256').update(opt, 'utf8').digest()
+    if (candidates.has(digest.toString('hex')) || candidates.has(digest.toString('base64'))) {
+      return opt
+    }
+  }
+  return null
+}
 
 // Build the 1:1 follow-up DM for a recorded poll vote. Shared by BOTH the
 // native-poll (pollUpdate) and text-vote paths so the two can never diverge:
@@ -183,7 +236,7 @@ export async function POST(request: NextRequest) {
 
         // The selected options — Evolution may send this as decrypted strings
         // or as SHA256 hashes. We try decrypted first, fall back to nothing.
-        const selectedOptions: string[] =
+        const selectedOptions: unknown[] =
           pollUpdate?.vote?.selectedOptions ||
           pollUpdate?.selectedOptions ||
           pollUpdate?.selected ||
@@ -196,15 +249,14 @@ export async function POST(request: NextRequest) {
               ? pollRow.options
               : JSON.parse(pollRow.options || '[]')
 
-            // Match selected values against known options (case-insensitive).
-            // If they come as hashes we can't match here — fallback is nothing.
+            // Resolve each selected value back to its option text. Handles
+            // plaintext AND the SHA-256 hashes WhatsApp actually sends.
             let voteResult: Awaited<ReturnType<typeof recordPollResponse>> | null = null
+            let matchedAny = false
             for (const sel of selectedOptions) {
-              const selStr = String(sel)
-              const matched = allOptions.find(
-                (o: string) => o.toLowerCase() === selStr.toLowerCase()
-              )
+              const matched = resolvePollOption(allOptions, sel)
               if (matched) {
+                matchedAny = true
                 const r = await recordPollResponse(
                   pollRow.poll_id,
                   pollRow.programme_id,
@@ -216,7 +268,13 @@ export async function POST(request: NextRequest) {
                 if (!voteResult || r.was_yes) voteResult = r
               }
             }
-            console.log(`[POLL-VOTE] ${voterName} -> ${selectedOptions.join(', ')}`)
+            if (matchedAny) {
+              console.log(`[POLL-VOTE] ${voterName} -> ${voteResult?.was_yes ? `${voteResult.status} (YES)` : 'recorded'}`)
+            } else {
+              // Couldn't resolve any option — log the raw shape so we can see
+              // exactly what Evolution is sending and extend resolvePollOption.
+              console.warn('[POLL-VOTE] unmatched vote payload:', JSON.stringify(selectedOptions).slice(0, 500))
+            }
 
             // Send the same 1:1 follow-up the text-vote path sends, so a parent
             // who taps "yes" on a NATIVE WhatsApp poll also gets their booking
