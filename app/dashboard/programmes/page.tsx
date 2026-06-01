@@ -832,7 +832,7 @@ function ProgrammesPageInner() {
                   {/* Capacity bar */}
                   {max > 0 && (
                     <div className="mb-3">
-                      <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <div className="flex justify-between text-xs text-ink-muted mb-1">
                         <span>{current} / {max} members</span>
                         <span>{pct}%</span>
                       </div>
@@ -899,7 +899,7 @@ function ProgrammesPageInner() {
         {/* ===== Section A: Age Group & Programme Info ===== */}
         <Section title="A - Programme Info" defaultOpen={true} complete={sectionAComplete}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Programme Name *</label>
+            <label className="block text-sm font-medium text-ink mb-1">Programme Name *</label>
             <input
               type="text"
               value={form.programmeName}
@@ -910,7 +910,7 @@ function ProgrammesPageInner() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Short Description</label>
+            <label className="block text-sm font-medium text-ink mb-1">Short Description</label>
             <textarea
               value={form.shortDescription}
               onChange={(e) => updateField('shortDescription', e.target.value)}
@@ -921,7 +921,7 @@ function ProgrammesPageInner() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Who is this for?</label>
+              <label className="block text-sm font-medium text-ink mb-1">Who is this for?</label>
               <select
                 value={form.targetAudience}
                 onChange={(e) => updateField('targetAudience', e.target.value)}
@@ -935,7 +935,7 @@ function ProgrammesPageInner() {
             </div>
             {(form.targetAudience === 'under_18' || form.targetAudience === 'both') && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Specific Age Group</label>
+                <label className="block text-sm font-medium text-ink mb-1">Specific Age Group</label>
                 <select
                   value={form.specificAgeGroup}
                   onChange={(e) => updateField('specificAgeGroup', e.target.value)}
@@ -961,8 +961,8 @@ function ProgrammesPageInner() {
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Skill Level</label>
-            <p className="text-xs text-gray-400 mb-2">Tick all that apply — coaches often run beginner and intermediate streams in the same programme.</p>
+            <label className="block text-sm font-medium text-ink mb-1">Skill Level</label>
+            <p className="text-xs text-ink-muted mb-2">Tick all that apply — coaches often run beginner and intermediate streams in the same programme.</p>
             <div className="flex flex-wrap gap-2">
               {[
                 'Complete beginners welcome',
@@ -986,8 +986,8 @@ function ProgrammesPageInner() {
                     }}
                     className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
                       checked
-                        ? 'bg-[#3D8B37] text-white border-[#3D8B37]'
-                        : 'bg-white text-gray-700 border-gray-300 hover:border-[#3D8B37]'
+                        ? 'bg-brand-600 text-white border-brand-600'
+                        : 'bg-surface text-ink border-line hover:border-brand-600'
                     }`}
                   >
                     {level}
@@ -1001,7 +1001,7 @@ function ProgrammesPageInner() {
         {/* ===== Section B: Schedule ===== */}
         <Section title="B - Schedule" complete={sectionBComplete}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Programme Type</label>
+            <label className="block text-sm font-medium text-ink mb-1">Programme Type</label>
             <select
               value={form.programmeType}
               onChange={(e) => updateField('programmeType', e.target.value)}
@@ -1018,7 +1018,7 @@ function ProgrammesPageInner() {
           {form.programmeType === 'Seasonal' && (
             <div className="ml-2 pl-4 border-l-2 border-[#3D8B37]/30 space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Season</label>
+                <label className="block text-sm font-medium text-ink mb-1">Season</label>
                 <select
                   value={form.seasonType}
                   onChange={(e) => updateField('seasonType', e.target.value)}
@@ -1034,7 +1034,7 @@ function ProgrammesPageInner() {
               {form.seasonType === 'custom' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Season start</label>
+                    <label className="block text-sm font-medium text-ink mb-1">Season start</label>
                     <input
                       type="date"
                       value={form.seasonStartDate}
@@ -1043,7 +1043,7 @@ function ProgrammesPageInner() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Season end</label>
+                    <label className="block text-sm font-medium text-ink mb-1">Season end</label>
                     <input
                       type="date"
                       value={form.seasonEndDate}
@@ -1056,7 +1056,7 @@ function ProgrammesPageInner() {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Session Day(s)</label>
+            <label className="block text-sm font-medium text-ink mb-2">Session Day(s)</label>
             <div className="flex flex-wrap gap-2">
               {DAYS.map((day) => (
                 <button
@@ -1065,8 +1065,8 @@ function ProgrammesPageInner() {
                   onClick={() => toggleDay(day)}
                   className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
                     form.sessionDays.includes(day)
-                      ? 'bg-[#3D8B37] text-white border-[#3D8B37]'
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-[#3D8B37]'
+                      ? 'bg-brand-600 text-white border-brand-600'
+                      : 'bg-surface text-ink border-line hover:border-brand-600'
                   }`}
                 >
                   {day}
@@ -1079,29 +1079,29 @@ function ProgrammesPageInner() {
               day so coaches with split schedules (e.g. Mon 17:00 / Wed 18:30)
               can capture each one. */}
           {form.sessionDays.length === 0 ? (
-            <p className="text-xs text-gray-400">Pick a session day above to set start time and duration.</p>
+            <p className="text-xs text-ink-muted">Pick a session day above to set start time and duration.</p>
           ) : (
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Session times</label>
+              <label className="block text-sm font-medium text-ink">Session times</label>
               {form.sessionDays.map((day) => {
                 const row = form.sessionSchedule.find((r) => r.day === day)
                   || { day, startTime: '', durationMins: 60 }
                 return (
                   <div key={day} className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-3 sm:col-span-2 text-sm font-medium text-gray-700">{day}</div>
+                    <div className="col-span-3 sm:col-span-2 text-sm font-medium text-ink">{day}</div>
                     <div className="col-span-4 sm:col-span-5">
                       <input
                         type="time"
                         value={row.startTime}
                         onChange={(e) => updateScheduleRow(day, { startTime: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                        className="input-field py-2 text-sm"
                       />
                     </div>
                     <div className="col-span-5 sm:col-span-5">
                       <select
                         value={row.durationMins}
                         onChange={(e) => updateScheduleRow(day, { durationMins: parseInt(e.target.value, 10) })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                        className="input-field py-2 text-sm"
                       >
                         <option value={30}>30 mins</option>
                         <option value={45}>45 mins</option>
@@ -1119,7 +1119,7 @@ function ProgrammesPageInner() {
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">How often does the pattern repeat?</label>
+              <label className="block text-sm font-medium text-ink mb-1">How often does the pattern repeat?</label>
               <select
                 value={form.sessionFrequency}
                 onChange={(e) => updateField('sessionFrequency', e.target.value)}
@@ -1133,7 +1133,7 @@ function ProgrammesPageInner() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Holiday Schedule</label>
+              <label className="block text-sm font-medium text-ink mb-1">Holiday Schedule</label>
               <select
                 value={form.holidaySchedule}
                 onChange={(e) => updateField('holidaySchedule', e.target.value)}
@@ -1148,8 +1148,8 @@ function ProgrammesPageInner() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Schedule Notes</label>
-            <p className="text-xs text-gray-400 mb-1">Describe anything flexible about your schedule — e.g. &quot;Sundays vary depending on fixtures. Coach confirms each week via WhatsApp.&quot;</p>
+            <label className="block text-sm font-medium text-ink mb-1">Schedule Notes</label>
+            <p className="text-xs text-ink-muted mb-1">Describe anything flexible about your schedule — e.g. &quot;Sundays vary depending on fixtures. Coach confirms each week via WhatsApp.&quot;</p>
             <textarea
               value={form.botNotes || ''}
               onChange={(e) => updateField('botNotes', e.target.value)}
@@ -1159,7 +1159,7 @@ function ProgrammesPageInner() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Cancellation Notice Required</label>
+            <label className="block text-sm font-medium text-ink mb-1">Cancellation Notice Required</label>
             <select
               value={form.cancellationNotice}
               onChange={(e) => updateField('cancellationNotice', e.target.value)}
@@ -1179,7 +1179,7 @@ function ProgrammesPageInner() {
         <Section title="C - Venue" complete={sectionCComplete}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Venue Name *</label>
+              <label className="block text-sm font-medium text-ink mb-1">Venue Name *</label>
               <input
                 type="text"
                 value={form.venueName}
@@ -1189,7 +1189,7 @@ function ProgrammesPageInner() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Parking</label>
+              <label className="block text-sm font-medium text-ink mb-1">Parking</label>
               <select
                 value={form.parking}
                 onChange={(e) => updateField('parking', e.target.value)}
@@ -1204,7 +1204,7 @@ function ProgrammesPageInner() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Full Address *</label>
+            <label className="block text-sm font-medium text-ink mb-1">Full Address *</label>
             <textarea
               value={form.venueAddress}
               onChange={(e) => updateField('venueAddress', e.target.value)}
@@ -1215,7 +1215,7 @@ function ProgrammesPageInner() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nearest Public Transport</label>
+              <label className="block text-sm font-medium text-ink mb-1">Nearest Public Transport</label>
               <input
                 type="text"
                 value={form.nearestTransport}
@@ -1225,7 +1225,7 @@ function ProgrammesPageInner() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Indoor or Outdoor</label>
+              <label className="block text-sm font-medium text-ink mb-1">Indoor or Outdoor</label>
               <select
                 value={form.indoorOutdoor}
                 onChange={(e) => updateField('indoorOutdoor', e.target.value)}
@@ -1240,7 +1240,7 @@ function ProgrammesPageInner() {
           </div>
           {(form.indoorOutdoor === 'Outdoor' || form.indoorOutdoor === 'Both') && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bad Weather Policy</label>
+              <label className="block text-sm font-medium text-ink mb-1">Bad Weather Policy</label>
               <select
                 value={form.badWeatherPolicy}
                 onChange={(e) => updateField('badWeatherPolicy', e.target.value)}
@@ -1260,7 +1260,7 @@ function ProgrammesPageInner() {
         <Section title="D - Capacity & Availability" complete={sectionDComplete}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Max Capacity</label>
+              <label className="block text-sm font-medium text-ink mb-1">Max Capacity</label>
               <input
                 type="number"
                 min="1"
@@ -1271,7 +1271,7 @@ function ProgrammesPageInner() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Threshold</label>
+              <label className="block text-sm font-medium text-ink mb-1">Full Threshold</label>
               <select
                 value={form.fullThreshold}
                 onChange={(e) => updateField('fullThreshold', e.target.value)}
@@ -1286,8 +1286,8 @@ function ProgrammesPageInner() {
           </div>
           <div className="flex items-center justify-between py-2">
             <div>
-              <label className="text-sm font-medium text-gray-700">Waitlist Enabled</label>
-              <p className="text-xs text-gray-500">Allow people to join a waitlist when full</p>
+              <label className="text-sm font-medium text-ink">Waitlist Enabled</label>
+              <p className="text-xs text-ink-muted">Allow people to join a waitlist when full</p>
             </div>
             <button
               type="button"
@@ -1305,7 +1305,7 @@ function ProgrammesPageInner() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Referral Trigger</label>
+              <label className="block text-sm font-medium text-ink mb-1">Referral Trigger</label>
               <select
                 value={form.referralTrigger}
                 onChange={(e) => updateField('referralTrigger', e.target.value)}
@@ -1321,7 +1321,7 @@ function ProgrammesPageInner() {
             </div>
             {form.referralTrigger && form.referralTrigger !== 'Manual' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Referral Incentive</label>
+                <label className="block text-sm font-medium text-ink mb-1">Referral Incentive</label>
                 <input
                   type="text"
                   value={form.referralIncentive}
@@ -1334,7 +1334,7 @@ function ProgrammesPageInner() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Programme Status</label>
+              <label className="block text-sm font-medium text-ink mb-1">Programme Status</label>
               <select
                 value={form.programmeStatus}
                 onChange={(e) => updateField('programmeStatus', e.target.value)}
@@ -1349,7 +1349,7 @@ function ProgrammesPageInner() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Trial Available</label>
+              <label className="block text-sm font-medium text-ink mb-1">Trial Available</label>
               <select
                 value={form.trialAvailable}
                 onChange={(e) => updateField('trialAvailable', e.target.value)}
@@ -1364,7 +1364,7 @@ function ProgrammesPageInner() {
           </div>
           {(form.trialAvailable === 'Free trial' || form.trialAvailable === 'Paid trial') && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Trial Instructions</label>
+              <label className="block text-sm font-medium text-ink mb-1">Trial Instructions</label>
               <input
                 type="text"
                 value={form.trialInstructions}
@@ -1379,7 +1379,7 @@ function ProgrammesPageInner() {
         {/* ===== Section E: What to Bring ===== */}
         <Section title="E - What to Bring" complete={sectionEComplete}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">What to Bring</label>
+            <label className="block text-sm font-medium text-ink mb-1">What to Bring</label>
             <textarea
               value={form.whatToBring}
               onChange={(e) => updateField('whatToBring', e.target.value)}
@@ -1390,7 +1390,7 @@ function ProgrammesPageInner() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Provided</label>
+              <label className="block text-sm font-medium text-ink mb-1">Equipment Provided</label>
               <select
                 value={form.equipmentProvided}
                 onChange={(e) => updateField('equipmentProvided', e.target.value)}
@@ -1403,7 +1403,7 @@ function ProgrammesPageInner() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Kit / Uniform</label>
+              <label className="block text-sm font-medium text-ink mb-1">Kit / Uniform</label>
               <select
                 value={form.kitRequired}
                 onChange={(e) => updateField('kitRequired', e.target.value)}
@@ -1418,7 +1418,7 @@ function ProgrammesPageInner() {
           </div>
           {(form.kitRequired === 'Required' || form.kitRequired === 'Recommended') && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Kit Details</label>
+              <label className="block text-sm font-medium text-ink mb-1">Kit Details</label>
               <input
                 type="text"
                 value={form.kitDetails}
@@ -1433,7 +1433,7 @@ function ProgrammesPageInner() {
         {/* ===== Section F: Cost & Payment ===== */}
         <Section title="F - Cost & Payment" complete={sectionFComplete}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Paid or Free</label>
+            <label className="block text-sm font-medium text-ink mb-1">Paid or Free</label>
             <select
               value={form.paidOrFree}
               onChange={(e) => updateField('paidOrFree', e.target.value)}
@@ -1448,7 +1448,7 @@ function ProgrammesPageInner() {
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Model</label>
+                  <label className="block text-sm font-medium text-ink mb-1">Payment Model</label>
                   <select
                     value={form.paymentModel}
                     onChange={(e) => updateField('paymentModel', e.target.value)}
@@ -1464,7 +1464,7 @@ function ProgrammesPageInner() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price (GBP)</label>
+                  <label className="block text-sm font-medium text-ink mb-1">Price (GBP)</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">&#163;</span>
                     <input
@@ -1480,7 +1480,7 @@ function ProgrammesPageInner() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">What does the price include?</label>
+                <label className="block text-sm font-medium text-ink mb-1">What does the price include?</label>
                 <input
                   type="text"
                   value={form.priceIncludes}
@@ -1490,7 +1490,7 @@ function ProgrammesPageInner() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sibling / Family Discount</label>
+                <label className="block text-sm font-medium text-ink mb-1">Sibling / Family Discount</label>
                 <input
                   type="text"
                   value={form.siblingDiscount}
@@ -1501,7 +1501,7 @@ function ProgrammesPageInner() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Refund Policy</label>
+                  <label className="block text-sm font-medium text-ink mb-1">Refund Policy</label>
                   <select
                     value={form.refundPolicy}
                     onChange={(e) => updateField('refundPolicy', e.target.value)}
@@ -1516,7 +1516,7 @@ function ProgrammesPageInner() {
                 </div>
                 {(form.refundPolicy === 'Partial refund' || form.refundPolicy === 'Coach discretion') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Refund Details</label>
+                    <label className="block text-sm font-medium text-ink mb-1">Refund Details</label>
                     <input
                       type="text"
                       value={form.refundDetails}
@@ -1528,7 +1528,7 @@ function ProgrammesPageInner() {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Methods</label>
+                <label className="block text-sm font-medium text-ink mb-2">Payment Methods</label>
                 <div className="flex flex-wrap gap-2">
                   {PAYMENT_METHOD_OPTIONS.map((method) => (
                     <button
@@ -1537,8 +1537,8 @@ function ProgrammesPageInner() {
                       onClick={() => togglePaymentMethod(method)}
                       className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
                         form.paymentMethods.includes(method)
-                          ? 'bg-[#3D8B37] text-white border-[#3D8B37]'
-                          : 'bg-white text-gray-700 border-gray-300 hover:border-[#3D8B37]'
+                          ? 'bg-brand-600 text-white border-brand-600'
+                          : 'bg-surface text-ink border-line hover:border-brand-600'
                       }`}
                     >
                       {method}
@@ -1547,7 +1547,7 @@ function ProgrammesPageInner() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Reminder Schedule</label>
+                <label className="block text-sm font-medium text-ink mb-1">Payment Reminder Schedule</label>
                 <select
                   value={form.paymentReminderSchedule}
                   onChange={(e) => updateField('paymentReminderSchedule', e.target.value)}
@@ -1570,7 +1570,7 @@ function ProgrammesPageInner() {
           {/* Existing FAQs (edit mode) */}
           {view === 'edit' && faqs.length > 0 && (
             <div className="space-y-3">
-              <p className="text-sm font-medium text-gray-700">Existing FAQs ({faqs.length})</p>
+              <p className="text-sm font-medium text-ink">Existing FAQs ({faqs.length})</p>
               {faqs.map((faq) => {
                 const fb = faqStatusBadge(faq.status)
                 const isEditing = editingFaqId === faq.id
@@ -1582,14 +1582,14 @@ function ProgrammesPageInner() {
                         type="text"
                         value={editFaqQ}
                         onChange={(e) => setEditFaqQ(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
+                        className="input-field py-2 text-sm"
                         placeholder="Question"
                       />
                       <textarea
                         value={editFaqA}
                         onChange={(e) => setEditFaqA(e.target.value)}
                         rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
+                        className="input-field py-2 text-sm"
                         placeholder="Answer"
                       />
                       <div className="flex gap-2">
@@ -1643,7 +1643,7 @@ function ProgrammesPageInner() {
                         Delete
                       </button>
                       {faq.times_asked > 0 && (
-                        <span className="text-xs text-gray-400">Asked {faq.times_asked} times</span>
+                        <span className="text-xs text-ink-muted">Asked {faq.times_asked} times</span>
                       )}
                     </div>
                   </div>
@@ -1655,7 +1655,7 @@ function ProgrammesPageInner() {
           {/* Local FAQs (create mode) */}
           {view === 'create' && localFaqs.length > 0 && (
             <div className="space-y-3">
-              <p className="text-sm font-medium text-gray-700">FAQs to create ({localFaqs.length})</p>
+              <p className="text-sm font-medium text-ink">FAQs to create ({localFaqs.length})</p>
               {localFaqs.map((faq, i) => (
                 <div key={i} className="border border-gray-200 rounded-lg p-4">
                   <p className="text-sm font-medium text-gray-900">{faq.question}</p>
@@ -1674,20 +1674,20 @@ function ProgrammesPageInner() {
 
           {/* Add new FAQ */}
           <div className="border border-dashed border-gray-300 rounded-lg p-4 space-y-3">
-            <p className="text-sm font-medium text-gray-700">Add a new FAQ</p>
+            <p className="text-sm font-medium text-ink">Add a new FAQ</p>
             <input
               type="text"
               value={newFaqQ}
               onChange={(e) => setNewFaqQ(e.target.value)}
               placeholder="Question parents often ask"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field py-2 text-sm"
             />
             <textarea
               value={newFaqA}
               onChange={(e) => setNewFaqA(e.target.value)}
               rows={2}
               placeholder="Your answer"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field py-2 text-sm"
             />
             <button
               type="button"
@@ -1710,7 +1710,7 @@ function ProgrammesPageInner() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink mb-1">
               Anything else the bot should know?
             </label>
             <textarea
@@ -1737,7 +1737,7 @@ function ProgrammesPageInner() {
             </ol>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Group ID</label>
+            <label className="block text-sm font-medium text-ink mb-1">WhatsApp Group ID</label>
             <input
               type="text"
               value={form.whatsappGroupId}

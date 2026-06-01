@@ -242,7 +242,7 @@ export default function ReferralsPage() {
           if (bucket.length === 0) return null
           return (
             <div key={status}>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-2">
                 {label} ({bucket.length})
               </h3>
               <div className="space-y-3">
@@ -250,30 +250,30 @@ export default function ReferralsPage() {
                   const showIssueCredit = r.status === 'attended' && r.referrer_reward_status === 'notified' && r.referrer_resolved
                   const referrerLabel = r.referrer_parent_name || r.referred_by_name
                   return (
-                    <div key={r.id} className="bg-white rounded-xl shadow-sm p-4">
+                    <div key={r.id} className="card shadow-card transition-all duration-200 hover:shadow-card-hover">
                       <div className="flex justify-between items-start mb-2">
                         <div>
-                          <h4 className="font-semibold text-gray-900">
+                          <h4 className="font-display font-semibold text-ink">
                             {r.friend_first_name}
-                            {r.child_name && <span className="text-gray-500 font-normal"> · child: {r.child_name}</span>}
+                            {r.child_name && <span className="text-ink-muted font-normal"> · child: {r.child_name}</span>}
                           </h4>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-ink-muted mt-1">
                             {r.programme_name}{r.promotion_title ? ` · ${r.promotion_title}` : ''}
                           </p>
                         </div>
-                        <span className={`text-xs px-2 py-1 rounded ${STATUS_COLOURS[r.status] || 'bg-gray-100'}`}>
+                        <span className={`text-xs px-2 py-1 rounded ${STATUS_COLOURS[r.status] || 'bg-surface-muted text-ink-muted'}`}>
                           {r.status.replace('_', ' ')}
                         </span>
                       </div>
-                      <div className="text-sm text-gray-700 space-y-1">
+                      <div className="text-sm text-ink space-y-1">
                         <p>📞 {r.friend_phone}</p>
                         {r.friend_email && <p>✉️ {r.friend_email}</p>}
                         {referrerLabel && (
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-ink-muted">
                             Referred by: {referrerLabel}
                             {!r.referrer_resolved && <span className="ml-1 text-amber-600">(unresolved)</span>}
                             {r.referrer_resolved && r.referrer_credits_balance != null && (
-                              <span className="ml-1 text-gray-400">· {r.referrer_credits_balance} credit{r.referrer_credits_balance === 1 ? '' : 's'} on file</span>
+                              <span className="ml-1 text-ink-muted">· {r.referrer_credits_balance} credit{r.referrer_credits_balance === 1 ? '' : 's'} on file</span>
                             )}
                           </p>
                         )}
@@ -283,7 +283,7 @@ export default function ReferralsPage() {
                           <button
                             onClick={() => updateStatus(r.id, 'confirmed')}
                             disabled={busyId === r.id}
-                            className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+                            className="text-xs bg-brand-600 text-white px-3 py-1 rounded hover:bg-brand-700 disabled:opacity-50 transition-colors"
                           >
                             Confirm
                           </button>
@@ -292,7 +292,7 @@ export default function ReferralsPage() {
                           <button
                             onClick={() => updateStatus(r.id, 'attended')}
                             disabled={busyId === r.id}
-                            className="text-xs bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 disabled:opacity-50"
+                            className="text-xs bg-brand-700 text-white px-3 py-1 rounded hover:bg-brand-800 disabled:opacity-50 transition-colors"
                           >
                             Mark attended
                           </button>
@@ -301,7 +301,7 @@ export default function ReferralsPage() {
                           <button
                             onClick={() => issueCredit(r.id)}
                             disabled={busyId === r.id}
-                            className="text-xs bg-amber-500 text-white px-3 py-1 rounded hover:bg-amber-600 disabled:opacity-50 font-medium"
+                            className="text-xs bg-amber-500 text-white px-3 py-1 rounded hover:bg-amber-600 disabled:opacity-50 font-medium transition-colors"
                           >
                             Issue credit to {r.referrer_parent_name?.split(/\s+/)[0] || 'referrer'}
                           </button>
@@ -313,7 +313,7 @@ export default function ReferralsPage() {
                           <button
                             onClick={() => updateStatus(r.id, 'converted')}
                             disabled={busyId === r.id}
-                            className="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 disabled:opacity-50"
+                            className="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
                           >
                             Mark converted
                           </button>
@@ -322,7 +322,7 @@ export default function ReferralsPage() {
                           <button
                             onClick={() => updateStatus(r.id, 'lapsed')}
                             disabled={busyId === r.id}
-                            className="text-xs bg-gray-400 text-white px-3 py-1 rounded hover:bg-gray-500 disabled:opacity-50"
+                            className="text-xs bg-ink-muted text-white px-3 py-1 rounded hover:bg-ink disabled:opacity-50 transition-colors"
                           >
                             Mark lapsed
                           </button>
@@ -336,7 +336,7 @@ export default function ReferralsPage() {
           )
         })}
         {referrals.length === 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-6 text-center text-gray-500">
+          <div className="card shadow-card text-center text-ink-muted">
             <p>No referrals yet. Create a &quot;Refer a friend&quot; promotion to get started.</p>
           </div>
         )}

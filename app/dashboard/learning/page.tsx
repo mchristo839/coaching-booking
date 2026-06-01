@@ -73,11 +73,11 @@ function PendingCard({
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-amber-200 p-5">
+    <div className="bg-surface rounded-xl shadow-card border border-amber-200 p-5">
       <div className="flex items-start justify-between gap-3 mb-3">
-        <p className="font-semibold text-gray-900">{faq.question}</p>
+        <p className="font-semibold text-ink">{faq.question}</p>
         {faq.programme_name && (
-          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded whitespace-nowrap flex-shrink-0">
+          <span className="text-xs bg-surface-muted text-ink-muted px-2 py-1 rounded whitespace-nowrap flex-shrink-0">
             {faq.programme_name}
           </span>
         )}
@@ -88,11 +88,11 @@ function PendingCard({
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
           rows={4}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37] mb-3 resize-y"
+          className="input-field mb-3 resize-y"
         />
       ) : (
-        <div className="bg-gray-50 rounded-lg px-4 py-3 text-sm text-gray-600 mb-3">
-          <p className="text-xs text-gray-400 mb-1 uppercase tracking-wide font-medium">Bot suggested answer</p>
+        <div className="bg-surface-muted rounded-lg px-4 py-3 text-sm text-ink-muted mb-3">
+          <p className="text-xs text-ink-muted mb-1 uppercase tracking-wide font-medium">Bot suggested answer</p>
           {answer}
         </div>
       )}
@@ -102,7 +102,7 @@ function PendingCard({
           <button
             onClick={handleApprove}
             disabled={saving}
-            className="bg-[#3D8B37] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#346E30] transition-colors disabled:opacity-50 min-h-[44px]"
+            className="btn-primary text-sm px-4 py-2"
           >
             {saving ? 'Saving...' : 'Save & Approve'}
           </button>
@@ -111,13 +111,13 @@ function PendingCard({
             <button
               onClick={handleApprove}
               disabled={saving}
-              className="bg-[#3D8B37] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#346E30] transition-colors disabled:opacity-50 min-h-[44px]"
+              className="btn-primary text-sm px-4 py-2"
             >
               {saving ? 'Saving...' : 'Approve'}
             </button>
             <button
               onClick={() => setEditMode(true)}
-              className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors min-h-[44px]"
+              className="btn-secondary text-sm px-4 py-2"
             >
               Edit & Approve
             </button>
@@ -167,31 +167,31 @@ function FaqRow({
 
   if (editing) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <label className="block text-xs font-medium text-gray-500 mb-1">Question</label>
+      <div className="bg-surface rounded-lg border border-line p-4">
+        <label className="block text-xs font-medium text-ink-muted mb-1">Question</label>
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37] mb-3"
+          className="input-field mb-3"
         />
-        <label className="block text-xs font-medium text-gray-500 mb-1">Answer</label>
+        <label className="block text-xs font-medium text-ink-muted mb-1">Answer</label>
         <textarea
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
           rows={3}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37] mb-3 resize-y"
+          className="input-field mb-3 resize-y"
         />
         <div className="flex gap-2">
           <button
             onClick={handleSave}
             disabled={saving}
-            className="bg-[#3D8B37] text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-[#346E30] transition-colors disabled:opacity-50"
+            className="btn-primary text-sm px-3 py-1.5 min-h-0"
           >
             {saving ? 'Saving...' : 'Save'}
           </button>
           <button
             onClick={() => { setEditing(false); setQuestion(faq.question); setAnswer(faq.answer) }}
-            className="text-gray-500 hover:text-gray-700 text-sm font-medium px-3 py-1.5"
+            className="text-ink-muted hover:text-ink text-sm font-medium px-3 py-1.5 transition-colors"
           >
             Cancel
           </button>
@@ -201,25 +201,25 @@ function FaqRow({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-100 p-4 hover:border-gray-200 transition-colors">
+    <div className="bg-surface rounded-lg border border-line p-4 hover:border-brand-200 hover:shadow-card transition-all">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-gray-900 text-sm">{faq.question}</p>
-          <p className="text-gray-600 text-sm mt-1">{faq.answer}</p>
+          <p className="font-medium text-ink text-sm">{faq.question}</p>
+          <p className="text-ink-muted text-sm mt-1">{faq.answer}</p>
           <div className="flex flex-wrap gap-2 mt-2">
             {faq.category && (
-              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{faq.category}</span>
+              <span className="text-xs bg-surface-muted text-ink-muted px-2 py-0.5 rounded">{faq.category}</span>
             )}
             <span className={`text-xs font-medium px-2 py-0.5 rounded ${src.cls}`}>{src.label}</span>
             {faq.times_asked > 0 && (
-              <span className="text-xs text-gray-400">Asked {faq.times_asked}x</span>
+              <span className="text-xs text-ink-muted">Asked {faq.times_asked}x</span>
             )}
           </div>
         </div>
         <div className="flex gap-1 flex-shrink-0">
           <button
             onClick={() => setEditing(true)}
-            className="text-gray-400 hover:text-[#3D8B37] p-1.5 rounded transition-colors"
+            className="text-ink-muted hover:text-brand-700 p-1.5 rounded transition-colors"
             title="Edit"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -237,7 +237,7 @@ function FaqRow({
           ) : (
             <button
               onClick={() => setConfirmDelete(true)}
-              className="text-gray-400 hover:text-red-500 p-1.5 rounded transition-colors"
+              className="text-ink-muted hover:text-red-500 p-1.5 rounded transition-colors"
               title="Delete"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
