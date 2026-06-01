@@ -33,7 +33,7 @@ export default function HomePage() {
           <div className="grid items-center gap-12 md:grid-cols-[1.1fr_0.9fr]">
             {/* Left: headline + CTAs */}
             <div>
-              <span className="eyebrow reveal reveal-1">For grassroots coaches</span>
+              <span className="eyebrow reveal reveal-1">For coaches &amp; instructors</span>
               <h1 className="reveal reveal-1 mt-4 font-display text-4xl font-extrabold leading-[1.08] tracking-[-0.02em] text-ink md:text-6xl">
                 Your WhatsApp group,{' '}
                 <span className="text-brand-600">run by an assistant</span> that never sleeps.
@@ -53,7 +53,7 @@ export default function HomePage() {
               </div>
 
               <p className="reveal reveal-3 mt-6 text-sm text-ink-muted">
-                Built for grassroots coaches across the UK
+                Built for coaches and instructors across the UK
               </p>
             </div>
 

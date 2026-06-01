@@ -330,7 +330,7 @@ export default function ProgrammeForm({
             value={kb.coachBio}
             onChange={(e) => updateKb('coachBio', e.target.value)}
             rows={2}
-            placeholder="e.g. UEFA B licensed coach with 10 years of grassroots football experience."
+            placeholder="e.g. UEFA B licensed coach with 10 years of coaching experience."
             className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
           />
         </div>
