@@ -800,18 +800,18 @@ function ProgrammesPageInner() {
               const desc = (p.shortDescription || p.short_description || '') as string
 
               return (
-                <div key={prog.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col">
+                <div key={prog.id} className="card shadow-card transition-all duration-200 hover:-translate-y-1 hover:shadow-card-hover flex flex-col">
                   {/* Top row */}
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <h3 className="font-semibold text-gray-900">{name}</h3>
+                      <h3 className="font-display font-semibold text-ink">{name}</h3>
                       {desc && (
-                        <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{desc}</p>
+                        <p className="text-sm text-ink-muted mt-0.5 line-clamp-2">{desc}</p>
                       )}
                     </div>
                     <button
                       onClick={() => openEdit(prog)}
-                      className="text-[#3D8B37] text-sm font-medium hover:underline ml-3 whitespace-nowrap"
+                      className="text-brand-700 text-sm font-medium hover:underline ml-3 whitespace-nowrap"
                     >
                       Edit
                     </button>
@@ -820,10 +820,10 @@ function ProgrammesPageInner() {
                   {/* Sport / age badges */}
                   <div className="flex flex-wrap gap-1.5 mb-3">
                     {Boolean(p.skillLevel || p.skill_level) && (
-                      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{String(p.skillLevel || p.skill_level)}</span>
+                      <span className="text-xs bg-brand-50 text-brand-700 px-2 py-0.5 rounded">{String(p.skillLevel || p.skill_level)}</span>
                     )}
                     {Boolean(p.targetAudience || p.target_audience || p.specificAgeGroup || p.specific_age_group) && (
-                      <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
+                      <span className="text-xs bg-surface-muted text-ink-muted px-2 py-0.5 rounded">
                         {String(p.specificAgeGroup || p.specific_age_group || p.targetAudience || p.target_audience)}
                       </span>
                     )}
@@ -836,7 +836,7 @@ function ProgrammesPageInner() {
                         <span>{current} / {max} members</span>
                         <span>{pct}%</span>
                       </div>
-                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-2 bg-surface-muted rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all ${capacityColor(pct)}`}
                           style={{ width: `${pct}%` }}
@@ -851,12 +851,12 @@ function ProgrammesPageInner() {
                       {badge.label}
                     </span>
                     {hasGroup ? (
-                      <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                      <span className="inline-flex items-center gap-1 bg-brand-50 text-brand-700 text-xs font-medium px-2 py-1 rounded">
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand-600 inline-block" />
                         WhatsApp linked
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-1 rounded">
+                      <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-xs font-medium px-2 py-1 rounded">
                         WhatsApp not linked
                       </span>
                     )}

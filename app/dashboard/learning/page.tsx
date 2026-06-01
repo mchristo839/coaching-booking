@@ -126,7 +126,7 @@ function PendingCard({
         <button
           onClick={handleCoachOnly}
           disabled={saving}
-          className="bg-white text-amber-700 px-4 py-2 rounded-lg text-sm font-medium border border-amber-200 hover:bg-amber-50 transition-colors disabled:opacity-50 min-h-[44px]"
+          className="bg-surface text-amber-700 px-4 py-2 rounded-lg text-sm font-medium border border-amber-200 hover:bg-amber-50 transition-colors disabled:opacity-50 min-h-[44px]"
         >
           Coach Only
         </button>
