@@ -13,6 +13,29 @@ import { resolveSender, classifyIntent, logInboxInteraction } from '@/app/lib/in
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 const BOT_JID = process.env.BOT_JID || ''
 
+// Build the 1:1 follow-up DM for a recorded poll vote. Shared by BOTH the
+// native-poll (pollUpdate) and text-vote paths so the two can never diverge:
+// a "yes" that fits capacity gets the booking/payment link, a full poll
+// waitlists, a closed poll says so. Returns null when no DM is warranted.
+function pollFollowUpMessage(result: {
+  status: 'confirmed' | 'waitlisted' | 'noted' | 'closed'
+  payment_link: string | null
+  poll_question: string
+}): string | null {
+  if (result.status === 'confirmed') {
+    return result.payment_link
+      ? `✅ You're in for "${result.poll_question}". To lock your spot please pay here: ${result.payment_link}`
+      : `✅ You're in for "${result.poll_question}". See you there!`
+  }
+  if (result.status === 'waitlisted') {
+    return `📋 "${result.poll_question}" is full — I've added you to the waitlist. I'll message you the moment a spot opens up.`
+  }
+  if (result.status === 'closed') {
+    return `Sorry — "${result.poll_question}" is now closed. I'll let you know when the next one's up.`
+  }
+  return null
+}
+
 /**
  * Detect if the bot was @mentioned in a WhatsApp group message.
  * WhatsApp uses LIDs (Linked Identities) in groups, so mentionedJid may contain
@@ -175,22 +198,38 @@ export async function POST(request: NextRequest) {
 
             // Match selected values against known options (case-insensitive).
             // If they come as hashes we can't match here — fallback is nothing.
+            let voteResult: Awaited<ReturnType<typeof recordPollResponse>> | null = null
             for (const sel of selectedOptions) {
               const selStr = String(sel)
               const matched = allOptions.find(
                 (o: string) => o.toLowerCase() === selStr.toLowerCase()
               )
               if (matched) {
-                await recordPollResponse(
+                const r = await recordPollResponse(
                   pollRow.poll_id,
                   pollRow.programme_id,
                   voterJid,
                   voterName,
                   matched
                 )
+                // Prefer the "yes" outcome when a vote selects multiple options.
+                if (!voteResult || r.was_yes) voteResult = r
               }
             }
             console.log(`[POLL-VOTE] ${voterName} -> ${selectedOptions.join(', ')}`)
+
+            // Send the same 1:1 follow-up the text-vote path sends, so a parent
+            // who taps "yes" on a NATIVE WhatsApp poll also gets their booking
+            // link / waitlist / closed message. Previously native votes were
+            // recorded but the parent never received a way to confirm their spot.
+            const nativeFollowUp = voteResult ? pollFollowUpMessage(voteResult) : null
+            if (nativeFollowUp && voterJid) {
+              try {
+                await sendWhatsAppMessage(voterJid, nativeFollowUp)
+              } catch (e) {
+                console.error('[POLL-VOTE] follow-up send failed:', e)
+              }
+            }
           }
         } else {
           console.log('[POLL-VOTE] Could not parse pollUpdate payload:', JSON.stringify(pollUpdate).slice(0, 500))
@@ -496,19 +535,8 @@ export async function POST(request: NextRequest) {
           chosen
         )
 
-        // 1:1 follow-up based on outcome
-        let followUp: string | null = null
-        if (result.status === 'confirmed') {
-          if (result.payment_link) {
-            followUp = `✅ You're in for "${result.poll_question}". To lock your spot please pay here: ${result.payment_link}`
-          } else {
-            followUp = `✅ You're in for "${result.poll_question}". See you there!`
-          }
-        } else if (result.status === 'waitlisted') {
-          followUp = `📋 "${result.poll_question}" is full — I've added you to the waitlist. I'll message you the moment a spot opens up.`
-        } else if (result.status === 'closed') {
-          followUp = `Sorry — "${result.poll_question}" is now closed. I'll let you know when the next one's up.`
-        }
+        // 1:1 follow-up based on outcome (shared with the native-poll path)
+        const followUp = pollFollowUpMessage(result)
 
         if (followUp) {
           // Fire-and-forget 1:1 DM so we don't block the webhook response
