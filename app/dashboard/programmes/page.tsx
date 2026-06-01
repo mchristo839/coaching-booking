@@ -1577,7 +1577,7 @@ function ProgrammesPageInner() {
 
                 if (isEditing) {
                   return (
-                    <div key={faq.id} className="border border-[#3D8B37] rounded-lg p-4 space-y-2 bg-green-50/30">
+                    <div key={faq.id} className="border border-brand-600 rounded-lg p-4 space-y-2 bg-brand-50/40">
                       <input
                         type="text"
                         value={editFaqQ}
@@ -1596,14 +1596,14 @@ function ProgrammesPageInner() {
                         <button
                           type="button"
                           onClick={() => saveFaqEdit(faq.id)}
-                          className="text-sm font-medium text-[#3D8B37] hover:underline"
+                          className="text-sm font-medium text-brand-700 hover:underline"
                         >
                           Save
                         </button>
                         <button
                           type="button"
                           onClick={() => setEditingFaqId(null)}
-                          className="text-sm font-medium text-gray-500 hover:underline"
+                          className="text-sm font-medium text-ink-muted hover:underline"
                         >
                           Cancel
                         </button>
@@ -1613,11 +1613,11 @@ function ProgrammesPageInner() {
                 }
 
                 return (
-                  <div key={faq.id} className="border border-gray-200 rounded-lg p-4">
+                  <div key={faq.id} className="border border-line rounded-lg p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{faq.question}</p>
-                        <p className="text-sm text-gray-600 mt-1">{faq.answer}</p>
+                        <p className="text-sm font-medium text-ink">{faq.question}</p>
+                        <p className="text-sm text-ink-muted mt-1">{faq.answer}</p>
                       </div>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded whitespace-nowrap ${fb.cls}`}>
                         {fb.label}
@@ -1631,7 +1631,7 @@ function ProgrammesPageInner() {
                           setEditFaqQ(faq.question)
                           setEditFaqA(faq.answer)
                         }}
-                        className="text-xs font-medium text-[#3D8B37] hover:underline"
+                        className="text-xs font-medium text-brand-700 hover:underline"
                       >
                         Edit
                       </button>
