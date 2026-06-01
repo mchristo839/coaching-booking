@@ -731,10 +731,10 @@ function ProgrammesPageInner() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-[#3D8B37] border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm">Loading programmes...</p>
+          <div className="w-8 h-8 border-[3px] border-brand-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-ink-muted text-sm">Loading programmes...</p>
         </div>
       </div>
     )
@@ -746,43 +746,43 @@ function ProgrammesPageInner() {
 
   if (view === 'list') {
     return (
-      <div className="min-h-screen bg-gray-50 px-4 py-6 md:px-8 max-w-4xl mx-auto">
+      <div className="min-h-screen bg-canvas px-4 py-6 md:px-8 max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="reveal flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1">
+            <Link href="/dashboard" className="text-ink-muted hover:text-ink transition-colors text-sm flex items-center gap-1">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
               Dashboard
             </Link>
-            <h1 className="text-2xl font-bold text-gray-900">Programmes</h1>
+            <h1 className="font-display text-2xl font-bold text-ink">Programmes</h1>
           </div>
           <button
             onClick={openCreate}
-            className="bg-[#3D8B37] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#346E30] transition-colors min-h-[44px] shadow-sm"
+            className="btn-primary text-sm"
           >
             + New Programme
           </button>
         </div>
 
-        {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>}
-        {successMsg && <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">{successMsg}</div>}
+        {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">{error}</div>}
+        {successMsg && <div className="bg-brand-50 text-brand-700 px-4 py-3 rounded-lg mb-4 text-sm border border-brand-100">{successMsg}</div>}
 
         {programmes.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-10 text-center">
-            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[#3D8B37]/10 flex items-center justify-center">
-              <svg className="w-7 h-7 text-[#3D8B37]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="card shadow-card p-10 text-center">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-brand-50 flex items-center justify-center">
+              <svg className="w-7 h-7 text-brand-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
             </div>
-            <p className="text-lg font-semibold text-gray-900 mb-2">No programmes yet</p>
-            <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
+            <p className="text-lg font-semibold text-ink mb-2">No programmes yet</p>
+            <p className="text-ink-muted text-sm mb-6 max-w-sm mx-auto">
               Create a programme, link a WhatsApp group, and your AI coaching assistant will be live in minutes.
             </p>
             <button
               onClick={openCreate}
-              className="inline-flex items-center bg-[#3D8B37] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#346E30] transition-colors shadow-sm"
+              className="btn-primary"
             >
               Create your first programme
             </button>

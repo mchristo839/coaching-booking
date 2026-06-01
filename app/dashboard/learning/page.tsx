@@ -500,10 +500,10 @@ export default function LearningPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-[#3D8B37] border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm">Loading learning log...</p>
+          <div className="w-8 h-8 border-[3px] border-brand-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-ink-muted text-sm">Loading learning log...</p>
         </div>
       </div>
     )
@@ -512,13 +512,13 @@ export default function LearningPage() {
   /* ---------- render ---------- */
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-canvas">
       <main className="px-4 py-6 md:px-8 lg:px-10 max-w-4xl mx-auto">
 
         {/* Back link */}
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#3D8B37] transition-colors mb-6"
+          className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-brand-700 transition-colors mb-6"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -527,9 +527,9 @@ export default function LearningPage() {
         </Link>
 
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Learning Log</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Review questions your bot couldn&apos;t answer and manage your FAQ library.</p>
+        <div className="reveal reveal-1 mb-6">
+          <h1 className="font-display text-2xl md:text-3xl font-bold text-ink">Learning Log</h1>
+          <p className="text-ink-muted text-sm mt-0.5">Review questions your bot couldn&apos;t answer and manage your FAQ library.</p>
         </div>
 
         {/* Programme filter tabs */}
@@ -539,8 +539,8 @@ export default function LearningPage() {
               onClick={() => setSelectedProgrammeId('all')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 selectedProgrammeId === 'all'
-                  ? 'bg-[#3D8B37] text-white'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:border-[#3D8B37] hover:text-[#3D8B37]'
+                  ? 'bg-brand-600 text-white'
+                  : 'bg-surface text-ink-muted border border-line hover:border-brand-300 hover:text-brand-700'
               }`}
             >
               All Programmes
@@ -551,8 +551,8 @@ export default function LearningPage() {
                 onClick={() => setSelectedProgrammeId(prog.id)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   selectedProgrammeId === prog.id
-                    ? 'bg-[#3D8B37] text-white'
-                    : 'bg-white text-gray-600 border border-gray-200 hover:border-[#3D8B37] hover:text-[#3D8B37]'
+                    ? 'bg-brand-600 text-white'
+                    : 'bg-surface text-ink-muted border border-line hover:border-brand-300 hover:text-brand-700'
                 }`}
               >
                 {prog.programName}
@@ -564,7 +564,7 @@ export default function LearningPage() {
         {/* ===== Section 1: Pending Review ===== */}
         <section className="mb-10">
           <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Pending Review</h2>
+            <h2 className="font-display text-lg font-semibold text-ink">Pending Review</h2>
             {filteredPending.length > 0 && (
               <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full">
                 {filteredPending.length} question{filteredPending.length !== 1 ? 's' : ''} awaiting your input
@@ -573,14 +573,14 @@ export default function LearningPage() {
           </div>
 
           {filteredPending.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+            <div className="bg-surface rounded-xl shadow-card border border-line p-8 text-center">
               <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-green-100 flex items-center justify-center">
                 <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <p className="text-gray-900 font-semibold mb-1">All caught up!</p>
-              <p className="text-gray-500 text-sm">No questions pending review.</p>
+              <p className="text-ink font-semibold mb-1">All caught up!</p>
+              <p className="text-ink-muted text-sm">No questions pending review.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
@@ -598,24 +598,24 @@ export default function LearningPage() {
 
         {/* ===== Section 2: FAQ Library ===== */}
         <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">FAQ Library</h2>
+          <h2 className="font-display text-lg font-semibold text-ink mb-4">FAQ Library</h2>
 
           {faqsByProgramme.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-              <p className="text-gray-500 text-sm">No programmes found. Create a programme first to start building your FAQ library.</p>
+            <div className="bg-surface rounded-xl shadow-card border border-line p-8 text-center">
+              <p className="text-ink-muted text-sm">No programmes found. Create a programme first to start building your FAQ library.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-8">
               {faqsByProgramme.map(({ programme, faqs }) => (
                 <div key={programme.id}>
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-gray-800">{programme.programName}</h3>
-                    <span className="text-xs text-gray-400">{faqs.length} FAQ{faqs.length !== 1 ? 's' : ''}</span>
+                    <h3 className="font-display font-semibold text-ink">{programme.programName}</h3>
+                    <span className="text-xs text-ink-muted">{faqs.length} FAQ{faqs.length !== 1 ? 's' : ''}</span>
                   </div>
 
                   {faqs.length === 0 ? (
-                    <div className="bg-white rounded-lg border border-gray-100 p-6 text-center mb-3">
-                      <p className="text-gray-400 text-sm">No FAQs for this programme yet.</p>
+                    <div className="bg-surface rounded-lg border border-line p-6 text-center mb-3">
+                      <p className="text-ink-muted text-sm">No FAQs for this programme yet.</p>
                     </div>
                   ) : (
                     <div className="flex flex-col gap-2 mb-3">
