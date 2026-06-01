@@ -875,24 +875,24 @@ function ProgrammesPageInner() {
   /* ================================================================ */
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-6 md:px-8 max-w-3xl mx-auto">
+    <div className="min-h-screen bg-canvas px-4 py-6 md:px-8 max-w-3xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="reveal flex items-center gap-3 mb-6">
         <button
           onClick={goBackToList}
-          className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1"
+          className="text-ink-muted hover:text-ink transition-colors text-sm flex items-center gap-1"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           Back
         </button>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="font-display text-2xl font-bold text-ink">
           {view === 'create' ? 'New Programme' : 'Edit Programme'}
         </h1>
       </div>
 
-      {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>}
+      {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">{error}</div>}
 
       <form onSubmit={view === 'create' ? handleCreate : handleUpdate} className="space-y-4">
 
@@ -1016,7 +1016,7 @@ function ProgrammesPageInner() {
             </select>
           </div>
           {form.programmeType === 'Seasonal' && (
-            <div className="ml-2 pl-4 border-l-2 border-[#3D8B37]/30 space-y-3">
+            <div className="ml-2 pl-4 border-l-2 border-brand-200 space-y-3">
               <div>
                 <label className="block text-sm font-medium text-ink mb-1">Season</label>
                 <select
