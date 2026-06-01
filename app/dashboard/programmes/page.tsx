@@ -1657,9 +1657,9 @@ function ProgrammesPageInner() {
             <div className="space-y-3">
               <p className="text-sm font-medium text-ink">FAQs to create ({localFaqs.length})</p>
               {localFaqs.map((faq, i) => (
-                <div key={i} className="border border-gray-200 rounded-lg p-4">
-                  <p className="text-sm font-medium text-gray-900">{faq.question}</p>
-                  <p className="text-sm text-gray-600 mt-1">{faq.answer}</p>
+                <div key={i} className="border border-line rounded-lg p-4">
+                  <p className="text-sm font-medium text-ink">{faq.question}</p>
+                  <p className="text-sm text-ink-muted mt-1">{faq.answer}</p>
                   <button
                     type="button"
                     onClick={() => setLocalFaqs((prev) => prev.filter((_, idx) => idx !== i))}
@@ -1673,7 +1673,7 @@ function ProgrammesPageInner() {
           )}
 
           {/* Add new FAQ */}
-          <div className="border border-dashed border-gray-300 rounded-lg p-4 space-y-3">
+          <div className="border border-dashed border-line rounded-lg p-4 space-y-3">
             <p className="text-sm font-medium text-ink">Add a new FAQ</p>
             <input
               type="text"
@@ -1703,7 +1703,7 @@ function ProgrammesPageInner() {
                 }
               }}
               disabled={!newFaqQ.trim() || !newFaqA.trim()}
-              className="bg-[#3D8B37] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#346E30] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="btn-primary text-sm disabled:opacity-40"
             >
               + Add FAQ
             </button>
