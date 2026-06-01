@@ -232,9 +232,12 @@ export default function NewPollPage() {
                 type="url"
                 value={paymentLink}
                 onChange={(e) => setPaymentLink(e.target.value)}
-                placeholder="https://..."
+                placeholder="https://monzo.me/yourname, Revolut or PayPal.me link"
                 className="input-field"
               />
+              <p className="mt-1 text-xs text-ink-muted">
+                Paste your own Revolut, Monzo or PayPal link — it&apos;s DM&apos;d to anyone who votes YES.
+              </p>
             </div>
           </div>
         </div>
