@@ -906,7 +906,7 @@ function ProgrammesPageInner() {
               onChange={(e) => updateField('programmeName', e.target.value)}
               required
               placeholder="e.g. Saturday Football Academy Under 12s"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             />
           </div>
           <div>
@@ -916,7 +916,7 @@ function ProgrammesPageInner() {
               onChange={(e) => updateField('shortDescription', e.target.value)}
               rows={2}
               placeholder="2-3 sentences about this programme"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -925,7 +925,7 @@ function ProgrammesPageInner() {
               <select
                 value={form.targetAudience}
                 onChange={(e) => updateField('targetAudience', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="under_18">Under 18s only</option>
@@ -939,7 +939,7 @@ function ProgrammesPageInner() {
                 <select
                   value={form.specificAgeGroup}
                   onChange={(e) => updateField('specificAgeGroup', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                  className="input-field"
                 >
                   <option value="">Select...</option>
                   <option value="Under 5s">Under 5s</option>
@@ -1005,7 +1005,7 @@ function ProgrammesPageInner() {
             <select
               value={form.programmeType}
               onChange={(e) => updateField('programmeType', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             >
               <option value="">Select...</option>
               <option value="Ongoing">Ongoing</option>
@@ -1022,7 +1022,7 @@ function ProgrammesPageInner() {
                 <select
                   value={form.seasonType}
                   onChange={(e) => updateField('seasonType', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                  className="input-field"
                 >
                   <option value="">Select...</option>
                   <option value="autumn_winter">Autumn / Winter (Sept–Mar)</option>
@@ -1039,7 +1039,7 @@ function ProgrammesPageInner() {
                       type="date"
                       value={form.seasonStartDate}
                       onChange={(e) => updateField('seasonStartDate', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                      className="input-field"
                     />
                   </div>
                   <div>
@@ -1048,7 +1048,7 @@ function ProgrammesPageInner() {
                       type="date"
                       value={form.seasonEndDate}
                       onChange={(e) => updateField('seasonEndDate', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                      className="input-field"
                     />
                   </div>
                 </div>
@@ -1123,7 +1123,7 @@ function ProgrammesPageInner() {
               <select
                 value={form.sessionFrequency}
                 onChange={(e) => updateField('sessionFrequency', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Weekly">Weekly</option>
@@ -1137,7 +1137,7 @@ function ProgrammesPageInner() {
               <select
                 value={form.holidaySchedule}
                 onChange={(e) => updateField('holidaySchedule', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Sessions pause">Yes — sessions pause</option>
@@ -1155,7 +1155,7 @@ function ProgrammesPageInner() {
               onChange={(e) => updateField('botNotes', e.target.value)}
               rows={3}
               placeholder="e.g. Training is every Wednesday 18:20-20:00. Sundays change weekly — sometimes a home match (14:00 KO), sometimes away, sometimes training at a different time. Coach will post the Sunday details in the group each week."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent text-sm"
+              className="input-field text-sm"
             />
           </div>
           <div>
@@ -1163,7 +1163,7 @@ function ProgrammesPageInner() {
             <select
               value={form.cancellationNotice}
               onChange={(e) => updateField('cancellationNotice', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             >
               <option value="">Select...</option>
               <option value="Same day">Same day</option>
@@ -1185,7 +1185,7 @@ function ProgrammesPageInner() {
                 value={form.venueName}
                 onChange={(e) => updateField('venueName', e.target.value)}
                 placeholder="e.g. Victoria Park"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               />
             </div>
             <div>
@@ -1193,7 +1193,7 @@ function ProgrammesPageInner() {
               <select
                 value={form.parking}
                 onChange={(e) => updateField('parking', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Free on site">Free on site</option>
@@ -1210,7 +1210,7 @@ function ProgrammesPageInner() {
               onChange={(e) => updateField('venueAddress', e.target.value)}
               rows={2}
               placeholder="Full venue address including postcode"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1221,7 +1221,7 @@ function ProgrammesPageInner() {
                 value={form.nearestTransport}
                 onChange={(e) => updateField('nearestTransport', e.target.value)}
                 placeholder="e.g. Hackney Wick Overground"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               />
             </div>
             <div>
@@ -1229,7 +1229,7 @@ function ProgrammesPageInner() {
               <select
                 value={form.indoorOutdoor}
                 onChange={(e) => updateField('indoorOutdoor', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Indoor">Indoor</option>
@@ -1244,7 +1244,7 @@ function ProgrammesPageInner() {
               <select
                 value={form.badWeatherPolicy}
                 onChange={(e) => updateField('badWeatherPolicy', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Sessions go ahead">Sessions go ahead regardless</option>
@@ -1267,7 +1267,7 @@ function ProgrammesPageInner() {
                 value={form.maxCapacity}
                 onChange={(e) => updateField('maxCapacity', e.target.value)}
                 placeholder="e.g. 20"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               />
             </div>
             <div>
@@ -1275,7 +1275,7 @@ function ProgrammesPageInner() {
               <select
                 value={form.fullThreshold}
                 onChange={(e) => updateField('fullThreshold', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="at_100">At 100%</option>
                 <option value="at_90">At 90%</option>
@@ -1309,7 +1309,7 @@ function ProgrammesPageInner() {
               <select
                 value={form.referralTrigger}
                 onChange={(e) => updateField('referralTrigger', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Below 80%">Below 80% full</option>
@@ -1327,7 +1327,7 @@ function ProgrammesPageInner() {
                   value={form.referralIncentive}
                   onChange={(e) => updateField('referralIncentive', e.target.value)}
                   placeholder="e.g. Free session for both"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                  className="input-field"
                 />
               </div>
             )}
@@ -1338,7 +1338,7 @@ function ProgrammesPageInner() {
               <select
                 value={form.programmeStatus}
                 onChange={(e) => updateField('programmeStatus', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="open">Open</option>
                 <option value="almost_full">Almost full</option>
@@ -1353,7 +1353,7 @@ function ProgrammesPageInner() {
               <select
                 value={form.trialAvailable}
                 onChange={(e) => updateField('trialAvailable', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Free trial">Free trial</option>
@@ -1370,7 +1370,7 @@ function ProgrammesPageInner() {
                 value={form.trialInstructions}
                 onChange={(e) => updateField('trialInstructions', e.target.value)}
                 placeholder="How to book a trial"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               />
             </div>
           )}
@@ -1385,7 +1385,7 @@ function ProgrammesPageInner() {
               onChange={(e) => updateField('whatToBring', e.target.value)}
               rows={3}
               placeholder="e.g. Football boots, shin pads, water bottle, appropriate sports kit"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1394,7 +1394,7 @@ function ProgrammesPageInner() {
               <select
                 value={form.equipmentProvided}
                 onChange={(e) => updateField('equipmentProvided', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="All provided">All equipment provided</option>
@@ -1407,7 +1407,7 @@ function ProgrammesPageInner() {
               <select
                 value={form.kitRequired}
                 onChange={(e) => updateField('kitRequired', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Required">Required</option>
@@ -1424,7 +1424,7 @@ function ProgrammesPageInner() {
                 value={form.kitDetails}
                 onChange={(e) => updateField('kitDetails', e.target.value)}
                 placeholder="Where to buy, cost, colours etc."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               />
             </div>
           )}
@@ -1437,7 +1437,7 @@ function ProgrammesPageInner() {
             <select
               value={form.paidOrFree}
               onChange={(e) => updateField('paidOrFree', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             >
               <option value="paid">Paid</option>
               <option value="free">Free</option>
@@ -1452,7 +1452,7 @@ function ProgrammesPageInner() {
                   <select
                     value={form.paymentModel}
                     onChange={(e) => updateField('paymentModel', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                    className="input-field"
                   >
                     <option value="">Select...</option>
                     <option value="Monthly">Monthly</option>
@@ -1486,7 +1486,7 @@ function ProgrammesPageInner() {
                   value={form.priceIncludes}
                   onChange={(e) => updateField('priceIncludes', e.target.value)}
                   placeholder="e.g. Coaching, equipment hire, match fees"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                  className="input-field"
                 />
               </div>
               <div>
@@ -1496,7 +1496,7 @@ function ProgrammesPageInner() {
                   value={form.siblingDiscount}
                   onChange={(e) => updateField('siblingDiscount', e.target.value)}
                   placeholder="e.g. 10% off for siblings"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                  className="input-field"
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1505,7 +1505,7 @@ function ProgrammesPageInner() {
                   <select
                     value={form.refundPolicy}
                     onChange={(e) => updateField('refundPolicy', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                    className="input-field"
                   >
                     <option value="">Select...</option>
                     <option value="Full refund">Full refund</option>
@@ -1522,7 +1522,7 @@ function ProgrammesPageInner() {
                       value={form.refundDetails}
                       onChange={(e) => updateField('refundDetails', e.target.value)}
                       placeholder="Explain refund conditions"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                      className="input-field"
                     />
                   </div>
                 )}
@@ -1551,7 +1551,7 @@ function ProgrammesPageInner() {
                 <select
                   value={form.paymentReminderSchedule}
                   onChange={(e) => updateField('paymentReminderSchedule', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                  className="input-field"
                 >
                   <option value="">Select...</option>
                   <option value="3 days before">3 days before due</option>
@@ -1718,7 +1718,7 @@ function ProgrammesPageInner() {
               onChange={(e) => updateField('botNotes', e.target.value)}
               rows={3}
               placeholder="Any extra context, rules, or instructions for the bot when answering questions about this programme"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             />
           </div>
         </Section>

@@ -147,24 +147,24 @@ export default function SchedulePage() {
     loadSchedule()
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-600">Loading...</p></div>
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-canvas"><p className="text-ink-muted">Loading...</p></div>
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8 max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/dashboard/control-centre" className="text-gray-500 hover:text-gray-700 text-sm">← Control Centre</Link>
-        <h1 className="text-2xl font-bold text-gray-900">Schedule</h1>
+    <div className="min-h-screen bg-canvas px-4 py-6 md:px-8 max-w-3xl mx-auto">
+      <div className="reveal reveal-1 flex items-center gap-3 mb-6">
+        <Link href="/dashboard/control-centre" className="text-ink-muted hover:text-brand-700 transition-colors text-sm">← Control Centre</Link>
+        <h1 className="font-display text-2xl font-bold text-ink">Schedule</h1>
       </div>
 
-      {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>}
-      {success && <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">{success}</div>}
+      {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">{error}</div>}
+      {success && <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm border border-green-100">{success}</div>}
 
-      <div className="bg-white rounded-xl shadow-sm p-5 mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Programme</label>
+      <div className="card shadow-card mb-4">
+        <label className="block text-sm font-medium text-ink mb-1.5">Programme</label>
         <select
           value={selectedProgrammeId}
           onChange={(e) => setSelectedProgrammeId(e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+          className="input-field"
         >
           {programmes.map((p) => (
             <option key={p.programme_id} value={p.programme_id}>{p.programme_name}</option>
@@ -172,22 +172,22 @@ export default function SchedulePage() {
         </select>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-5 mb-4">
+      <div className="card shadow-card mb-4">
         <div className="flex justify-between items-center mb-3">
-          <h2 className="font-semibold text-gray-900">Recurring series ({series.length})</h2>
-          <button onClick={() => setShowCreate(!showCreate)} className="text-blue-600 text-sm hover:underline">
+          <h2 className="font-display font-semibold text-ink">Recurring series ({series.length})</h2>
+          <button onClick={() => setShowCreate(!showCreate)} className="text-brand-700 text-sm font-medium hover:underline">
             {showCreate ? 'Cancel' : '+ New series'}
           </button>
         </div>
 
         {showCreate && (
-          <form onSubmit={handleCreateSeries} className="bg-gray-50 p-4 rounded-lg space-y-3 mb-4">
+          <form onSubmit={handleCreateSeries} className="bg-surface-muted p-4 rounded-lg space-y-3 mb-4">
             <input
               type="text"
               value={seriesTitle}
               onChange={(e) => setSeriesTitle(e.target.value)}
               placeholder="Series title (optional)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
+              className="input-field"
             />
             <div className="grid grid-cols-2 gap-2">
               <input
@@ -195,14 +195,14 @@ export default function SchedulePage() {
                 value={seriesStart}
                 onChange={(e) => setSeriesStart(e.target.value)}
                 required
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
+                className="input-field"
               />
               <input
                 type="time"
                 value={seriesTime}
                 onChange={(e) => setSeriesTime(e.target.value)}
                 required
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
+                className="input-field"
               />
             </div>
             <input
@@ -210,14 +210,14 @@ export default function SchedulePage() {
               value={seriesRrule}
               onChange={(e) => setSeriesRrule(e.target.value)}
               placeholder="RRULE (e.g. FREQ=WEEKLY;BYDAY=SA)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 font-mono"
+              className="input-field font-mono"
             />
             <input
               type="text"
               value={seriesVenue}
               onChange={(e) => setSeriesVenue(e.target.value)}
               placeholder="Default venue"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
+              className="input-field"
             />
             <input
               type="number"
@@ -225,13 +225,13 @@ export default function SchedulePage() {
               max="240"
               value={seriesDuration}
               onChange={(e) => setSeriesDuration(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
+              className="input-field"
               placeholder="Duration (mins)"
             />
             <button
               type="submit"
               disabled={creating}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="btn-primary"
             >
               {creating ? 'Creating...' : 'Create series'}
             </button>
@@ -240,34 +240,34 @@ export default function SchedulePage() {
 
         <ul className="space-y-1 text-sm">
           {series.map((s) => (
-            <li key={s.id} className="flex justify-between text-gray-700">
+            <li key={s.id} className="flex justify-between text-ink">
               <span>{s.title || s.series_type}</span>
-              <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{s.recurrence_rule}</code>
+              <code className="text-xs bg-surface-muted px-2 py-0.5 rounded">{s.recurrence_rule}</code>
             </li>
           ))}
-          {series.length === 0 && <li className="text-gray-400 italic">No series yet.</li>}
+          {series.length === 0 && <li className="text-ink-muted italic">No series yet.</li>}
         </ul>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-5">
-        <h2 className="font-semibold text-gray-900 mb-3">Upcoming (next 8 weeks)</h2>
+      <div className="card shadow-card">
+        <h2 className="font-display font-semibold text-ink mb-3">Upcoming (next 8 weeks)</h2>
         <ul className="space-y-2">
           {instances.map((inst) => (
             <li
               key={`${inst.series_id}-${inst.date}`}
               className={`flex justify-between items-center text-sm p-3 rounded-lg ${
                 inst.status === 'cancelled' ? 'bg-red-50' :
-                inst.status === 'rescheduled' ? 'bg-yellow-50' :
-                'bg-gray-50'
+                inst.status === 'rescheduled' ? 'bg-amber-50' :
+                'bg-surface-muted'
               }`}
             >
               <div>
-                <div className="font-medium text-gray-900">
+                <div className="font-medium text-ink">
                   {new Date(inst.starts_at).toLocaleString('en-GB', {
                     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
                   })}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-ink-muted">
                   {inst.title || 'Session'}{inst.venue ? ` · ${inst.venue}` : ''}
                   {inst.status === 'cancelled' && ` · CANCELLED${inst.reason ? ` (${inst.reason})` : ''}`}
                   {inst.status === 'rescheduled' && ` · Moved to ${inst.rescheduled_to ? new Date(inst.rescheduled_to).toLocaleString('en-GB') : 'TBC'}`}
@@ -283,7 +283,7 @@ export default function SchedulePage() {
               )}
             </li>
           ))}
-          {instances.length === 0 && <li className="text-gray-400 italic">No upcoming sessions. Create a series above.</li>}
+          {instances.length === 0 && <li className="text-ink-muted italic">No upcoming sessions. Create a series above.</li>}
         </ul>
       </div>
     </div>

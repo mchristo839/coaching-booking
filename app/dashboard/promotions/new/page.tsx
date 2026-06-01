@@ -157,16 +157,16 @@ export default function NewPromotionPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
+        <p className="text-ink-muted">Loading...</p>
       </div>
     )
   }
 
   if (authorisedProgrammes.length === 0) {
     return (
-      <div className="min-h-screen px-4 py-6 md:px-8 max-w-3xl mx-auto">
-        <div className="bg-yellow-50 text-yellow-800 px-4 py-3 rounded-lg">
+      <div className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-3xl mx-auto">
+        <div className="bg-amber-50 text-amber-800 px-4 py-3 rounded-lg border border-amber-100">
           You don&apos;t have authority over any programmes.
         </div>
       </div>
@@ -174,26 +174,26 @@ export default function NewPromotionPage() {
   }
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8 max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/dashboard/control-centre" className="text-gray-500 hover:text-gray-700 text-sm">
+    <div className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-3xl mx-auto">
+      <div className="reveal reveal-1 flex items-center gap-3 mb-6">
+        <Link href="/dashboard/control-centre" className="text-ink-muted hover:text-brand-700 text-sm transition-colors">
           ← Control Centre
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">New Promotion</h1>
+        <h1 className="font-display text-2xl font-bold text-ink">New Promotion</h1>
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
+        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">{error}</div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+        <div className="card shadow-card space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Promotion type *</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">Promotion type *</label>
             <select
               value={promotionType}
               onChange={(e) => setPromotionType(e.target.value as PromoType)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              className="input-field"
             >
               {(Object.keys(PROMO_TYPE_LABELS) as PromoType[]).map((t) => (
                 <option key={t} value={t}>{PROMO_TYPE_LABELS[t]}</option>
@@ -202,69 +202,69 @@ export default function NewPromotionPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Title (optional)</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">Title (optional)</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="AI will generate one if left blank"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              className="input-field"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">What&apos;s it about? *</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">What&apos;s it about? *</label>
             <textarea
               value={detail}
               onChange={(e) => setDetail(e.target.value)}
               rows={3}
               required
               placeholder="e.g. Summer football camp for Under-10s. 3 days of coaching, 10am-3pm, lunch included."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              className="input-field"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Start date/time</label>
+              <label className="block text-sm font-medium text-ink mb-1.5">Start date/time</label>
               <input
                 type="datetime-local"
                 value={startAt}
                 onChange={(e) => setStartAt(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                className="input-field"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">End date/time</label>
+              <label className="block text-sm font-medium text-ink mb-1.5">End date/time</label>
               <input
                 type="datetime-local"
                 value={endAt}
                 onChange={(e) => setEndAt(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                className="input-field"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Venue</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">Venue</label>
             <input
               type="text"
               value={venue}
               onChange={(e) => setVenue(e.target.value)}
               placeholder="e.g. Victoria Park, London E9 7BT"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              className="input-field"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {promotionType !== 'holiday_camp' && (
               <div>
-                <label className="flex items-center gap-2 text-sm text-gray-700 mb-1">
+                <label className="flex items-center gap-2 text-sm text-ink mb-1">
                   <input
                     type="checkbox"
                     checked={isFree}
                     onChange={(e) => setIsFree(e.target.checked)}
-                    className="w-4 h-4"
+                    className="w-4 h-4 accent-brand-600"
                   />
                   Free event
                 </label>
@@ -276,13 +276,13 @@ export default function NewPromotionPage() {
                     value={costGbp}
                     onChange={(e) => setCostGbp(e.target.value)}
                     placeholder="Cost in £"
-                    className="mt-1 w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                    className="input-field mt-1"
                   />
                 )}
               </div>
             )}
             <div className={promotionType === 'holiday_camp' ? 'sm:col-span-2' : ''}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink mb-1.5">
                 Payment / booking link{promotionType === 'holiday_camp' && ' *'}
               </label>
               <input
@@ -290,10 +290,10 @@ export default function NewPromotionPage() {
                 value={paymentLink}
                 onChange={(e) => setPaymentLink(e.target.value)}
                 placeholder={promotionType === 'holiday_camp' ? 'https://monzo.me/yourname or Revolut link' : 'https://...'}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                className="input-field"
               />
               {promotionType === 'holiday_camp' && (
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-ink-muted">
                   Shared with parents after they pick their days. They&apos;ll be asked to use the child&apos;s name as the bank reference.
                 </p>
               )}
@@ -302,18 +302,18 @@ export default function NewPromotionPage() {
         </div>
 
         {promotionType === 'holiday_camp' && (
-          <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
+          <div className="card shadow-card space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Camp days</h2>
+              <h2 className="font-display text-lg font-semibold text-ink">Camp days</h2>
               <button
                 type="button"
                 onClick={addCampDay}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                className="text-sm text-brand-700 hover:underline font-medium"
               >
                 + Add day
               </button>
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-ink-muted">
               Each row is one bookable day. Parents will see these as options (a, b, c…) and pick any combination for each child.
             </p>
             <div className="space-y-2">
@@ -324,7 +324,7 @@ export default function NewPromotionPage() {
                       type="date"
                       value={row.date}
                       onChange={(e) => updateCampDay(i, { date: e.target.value })}
-                      className="w-full px-2 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      className="input-field px-2 py-2 text-sm"
                     />
                   </div>
                   <div className="col-span-4">
@@ -333,7 +333,7 @@ export default function NewPromotionPage() {
                       value={row.label}
                       onChange={(e) => updateCampDay(i, { label: e.target.value })}
                       placeholder={deriveLabel(row.date) || 'Label (e.g. Tue 7 Apr)'}
-                      className="w-full px-2 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      className="input-field px-2 py-2 text-sm"
                     />
                   </div>
                   <div className="col-span-2">
@@ -344,7 +344,7 @@ export default function NewPromotionPage() {
                       value={row.price_gbp}
                       onChange={(e) => updateCampDay(i, { price_gbp: e.target.value })}
                       placeholder="£"
-                      className="w-full px-2 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      className="input-field px-2 py-2 text-sm"
                     />
                   </div>
                   <div className="col-span-1">
@@ -354,7 +354,7 @@ export default function NewPromotionPage() {
                       value={row.capacity}
                       onChange={(e) => updateCampDay(i, { capacity: e.target.value })}
                       placeholder="Cap"
-                      className="w-full px-2 py-2 border border-gray-300 rounded text-sm text-gray-900"
+                      className="input-field px-2 py-2 text-sm"
                     />
                   </div>
                   <div className="col-span-1 flex items-center justify-end">
@@ -362,7 +362,7 @@ export default function NewPromotionPage() {
                       <button
                         type="button"
                         onClick={() => removeCampDay(i)}
-                        className="text-gray-400 hover:text-red-600 text-lg px-1"
+                        className="text-ink-muted hover:text-red-600 text-lg px-1 transition-colors"
                         title="Remove this day"
                       >
                         ×
@@ -375,37 +375,40 @@ export default function NewPromotionPage() {
           </div>
         )}
 
-        <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
-          <h2 className="text-lg font-semibold text-gray-900">Send to</h2>
+        <div className="card shadow-card space-y-3">
+          <h2 className="font-display text-lg font-semibold text-ink">Send to</h2>
 
-          <label className="flex items-center gap-2 text-sm text-gray-700">
+          <label className="flex items-center gap-2 text-sm text-ink">
             <input
               type="radio"
               checked={sendMode === 'all_groups'}
               onChange={() => setSendMode('all_groups')}
+              className="accent-brand-600"
             />
             All my groups ({authorisedProgrammes.length})
           </label>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
+          <label className="flex items-center gap-2 text-sm text-ink">
             <input
               type="radio"
               checked={sendMode === 'selected_groups'}
               onChange={() => setSendMode('selected_groups')}
+              className="accent-brand-600"
             />
             Select groups
           </label>
 
           {sendMode === 'selected_groups' && (
-            <div className="ml-6 space-y-2 border-l-2 border-gray-200 pl-4">
+            <div className="ml-6 space-y-2 border-l-2 border-line pl-4">
               {authorisedProgrammes.map((p) => (
-                <label key={p.programme_id} className="flex items-center gap-2 text-sm">
+                <label key={p.programme_id} className="flex items-center gap-2 text-sm text-ink">
                   <input
                     type="checkbox"
                     checked={selectedProgrammeIds.includes(p.programme_id)}
                     onChange={() => toggleProgramme(p.programme_id)}
+                    className="accent-brand-600"
                   />
                   <span>{p.programme_name}</span>
-                  <span className="text-xs text-gray-400">({p.role.replace('_', ' ')})</span>
+                  <span className="text-xs text-ink-muted">({p.role.replace('_', ' ')})</span>
                 </label>
               ))}
             </div>
@@ -416,13 +419,13 @@ export default function NewPromotionPage() {
           <button
             type="submit"
             disabled={saving}
-            className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+            className="btn-primary px-8"
           >
             {saving ? 'Generating...' : 'Generate & preview'}
           </button>
           <Link
             href="/dashboard/control-centre"
-            className="bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200"
+            className="btn-secondary"
           >
             Cancel
           </Link>

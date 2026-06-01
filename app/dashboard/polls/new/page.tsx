@@ -106,50 +106,50 @@ export default function NewPollPage() {
   }
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-600">Loading...</p></div>
+    return <div className="min-h-screen flex items-center justify-center bg-canvas"><p className="text-ink-muted">Loading...</p></div>
   }
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8 max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/dashboard/control-centre" className="text-gray-500 hover:text-gray-700 text-sm">← Control Centre</Link>
-        <h1 className="text-2xl font-bold text-gray-900">New Poll</h1>
+    <div className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-3xl mx-auto">
+      <div className="reveal reveal-1 flex items-center gap-3 mb-6">
+        <Link href="/dashboard/control-centre" className="text-ink-muted hover:text-brand-700 text-sm transition-colors">← Control Centre</Link>
+        <h1 className="font-display text-2xl font-bold text-ink">New Poll</h1>
       </div>
 
-      {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>}
+      {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">{error}</div>}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+        <div className="card shadow-card space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Question *</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">Question *</label>
             <input
               type="text"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               required
               placeholder="e.g. Can your child make training on Saturday?"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              className="input-field"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Options (2-6)</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">Options (2-6)</label>
             <div className="space-y-2">
               {options.map((opt, i) => (
                 <div key={i} className="flex gap-2">
-                  <span className="text-xs text-gray-500 pt-3 w-6">{String.fromCharCode(97 + i)})</span>
+                  <span className="text-xs text-ink-muted pt-3 w-6">{String.fromCharCode(97 + i)})</span>
                   <input
                     type="text"
                     value={opt}
                     onChange={(e) => updateOption(i, e.target.value)}
                     placeholder={`Option ${i + 1}`}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                    className="input-field flex-1 py-2"
                   />
                   {options.length > 2 && (
                     <button
                       type="button"
                       onClick={() => removeOption(i)}
-                      className="text-red-500 text-sm px-2"
+                      className="text-red-500 hover:text-red-600 text-sm px-2 transition-colors"
                     >
                       ✕
                     </button>
@@ -160,7 +160,7 @@ export default function NewPollPage() {
                 <button
                   type="button"
                   onClick={addOption}
-                  className="text-blue-600 text-sm hover:underline ml-8"
+                  className="text-brand-700 text-sm hover:underline ml-8"
                 >
                   + Add option
                 </button>
@@ -170,56 +170,56 @@ export default function NewPollPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Closes at (optional)</label>
+              <label className="block text-sm font-medium text-ink mb-1.5">Closes at (optional)</label>
               <input
                 type="datetime-local"
                 value={closesAt}
                 onChange={(e) => setClosesAt(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                className="input-field"
               />
             </div>
             <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} className="accent-brand-600" />
                 Anonymous
               </label>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">Group session (optional)</h2>
-          <p className="text-xs text-gray-500 -mt-2">
+        <div className="card shadow-card space-y-4">
+          <h2 className="font-display text-lg font-semibold text-ink">Group session (optional)</h2>
+          <p className="text-xs text-ink-muted -mt-2">
             For booking-style polls. Cap the seats, link payment, and the bot
             will auto-waitlist overflow + DM payment links to YES voters.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Capacity</label>
+              <label className="block text-sm font-medium text-ink mb-1.5">Capacity</label>
               <input
                 type="number"
                 min={1}
                 value={capacity}
                 onChange={(e) => setCapacity(e.target.value)}
                 placeholder="e.g. 12"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                className="input-field"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Session date/time</label>
+              <label className="block text-sm font-medium text-ink mb-1.5">Session date/time</label>
               <input
                 type="datetime-local"
                 value={sessionAt}
                 onChange={(e) => setSessionAt(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                className="input-field"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Which option means YES?</label>
+              <label className="block text-sm font-medium text-ink mb-1.5">Which option means YES?</label>
               <select
                 value={yesOptionIndex}
                 onChange={(e) => setYesOptionIndex(parseInt(e.target.value, 10))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                className="input-field"
               >
                 {options.map((opt, i) => (
                   <option key={i} value={i}>{String.fromCharCode(97 + i)}) {opt || `Option ${i + 1}`}</option>
@@ -227,37 +227,38 @@ export default function NewPollPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Payment link (optional)</label>
+              <label className="block text-sm font-medium text-ink mb-1.5">Payment link (optional)</label>
               <input
                 type="url"
                 value={paymentLink}
                 onChange={(e) => setPaymentLink(e.target.value)}
                 placeholder="https://..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                className="input-field"
               />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
-          <h2 className="text-lg font-semibold text-gray-900">Send to</h2>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input type="radio" checked={sendMode === 'all_groups'} onChange={() => setSendMode('all_groups')} />
+        <div className="card shadow-card space-y-3">
+          <h2 className="font-display text-lg font-semibold text-ink">Send to</h2>
+          <label className="flex items-center gap-2 text-sm text-ink">
+            <input type="radio" checked={sendMode === 'all_groups'} onChange={() => setSendMode('all_groups')} className="accent-brand-600" />
             All my groups ({authorisedProgrammes.length})
           </label>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input type="radio" checked={sendMode === 'selected_groups'} onChange={() => setSendMode('selected_groups')} />
+          <label className="flex items-center gap-2 text-sm text-ink">
+            <input type="radio" checked={sendMode === 'selected_groups'} onChange={() => setSendMode('selected_groups')} className="accent-brand-600" />
             Select groups
           </label>
 
           {sendMode === 'selected_groups' && (
-            <div className="ml-6 space-y-2 border-l-2 border-gray-200 pl-4">
+            <div className="ml-6 space-y-2 border-l-2 border-line pl-4">
               {authorisedProgrammes.map((p) => (
-                <label key={p.programme_id} className="flex items-center gap-2 text-sm">
+                <label key={p.programme_id} className="flex items-center gap-2 text-sm text-ink">
                   <input
                     type="checkbox"
                     checked={selectedProgrammeIds.includes(p.programme_id)}
                     onChange={() => toggleProgramme(p.programme_id)}
+                    className="accent-brand-600"
                   />
                   {p.programme_name}
                 </label>
@@ -270,11 +271,11 @@ export default function NewPollPage() {
           <button
             type="submit"
             disabled={saving}
-            className="bg-purple-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50"
+            className="btn-primary px-8"
           >
             {saving ? 'Sending...' : 'Send poll'}
           </button>
-          <Link href="/dashboard/control-centre" className="bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200">
+          <Link href="/dashboard/control-centre" className="btn-secondary">
             Cancel
           </Link>
         </div>

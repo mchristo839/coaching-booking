@@ -109,49 +109,49 @@ export default function AdminInvitesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
+        <p className="text-ink-muted">Loading...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Invite Codes</h1>
+    <div className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-3xl mx-auto">
+      <h1 className="reveal reveal-1 font-display text-2xl font-bold text-ink mb-6">Invite Codes</h1>
 
       {error && (
-        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
+        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">{error}</div>
       )}
 
       {/* Create new code */}
-      <div className="bg-white rounded-xl shadow-sm p-6 mb-6 space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">Generate New Code</h2>
+      <div className="card shadow-card mb-6 space-y-4">
+        <h2 className="font-display text-lg font-semibold text-ink">Generate New Code</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Max uses</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">Max uses</label>
             <input
               type="number"
               min="1"
               value={maxUses}
               onChange={(e) => setMaxUses(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              className="input-field"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">Notes (optional)</label>
             <input
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Paul's referrals"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              className="input-field"
             />
           </div>
         </div>
         <button
           onClick={handleCreate}
           disabled={creating}
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+          className="btn-primary"
         >
           {creating ? 'Creating...' : 'Generate Code'}
         </button>
@@ -160,35 +160,35 @@ export default function AdminInvitesPage() {
       {/* Code list */}
       <div className="space-y-3">
         {codes.length === 0 ? (
-          <p className="text-gray-500 text-sm">No invite codes yet.</p>
+          <p className="text-ink-muted text-sm">No invite codes yet.</p>
         ) : (
           codes.map((code) => (
-            <div key={code.code} className="bg-white rounded-xl shadow-sm p-4">
+            <div key={code.code} className="bg-surface rounded-xl border border-line shadow-card p-4 transition-all duration-200 hover:shadow-card-hover">
               <div className="flex justify-between items-start">
                 <div>
-                  <span className="font-mono font-bold text-gray-900 text-lg">{code.code}</span>
+                  <span className="font-mono font-bold text-ink text-lg">{code.code}</span>
                   <div className="flex gap-2 mt-1">
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-ink-muted">
                       {code.uses}/{code.max_uses} used
                     </span>
                     {isExpired(code) && (
                       <span className="text-xs text-red-600 font-medium">Expired</span>
                     )}
                     {isMaxed(code) && !isExpired(code) && (
-                      <span className="text-xs text-yellow-600 font-medium">Maxed out</span>
+                      <span className="text-xs text-amber-600 font-medium">Maxed out</span>
                     )}
                     {!isExpired(code) && !isMaxed(code) && (
-                      <span className="text-xs text-green-600 font-medium">Active</span>
+                      <span className="text-xs text-brand-700 font-medium">Active</span>
                     )}
                   </div>
                   {code.notes && (
-                    <p className="text-xs text-gray-400 mt-1">{code.notes}</p>
+                    <p className="text-xs text-ink-muted mt-1">{code.notes}</p>
                   )}
                 </div>
                 <button
                   onClick={() => copyLink(code.code)}
                   disabled={isExpired(code) || isMaxed(code)}
-                  className="text-blue-600 text-sm hover:underline disabled:text-gray-400 disabled:no-underline"
+                  className="text-brand-700 text-sm font-medium hover:underline disabled:text-ink-muted/50 disabled:no-underline"
                 >
                   {copied === code.code ? 'Copied!' : 'Copy link'}
                 </button>

@@ -33,13 +33,13 @@ interface Programme {
 function sourceBadge(source: string | null): { label: string; cls: string } {
   switch (source?.toLowerCase()) {
     case 'coach':
-      return { label: 'Coach', cls: 'bg-[#3D8B37]/10 text-[#3D8B37]' }
+      return { label: 'Coach', cls: 'bg-brand-50 text-brand-700' }
     case 'preloaded':
-      return { label: 'Preloaded', cls: 'bg-blue-100 text-blue-700' }
+      return { label: 'Preloaded', cls: 'bg-surface-muted text-ink-muted' }
     case 'learned':
-      return { label: 'Learned', cls: 'bg-purple-100 text-purple-700' }
+      return { label: 'Learned', cls: 'bg-brand-100 text-brand-800' }
     default:
-      return { label: source || 'Unknown', cls: 'bg-gray-100 text-gray-600' }
+      return { label: source || 'Unknown', cls: 'bg-surface-muted text-ink-muted' }
   }
 }
 
