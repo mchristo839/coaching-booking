@@ -33,13 +33,13 @@ interface Programme {
 function sourceBadge(source: string | null): { label: string; cls: string } {
   switch (source?.toLowerCase()) {
     case 'coach':
-      return { label: 'Coach', cls: 'bg-[#3D8B37]/10 text-[#3D8B37]' }
+      return { label: 'Coach', cls: 'bg-brand-50 text-brand-700' }
     case 'preloaded':
-      return { label: 'Preloaded', cls: 'bg-blue-100 text-blue-700' }
+      return { label: 'Preloaded', cls: 'bg-surface-muted text-ink-muted' }
     case 'learned':
-      return { label: 'Learned', cls: 'bg-purple-100 text-purple-700' }
+      return { label: 'Learned', cls: 'bg-brand-100 text-brand-800' }
     default:
-      return { label: source || 'Unknown', cls: 'bg-gray-100 text-gray-600' }
+      return { label: source || 'Unknown', cls: 'bg-surface-muted text-ink-muted' }
   }
 }
 
@@ -73,11 +73,11 @@ function PendingCard({
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-amber-200 p-5">
+    <div className="bg-surface rounded-xl shadow-card border border-amber-200 p-5">
       <div className="flex items-start justify-between gap-3 mb-3">
-        <p className="font-semibold text-gray-900">{faq.question}</p>
+        <p className="font-semibold text-ink">{faq.question}</p>
         {faq.programme_name && (
-          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded whitespace-nowrap flex-shrink-0">
+          <span className="text-xs bg-surface-muted text-ink-muted px-2 py-1 rounded whitespace-nowrap flex-shrink-0">
             {faq.programme_name}
           </span>
         )}
@@ -88,11 +88,11 @@ function PendingCard({
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
           rows={4}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37] mb-3 resize-y"
+          className="input-field mb-3 resize-y"
         />
       ) : (
-        <div className="bg-gray-50 rounded-lg px-4 py-3 text-sm text-gray-600 mb-3">
-          <p className="text-xs text-gray-400 mb-1 uppercase tracking-wide font-medium">Bot suggested answer</p>
+        <div className="bg-surface-muted rounded-lg px-4 py-3 text-sm text-ink-muted mb-3">
+          <p className="text-xs text-ink-muted mb-1 uppercase tracking-wide font-medium">Bot suggested answer</p>
           {answer}
         </div>
       )}
@@ -102,7 +102,7 @@ function PendingCard({
           <button
             onClick={handleApprove}
             disabled={saving}
-            className="bg-[#3D8B37] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#346E30] transition-colors disabled:opacity-50 min-h-[44px]"
+            className="btn-primary text-sm px-4 py-2"
           >
             {saving ? 'Saving...' : 'Save & Approve'}
           </button>
@@ -111,13 +111,13 @@ function PendingCard({
             <button
               onClick={handleApprove}
               disabled={saving}
-              className="bg-[#3D8B37] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#346E30] transition-colors disabled:opacity-50 min-h-[44px]"
+              className="btn-primary text-sm px-4 py-2"
             >
               {saving ? 'Saving...' : 'Approve'}
             </button>
             <button
               onClick={() => setEditMode(true)}
-              className="bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors min-h-[44px]"
+              className="btn-secondary text-sm px-4 py-2"
             >
               Edit & Approve
             </button>
@@ -126,7 +126,7 @@ function PendingCard({
         <button
           onClick={handleCoachOnly}
           disabled={saving}
-          className="bg-white text-amber-700 px-4 py-2 rounded-lg text-sm font-medium border border-amber-200 hover:bg-amber-50 transition-colors disabled:opacity-50 min-h-[44px]"
+          className="bg-surface text-amber-700 px-4 py-2 rounded-lg text-sm font-medium border border-amber-200 hover:bg-amber-50 transition-colors disabled:opacity-50 min-h-[44px]"
         >
           Coach Only
         </button>
@@ -167,31 +167,31 @@ function FaqRow({
 
   if (editing) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <label className="block text-xs font-medium text-gray-500 mb-1">Question</label>
+      <div className="bg-surface rounded-lg border border-line p-4">
+        <label className="block text-xs font-medium text-ink-muted mb-1">Question</label>
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37] mb-3"
+          className="input-field mb-3"
         />
-        <label className="block text-xs font-medium text-gray-500 mb-1">Answer</label>
+        <label className="block text-xs font-medium text-ink-muted mb-1">Answer</label>
         <textarea
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
           rows={3}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37] mb-3 resize-y"
+          className="input-field mb-3 resize-y"
         />
         <div className="flex gap-2">
           <button
             onClick={handleSave}
             disabled={saving}
-            className="bg-[#3D8B37] text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-[#346E30] transition-colors disabled:opacity-50"
+            className="btn-primary text-sm px-3 py-1.5 min-h-0"
           >
             {saving ? 'Saving...' : 'Save'}
           </button>
           <button
             onClick={() => { setEditing(false); setQuestion(faq.question); setAnswer(faq.answer) }}
-            className="text-gray-500 hover:text-gray-700 text-sm font-medium px-3 py-1.5"
+            className="text-ink-muted hover:text-ink text-sm font-medium px-3 py-1.5 transition-colors"
           >
             Cancel
           </button>
@@ -201,25 +201,25 @@ function FaqRow({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-100 p-4 hover:border-gray-200 transition-colors">
+    <div className="bg-surface rounded-lg border border-line p-4 hover:border-brand-200 hover:shadow-card transition-all">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-gray-900 text-sm">{faq.question}</p>
-          <p className="text-gray-600 text-sm mt-1">{faq.answer}</p>
+          <p className="font-medium text-ink text-sm">{faq.question}</p>
+          <p className="text-ink-muted text-sm mt-1">{faq.answer}</p>
           <div className="flex flex-wrap gap-2 mt-2">
             {faq.category && (
-              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{faq.category}</span>
+              <span className="text-xs bg-surface-muted text-ink-muted px-2 py-0.5 rounded">{faq.category}</span>
             )}
             <span className={`text-xs font-medium px-2 py-0.5 rounded ${src.cls}`}>{src.label}</span>
             {faq.times_asked > 0 && (
-              <span className="text-xs text-gray-400">Asked {faq.times_asked}x</span>
+              <span className="text-xs text-ink-muted">Asked {faq.times_asked}x</span>
             )}
           </div>
         </div>
         <div className="flex gap-1 flex-shrink-0">
           <button
             onClick={() => setEditing(true)}
-            className="text-gray-400 hover:text-[#3D8B37] p-1.5 rounded transition-colors"
+            className="text-ink-muted hover:text-brand-700 p-1.5 rounded transition-colors"
             title="Edit"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -237,7 +237,7 @@ function FaqRow({
           ) : (
             <button
               onClick={() => setConfirmDelete(true)}
-              className="text-gray-400 hover:text-red-500 p-1.5 rounded transition-colors"
+              className="text-ink-muted hover:text-red-500 p-1.5 rounded transition-colors"
               title="Delete"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -277,7 +277,7 @@ function AddFaqForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-[#3D8B37] text-sm font-medium hover:underline"
+        className="text-brand-700 text-sm font-medium hover:underline"
       >
         + Add FAQ
       </button>
@@ -285,33 +285,33 @@ function AddFaqForm({
   }
 
   return (
-    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-      <label className="block text-xs font-medium text-gray-500 mb-1">Question</label>
+    <div className="bg-surface-muted rounded-lg p-4 border border-line">
+      <label className="block text-xs font-medium text-ink-muted mb-1">Question</label>
       <input
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         placeholder="e.g. What should my child wear?"
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37] mb-3 bg-white"
+        className="input-field mb-3"
       />
-      <label className="block text-xs font-medium text-gray-500 mb-1">Answer</label>
+      <label className="block text-xs font-medium text-ink-muted mb-1">Answer</label>
       <textarea
         value={answer}
         onChange={(e) => setAnswer(e.target.value)}
         rows={3}
         placeholder="Your answer..."
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37] mb-3 resize-y bg-white"
+        className="input-field mb-3 resize-y"
       />
       <div className="flex gap-2">
         <button
           onClick={handleSubmit}
           disabled={saving || !question.trim() || !answer.trim()}
-          className="bg-[#3D8B37] text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-[#346E30] transition-colors disabled:opacity-50"
+          className="btn-primary text-sm px-3 py-1.5 min-h-0"
         >
           {saving ? 'Adding...' : 'Add FAQ'}
         </button>
         <button
           onClick={() => { setOpen(false); setQuestion(''); setAnswer('') }}
-          className="text-gray-500 hover:text-gray-700 text-sm font-medium px-3 py-1.5"
+          className="text-ink-muted hover:text-ink text-sm font-medium px-3 py-1.5 transition-colors"
         >
           Cancel
         </button>
@@ -500,10 +500,10 @@ export default function LearningPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-[#3D8B37] border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm">Loading learning log...</p>
+          <div className="w-8 h-8 border-[3px] border-brand-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-ink-muted text-sm">Loading learning log...</p>
         </div>
       </div>
     )
@@ -512,13 +512,13 @@ export default function LearningPage() {
   /* ---------- render ---------- */
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-canvas">
       <main className="px-4 py-6 md:px-8 lg:px-10 max-w-4xl mx-auto">
 
         {/* Back link */}
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#3D8B37] transition-colors mb-6"
+          className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-brand-700 transition-colors mb-6"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -527,9 +527,9 @@ export default function LearningPage() {
         </Link>
 
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Learning Log</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Review questions your bot couldn&apos;t answer and manage your FAQ library.</p>
+        <div className="reveal reveal-1 mb-6">
+          <h1 className="font-display text-2xl md:text-3xl font-bold text-ink">Learning Log</h1>
+          <p className="text-ink-muted text-sm mt-0.5">Review questions your bot couldn&apos;t answer and manage your FAQ library.</p>
         </div>
 
         {/* Programme filter tabs */}
@@ -539,8 +539,8 @@ export default function LearningPage() {
               onClick={() => setSelectedProgrammeId('all')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 selectedProgrammeId === 'all'
-                  ? 'bg-[#3D8B37] text-white'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:border-[#3D8B37] hover:text-[#3D8B37]'
+                  ? 'bg-brand-600 text-white'
+                  : 'bg-surface text-ink-muted border border-line hover:border-brand-300 hover:text-brand-700'
               }`}
             >
               All Programmes
@@ -551,8 +551,8 @@ export default function LearningPage() {
                 onClick={() => setSelectedProgrammeId(prog.id)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   selectedProgrammeId === prog.id
-                    ? 'bg-[#3D8B37] text-white'
-                    : 'bg-white text-gray-600 border border-gray-200 hover:border-[#3D8B37] hover:text-[#3D8B37]'
+                    ? 'bg-brand-600 text-white'
+                    : 'bg-surface text-ink-muted border border-line hover:border-brand-300 hover:text-brand-700'
                 }`}
               >
                 {prog.programName}
@@ -564,7 +564,7 @@ export default function LearningPage() {
         {/* ===== Section 1: Pending Review ===== */}
         <section className="mb-10">
           <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Pending Review</h2>
+            <h2 className="font-display text-lg font-semibold text-ink">Pending Review</h2>
             {filteredPending.length > 0 && (
               <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full">
                 {filteredPending.length} question{filteredPending.length !== 1 ? 's' : ''} awaiting your input
@@ -573,14 +573,14 @@ export default function LearningPage() {
           </div>
 
           {filteredPending.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+            <div className="bg-surface rounded-xl shadow-card border border-line p-8 text-center">
               <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-green-100 flex items-center justify-center">
                 <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <p className="text-gray-900 font-semibold mb-1">All caught up!</p>
-              <p className="text-gray-500 text-sm">No questions pending review.</p>
+              <p className="text-ink font-semibold mb-1">All caught up!</p>
+              <p className="text-ink-muted text-sm">No questions pending review.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
@@ -598,24 +598,24 @@ export default function LearningPage() {
 
         {/* ===== Section 2: FAQ Library ===== */}
         <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">FAQ Library</h2>
+          <h2 className="font-display text-lg font-semibold text-ink mb-4">FAQ Library</h2>
 
           {faqsByProgramme.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-              <p className="text-gray-500 text-sm">No programmes found. Create a programme first to start building your FAQ library.</p>
+            <div className="bg-surface rounded-xl shadow-card border border-line p-8 text-center">
+              <p className="text-ink-muted text-sm">No programmes found. Create a programme first to start building your FAQ library.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-8">
               {faqsByProgramme.map(({ programme, faqs }) => (
                 <div key={programme.id}>
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-gray-800">{programme.programName}</h3>
-                    <span className="text-xs text-gray-400">{faqs.length} FAQ{faqs.length !== 1 ? 's' : ''}</span>
+                    <h3 className="font-display font-semibold text-ink">{programme.programName}</h3>
+                    <span className="text-xs text-ink-muted">{faqs.length} FAQ{faqs.length !== 1 ? 's' : ''}</span>
                   </div>
 
                   {faqs.length === 0 ? (
-                    <div className="bg-white rounded-lg border border-gray-100 p-6 text-center mb-3">
-                      <p className="text-gray-400 text-sm">No FAQs for this programme yet.</p>
+                    <div className="bg-surface rounded-lg border border-line p-6 text-center mb-3">
+                      <p className="text-ink-muted text-sm">No FAQs for this programme yet.</p>
                     </div>
                   ) : (
                     <div className="flex flex-col gap-2 mb-3">

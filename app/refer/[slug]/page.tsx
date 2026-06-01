@@ -135,23 +135,28 @@ export default function PublicReferralPage() {
   }
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-600">Loading...</p></div>
+    return <div className="min-h-screen flex items-center justify-center bg-canvas"><p className="text-ink-muted">Loading...</p></div>
   }
 
   if (!promotion) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg max-w-md">{error || 'Not found'}</div>
+      <div className="min-h-screen flex items-center justify-center bg-canvas px-4">
+        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg max-w-md border border-red-100">{error || 'Not found'}</div>
       </div>
     )
   }
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-12">
-        <div className="bg-white rounded-xl shadow-sm w-full max-w-md p-6 md:p-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">You&apos;re in!</h1>
-          <p className="text-gray-600">
+      <div className="min-h-screen flex items-center justify-center bg-canvas px-4 py-12">
+        <div className="reveal reveal-1 card shadow-card w-full max-w-md p-6 md:p-8 text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-brand-50 flex items-center justify-center">
+            <svg className="w-8 h-8 text-brand-700" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h1 className="font-display text-2xl font-bold text-ink mb-3">You&apos;re in!</h1>
+          <p className="text-ink-muted leading-relaxed">
             We&apos;ve got your details. The coach will be in touch shortly with the session info.
           </p>
         </div>
@@ -163,10 +168,10 @@ export default function PublicReferralPage() {
   // state instead of the form — no submissions accepted, no broken UX.
   if (promotion.closed) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-12">
-        <div className="bg-white rounded-xl shadow-sm w-full max-w-md p-6 md:p-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-3">This offer has closed</h1>
-          <p className="text-gray-600">
+      <div className="min-h-screen flex items-center justify-center bg-canvas px-4 py-12">
+        <div className="reveal reveal-1 card shadow-card w-full max-w-md p-6 md:p-8 text-center">
+          <h1 className="font-display text-2xl font-bold text-ink mb-3">This offer has closed</h1>
+          <p className="text-ink-muted leading-relaxed">
             Thanks for your interest in {promotion.title || 'this offer'}. Bookings are no longer open
             for this campaign — get in touch with the coach directly if you&apos;d still like to come along.
           </p>
@@ -176,66 +181,67 @@ export default function PublicReferralPage() {
   }
 
   return (
-    <div className="min-h-screen px-4 py-12 flex items-start justify-center">
-      <div className="bg-white rounded-xl shadow-sm w-full max-w-md p-6 md:p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+    <div className="min-h-screen bg-canvas px-4 py-12 flex items-start justify-center">
+      <div className="reveal reveal-1 card shadow-card w-full max-w-md p-6 md:p-8">
+        <span className="eyebrow mb-3">You&apos;re invited</span>
+        <h1 className="font-display text-2xl font-bold text-ink mb-2 tracking-[-0.01em]">
           {promotion.title || 'Free taster session'}
         </h1>
-        <p className="text-gray-600 mb-4">{promotion.detail}</p>
-        {promotion.venue && <p className="text-sm text-gray-500 mb-1">📍 {promotion.venue}</p>}
+        <p className="text-ink-muted mb-4 leading-relaxed">{promotion.detail}</p>
+        {promotion.venue && <p className="text-sm text-ink-muted mb-1">📍 {promotion.venue}</p>}
         {promotion.startAt && (
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-ink-muted mb-4">
             🗓 {new Date(promotion.startAt).toLocaleString('en-GB')}
           </p>
         )}
 
-        {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>}
+        {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">{error}</div>}
 
-        <form onSubmit={handleSubmit} className="space-y-3 mt-6">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Child&apos;s first name *</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">Child&apos;s first name *</label>
             <input
               type="text"
               value={childName}
               onChange={(e) => setChildName(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              className="input-field"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Parent first name *</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">Parent first name *</label>
             <input
               type="text"
               value={friendFirstName}
               onChange={(e) => setFriendFirstName(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              className="input-field"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Mobile / WhatsApp *</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">Mobile / WhatsApp *</label>
             <input
               type="tel"
               value={friendPhone}
               onChange={(e) => setFriendPhone(e.target.value)}
               required
               placeholder="07123 456789"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              className="input-field"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">Email</label>
             <input
               type="email"
               value={friendEmail}
               onChange={(e) => setFriendEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+              className="input-field"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Who referred you?</label>
+            <label className="block text-sm font-medium text-ink mb-1.5">Who referred you?</label>
             {!contactsLoaded ? (
-              <div className="w-full px-4 py-3 border border-gray-200 rounded-lg text-gray-400 bg-gray-50 text-sm">
+              <div className="w-full px-4 py-3 border border-line rounded-lg text-ink-muted bg-surface-muted text-sm">
                 Loading…
               </div>
             ) : contacts.length > 0 ? (
@@ -243,7 +249,7 @@ export default function PublicReferralPage() {
                 <select
                   value={referrerSelection}
                   onChange={(e) => setReferrerSelection(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white"
+                  className="input-field"
                 >
                   <option value="">Pick from list…</option>
                   {contacts.map((c) => (
@@ -257,7 +263,7 @@ export default function PublicReferralPage() {
                     value={referredByName}
                     onChange={(e) => setReferredByName(e.target.value)}
                     placeholder="Type the parent's name"
-                    className="mt-2 w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                    className="input-field mt-2"
                   />
                 )}
               </>
@@ -267,7 +273,7 @@ export default function PublicReferralPage() {
                 value={referredByName}
                 onChange={(e) => setReferredByName(e.target.value)}
                 placeholder="Parent name"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900"
+                className="input-field"
               />
             )}
           </div>
@@ -275,7 +281,7 @@ export default function PublicReferralPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+            className="btn-primary w-full"
           >
             {submitting ? 'Submitting...' : 'Claim my spot'}
           </button>

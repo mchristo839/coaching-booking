@@ -65,22 +65,22 @@ export default function PollDetailPage() {
     load()
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-600">Loading...</p></div>
-  if (!poll) return <div className="min-h-screen px-4 py-6 max-w-3xl mx-auto"><p className="text-red-600">{error || 'Not found'}</p></div>
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-canvas"><p className="text-ink-muted">Loading...</p></div>
+  if (!poll) return <div className="min-h-screen bg-canvas px-4 py-8 max-w-3xl mx-auto"><p className="text-red-600">{error || 'Not found'}</p></div>
 
   const options: string[] = Array.isArray(poll.options) ? poll.options : JSON.parse(poll.options || '[]')
   const totalVotes = tally.reduce((sum, t) => sum + parseInt(t.count), 0)
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8 max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/dashboard/control-centre" className="text-gray-500 hover:text-gray-700 text-sm">← Control Centre</Link>
-        <h1 className="text-2xl font-bold text-gray-900">Poll results</h1>
+    <div className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-3xl mx-auto">
+      <div className="reveal reveal-1 flex items-center gap-3 mb-6">
+        <Link href="/dashboard/control-centre" className="text-ink-muted hover:text-brand-700 text-sm transition-colors">← Control Centre</Link>
+        <h1 className="font-display text-2xl font-bold text-ink">Poll results</h1>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
-        <h2 className="font-semibold text-gray-900 mb-1">{poll.question}</h2>
-        <p className="text-xs text-gray-500 mb-4">
+      <div className="card shadow-card mb-6">
+        <h2 className="font-display font-semibold text-ink mb-1">{poll.question}</h2>
+        <p className="text-xs text-ink-muted mb-4">
           Status: {poll.status} · Total votes: {totalVotes} · Target groups: {targets.length}
           {poll.closes_at && ` · Closes: ${new Date(poll.closes_at).toLocaleString('en-GB')}`}
         </p>
@@ -92,12 +92,12 @@ export default function PollDetailPage() {
             const pct = totalVotes === 0 ? 0 : Math.round((count / totalVotes) * 100)
             return (
               <div key={opt} className="flex items-center gap-3">
-                <span className="text-sm text-gray-500 w-8">{String.fromCharCode(97 + i)})</span>
-                <span className="text-sm text-gray-900 flex-1">{opt}</span>
-                <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-                  <div className="bg-purple-500 h-full transition-all" style={{ width: `${pct}%` }} />
+                <span className="text-sm text-ink-muted w-8">{String.fromCharCode(97 + i)})</span>
+                <span className="text-sm text-ink flex-1">{opt}</span>
+                <div className="flex-1 bg-surface-muted rounded-full h-2 overflow-hidden">
+                  <div className="bg-brand-600 h-full transition-all" style={{ width: `${pct}%` }} />
                 </div>
-                <span className="text-sm text-gray-700 w-16 text-right">{count} ({pct}%)</span>
+                <span className="text-sm text-ink w-16 text-right">{count} ({pct}%)</span>
               </div>
             )
           })}
@@ -106,7 +106,7 @@ export default function PollDetailPage() {
         {poll.status === 'active' && (
           <button
             onClick={handleClose}
-            className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200"
+            className="btn-secondary"
           >
             Close poll
           </button>
@@ -114,13 +114,13 @@ export default function PollDetailPage() {
       </div>
 
       {!poll.anonymous && responses.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-5">
-          <h3 className="font-semibold text-gray-900 mb-3">Who voted</h3>
+        <div className="card shadow-card">
+          <h3 className="font-display font-semibold text-ink mb-3">Who voted</h3>
           <ul className="space-y-1 text-sm">
             {responses.map((r, i) => (
               <li key={i} className="flex justify-between">
-                <span className="text-gray-900">{r.sender_name || 'Anonymous'}</span>
-                <span className="text-gray-500">{r.chosen_option}</span>
+                <span className="text-ink">{r.sender_name || 'Anonymous'}</span>
+                <span className="text-ink-muted">{r.chosen_option}</span>
               </li>
             ))}
           </ul>

@@ -137,10 +137,10 @@ export default function JoinPage() {
   // ─── Loading ───
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-[#3D8B37] border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm">Loading programme...</p>
+          <div className="w-8 h-8 border-[3px] border-brand-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-ink-muted text-sm">Loading programme...</p>
         </div>
       </div>
     )
@@ -149,15 +149,15 @@ export default function JoinPage() {
   // ─── Error ───
   if (error || !prog) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md w-full text-center">
+      <div className="min-h-screen flex items-center justify-center bg-canvas px-4">
+        <div className="reveal reveal-1 bg-surface rounded-xl shadow-card border border-line p-8 max-w-md w-full text-center">
           <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
             <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <h1 className="text-xl font-bold text-gray-900 mb-2">Programme Not Found</h1>
-          <p className="text-gray-500 text-sm">{error || 'This programme could not be found.'}</p>
+          <h1 className="font-display text-xl font-bold text-ink mb-2">Programme Not Found</h1>
+          <p className="text-ink-muted text-sm">{error || 'This programme could not be found.'}</p>
         </div>
       </div>
     )
@@ -172,28 +172,28 @@ export default function JoinPage() {
   // ─── Success State ───
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md w-full text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#3D8B37]/10 flex items-center justify-center">
+      <div className="min-h-screen bg-canvas flex items-center justify-center px-4">
+        <div className="reveal reveal-1 bg-surface rounded-xl shadow-card border border-line p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-brand-50 flex items-center justify-center">
             {success.status === 'waitlisted' ? (
               <svg className="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             ) : (
-              <svg className="w-8 h-8 text-[#3D8B37]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-8 h-8 text-brand-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             )}
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-3">
+          <h1 className="font-display text-2xl font-bold text-ink mb-3">
             {success.status === 'waitlisted' ? 'Added to Waitlist' : "You're In!"}
           </h1>
-          <p className="text-gray-600 leading-relaxed whitespace-pre-line">{success.message}</p>
+          <p className="text-ink-muted leading-relaxed whitespace-pre-line">{success.message}</p>
 
           {prog.what_to_bring && success.status !== 'waitlisted' && (
-            <div className="mt-6 bg-[#3D8B37]/5 rounded-xl p-4 text-left">
-              <p className="text-sm font-semibold text-[#3D8B37] mb-1">What to bring</p>
-              <p className="text-sm text-gray-600">{prog.what_to_bring}</p>
+            <div className="mt-6 bg-brand-50 rounded-xl p-4 text-left">
+              <p className="text-sm font-semibold text-brand-700 mb-1">What to bring</p>
+              <p className="text-sm text-ink-muted">{prog.what_to_bring}</p>
             </div>
           )}
         </div>
@@ -203,10 +203,10 @@ export default function JoinPage() {
 
   // ─── Main Form ───
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-canvas">
       {/* Hero */}
-      <div className="bg-[#3D8B37] text-white">
-        <div className="max-w-2xl mx-auto px-4 py-8 md:py-12">
+      <div className="bg-brand-600 text-white">
+        <div className="reveal reveal-1 max-w-2xl mx-auto px-4 py-8 md:py-12">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -215,9 +215,9 @@ export default function JoinPage() {
             </div>
             <span className="text-sm font-medium text-white/80">{displayName}</span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold mb-2">{prog.programme_name}</h1>
+          <h1 className="font-display text-2xl md:text-3xl font-bold mb-2 tracking-[-0.01em]">{prog.programme_name}</h1>
           {prog.short_description && (
-            <p className="text-white/80 text-sm md:text-base">{prog.short_description}</p>
+            <p className="text-white/80 text-sm md:text-base leading-relaxed">{prog.short_description}</p>
           )}
 
           {/* Quick info pills */}
@@ -291,8 +291,8 @@ export default function JoinPage() {
               >
                 {days && <p>{days}</p>}
                 {prog.session_start_time && <p>{prog.session_start_time}{prog.session_duration ? ` (${prog.session_duration})` : ''}</p>}
-                {prog.session_frequency && <p className="text-gray-400">{prog.session_frequency}</p>}
-                {prog.holiday_schedule && <p className="text-gray-400">Holidays: {prog.holiday_schedule}</p>}
+                {prog.session_frequency && <p className="text-ink-muted">{prog.session_frequency}</p>}
+                {prog.holiday_schedule && <p className="text-ink-muted">Holidays: {prog.holiday_schedule}</p>}
               </InfoCard>
             )}
 
@@ -304,9 +304,9 @@ export default function JoinPage() {
               >
                 {prog.venue_name && <p className="font-medium">{prog.venue_name}</p>}
                 {prog.venue_address && <p>{prog.venue_address}</p>}
-                {prog.indoor_outdoor && <p className="text-gray-400">{prog.indoor_outdoor}</p>}
-                {prog.parking && <p className="text-gray-400">Parking: {prog.parking}</p>}
-                {prog.nearest_transport && <p className="text-gray-400">Transport: {prog.nearest_transport}</p>}
+                {prog.indoor_outdoor && <p className="text-ink-muted">{prog.indoor_outdoor}</p>}
+                {prog.parking && <p className="text-ink-muted">Parking: {prog.parking}</p>}
+                {prog.nearest_transport && <p className="text-ink-muted">Transport: {prog.nearest_transport}</p>}
               </InfoCard>
             )}
 
@@ -317,13 +317,13 @@ export default function JoinPage() {
                 title="Pricing"
               >
                 {prog.paid_or_free === 'free' ? (
-                  <p className="font-medium text-[#3D8B37]">Free</p>
+                  <p className="font-medium text-brand-700">Free</p>
                 ) : (
                   <>
-                    {prog.price_gbp && <p className="font-medium text-lg">{`£${prog.price_gbp}`}{prog.payment_model ? <span className="text-sm font-normal text-gray-500"> / {prog.payment_model}</span> : ''}</p>}
-                    {prog.price_includes && <p className="text-gray-400">Includes: {prog.price_includes}</p>}
-                    {prog.sibling_discount && <p className="text-gray-400">Sibling discount: {prog.sibling_discount}</p>}
-                    {methods && <p className="text-gray-400">Pay by: {methods}</p>}
+                    {prog.price_gbp && <p className="font-medium text-lg text-ink">{`£${prog.price_gbp}`}{prog.payment_model ? <span className="text-sm font-normal text-ink-muted"> / {prog.payment_model}</span> : ''}</p>}
+                    {prog.price_includes && <p className="text-ink-muted">Includes: {prog.price_includes}</p>}
+                    {prog.sibling_discount && <p className="text-ink-muted">Sibling discount: {prog.sibling_discount}</p>}
+                    {methods && <p className="text-ink-muted">Pay by: {methods}</p>}
                   </>
                 )}
               </InfoCard>
@@ -336,8 +336,8 @@ export default function JoinPage() {
                 title="What to Bring"
               >
                 {prog.what_to_bring && <p>{prog.what_to_bring}</p>}
-                {prog.kit_required === 'yes' && prog.kit_details && <p className="text-gray-400">Kit: {prog.kit_details}</p>}
-                {prog.equipment_provided && <p className="text-gray-400">Equipment provided: {prog.equipment_provided}</p>}
+                {prog.kit_required === 'yes' && prog.kit_details && <p className="text-ink-muted">Kit: {prog.kit_details}</p>}
+                {prog.equipment_provided && <p className="text-ink-muted">Equipment provided: {prog.equipment_provided}</p>}
               </InfoCard>
             )}
 
@@ -348,15 +348,15 @@ export default function JoinPage() {
             >
               <p className="font-medium">{coachName}</p>
               {prog.sport && <p>{prog.sport}{prog.coaching_level ? ` — ${prog.coaching_level}` : ''}</p>}
-              {prog.dbs_status && <p className="text-gray-400">DBS: {prog.dbs_status}</p>}
-              {prog.first_aid && <p className="text-gray-400">First Aid: {prog.first_aid}</p>}
+              {prog.dbs_status && <p className="text-ink-muted">DBS: {prog.dbs_status}</p>}
+              {prog.first_aid && <p className="text-ink-muted">First Aid: {prog.first_aid}</p>}
             </InfoCard>
 
             {/* Trial info */}
             {prog.trial_available && prog.trial_available !== 'no' && (
-              <div className="bg-[#3D8B37]/5 border border-[#3D8B37]/20 rounded-xl p-4">
-                <p className="text-sm font-semibold text-[#3D8B37] mb-1">Trial Available</p>
-                <p className="text-sm text-gray-600">{prog.trial_instructions || 'Try a session before committing.'}</p>
+              <div className="bg-brand-50 border border-brand-100 rounded-xl p-4">
+                <p className="text-sm font-semibold text-brand-700 mb-1">Trial Available</p>
+                <p className="text-sm text-ink-muted">{prog.trial_instructions || 'Try a session before committing.'}</p>
               </div>
             )}
           </div>
@@ -364,67 +364,67 @@ export default function JoinPage() {
           {/* Right: Signup Form */}
           <div className="md:col-span-3">
             {prog.isFull && !prog.waitlist_enabled ? (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center">
+              <div className="bg-surface rounded-xl shadow-card border border-line p-6 text-center">
                 <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-red-100 flex items-center justify-center">
                   <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </div>
-                <h2 className="text-lg font-bold text-gray-900 mb-1">Programme Full</h2>
-                <p className="text-gray-500 text-sm">
+                <h2 className="font-display text-lg font-bold text-ink mb-1">Programme Full</h2>
+                <p className="text-ink-muted text-sm">
                   {prog.programme_name} is currently at capacity. Please contact {coachName} directly for more information.
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-1">
+              <form onSubmit={handleSubmit} className="bg-surface rounded-xl shadow-card border border-line p-6">
+                <h2 className="font-display text-lg font-bold text-ink mb-1">
                   {prog.isFull ? 'Join the Waitlist' : 'Sign Up'}
                 </h2>
-                <p className="text-gray-500 text-sm mb-5">
+                <p className="text-ink-muted text-sm mb-5">
                   {prog.isFull
                     ? `${prog.programme_name} is currently full, but you can join the waitlist and we'll let you know when a space opens up.`
                     : `Fill in your details to join ${prog.programme_name}.`}
                 </p>
 
                 {submitError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">
+                  <div className="bg-red-50 border border-red-100 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">
                     {submitError}
                   </div>
                 )}
 
                 {/* Parent/Guardian Details */}
                 <fieldset className="mb-5">
-                  <legend className="text-sm font-semibold text-gray-700 mb-3">Your Details</legend>
+                  <legend className="text-sm font-semibold text-ink mb-3">Your Details</legend>
                   <div className="flex flex-col gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Full Name *</label>
+                      <label className="block text-xs font-medium text-ink-muted mb-1">Full Name *</label>
                       <input
                         type="text"
                         required
                         value={parentName}
                         onChange={(e) => setParentName(e.target.value)}
                         placeholder="Your full name"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37]"
+                        className="input-field py-2.5 text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Email</label>
+                      <label className="block text-xs font-medium text-ink-muted mb-1">Email</label>
                       <input
                         type="email"
                         value={parentEmail}
                         onChange={(e) => setParentEmail(e.target.value)}
                         placeholder="your@email.com"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37]"
+                        className="input-field py-2.5 text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Phone Number</label>
+                      <label className="block text-xs font-medium text-ink-muted mb-1">Phone Number</label>
                       <input
                         type="tel"
                         value={parentPhone}
                         onChange={(e) => setParentPhone(e.target.value)}
                         placeholder="07xxx xxxxxx"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37]"
+                        className="input-field py-2.5 text-sm"
                       />
                     </div>
                   </div>
@@ -433,25 +433,25 @@ export default function JoinPage() {
                 {/* Child Details (for under 18s) */}
                 {isUnder18 && (
                   <fieldset className="mb-5">
-                    <legend className="text-sm font-semibold text-gray-700 mb-3">Child Details</legend>
+                    <legend className="text-sm font-semibold text-ink mb-3">Child Details</legend>
                     <div className="flex flex-col gap-3">
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Child&apos;s Name</label>
+                        <label className="block text-xs font-medium text-ink-muted mb-1">Child&apos;s Name</label>
                         <input
                           type="text"
                           value={childName}
                           onChange={(e) => setChildName(e.target.value)}
                           placeholder="Child's full name"
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37]"
+                          className="input-field py-2.5 text-sm"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Date of Birth</label>
+                        <label className="block text-xs font-medium text-ink-muted mb-1">Date of Birth</label>
                         <input
                           type="date"
                           value={childDob}
                           onChange={(e) => setChildDob(e.target.value)}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37]"
+                          className="input-field py-2.5 text-sm"
                         />
                       </div>
                     </div>
@@ -460,9 +460,9 @@ export default function JoinPage() {
 
                 {/* Medical / Additional Info */}
                 <fieldset className="mb-5">
-                  <legend className="text-sm font-semibold text-gray-700 mb-3">Additional Information</legend>
+                  <legend className="text-sm font-semibold text-ink mb-3">Additional Information</legend>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                    <label className="block text-xs font-medium text-ink-muted mb-1">
                       Medical conditions or allergies we should know about
                     </label>
                     <textarea
@@ -470,9 +470,9 @@ export default function JoinPage() {
                       onChange={(e) => setMedicalNotes(e.target.value)}
                       rows={3}
                       placeholder="e.g. Asthma (carries inhaler), nut allergy..."
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37] resize-y"
+                      className="input-field py-2.5 text-sm resize-y"
                     />
-                    <p className="text-xs text-gray-400 mt-1">This information is shared confidentially with {coachName} only.</p>
+                    <p className="text-xs text-ink-muted mt-1">This information is shared confidentially with {coachName} only.</p>
                   </div>
                 </fieldset>
 
@@ -482,9 +482,9 @@ export default function JoinPage() {
                     type="checkbox"
                     checked={agreed}
                     onChange={(e) => setAgreed(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#3D8B37] focus:ring-[#3D8B37]"
+                    className="mt-0.5 w-4 h-4 rounded border-line text-brand-600 focus:ring-brand-600"
                   />
-                  <span className="text-xs text-gray-500 leading-relaxed">
+                  <span className="text-xs text-ink-muted leading-relaxed">
                     I confirm the above details are correct and consent to {displayName} storing this information for the purposes of managing
                     {isUnder18 ? " my child's" : ' my'} participation in {prog.programme_name}.
                   </span>
@@ -493,7 +493,7 @@ export default function JoinPage() {
                 <button
                   type="submit"
                   disabled={submitting || !agreed || !parentName.trim()}
-                  className="w-full bg-[#3D8B37] text-white py-3 rounded-xl font-semibold hover:bg-[#346E30] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="btn-primary w-full text-sm"
                 >
                   {submitting
                     ? 'Submitting...'
@@ -510,8 +510,8 @@ export default function JoinPage() {
 
         {/* Footer */}
         <div className="text-center mt-8 pb-6">
-          <p className="text-xs text-gray-400">
-            Powered by <span className="font-medium text-gray-500">MyCoachingAssistant</span>
+          <p className="text-xs text-ink-muted">
+            Powered by <span className="font-medium text-ink">MyCoachingAssistant</span>
           </p>
         </div>
       </div>
@@ -533,12 +533,12 @@ function InfoCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+    <div className="bg-surface rounded-xl shadow-card border border-line p-4 transition-shadow duration-200 hover:shadow-card-hover">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-[#3D8B37]">{icon}</span>
-        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+        <span className="text-brand-700">{icon}</span>
+        <h3 className="text-sm font-semibold text-ink">{title}</h3>
       </div>
-      <div className="text-sm text-gray-600 flex flex-col gap-0.5">{children}</div>
+      <div className="text-sm text-ink-muted flex flex-col gap-0.5">{children}</div>
     </div>
   )
 }

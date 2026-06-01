@@ -40,8 +40,8 @@ export default function ControlCentrePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
+        <p className="text-ink-muted">Loading...</p>
       </div>
     )
   }
@@ -49,13 +49,13 @@ export default function ControlCentrePage() {
   // Hide the Control Centre entirely if user has no authority over any programme
   if (programmes.length === 0) {
     return (
-      <div className="min-h-screen px-4 py-6 md:px-8 max-w-3xl mx-auto">
+      <div className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-3xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
-          <Link href="/dashboard" className="text-gray-500 hover:text-gray-700 text-sm">
+          <Link href="/dashboard" className="text-ink-muted hover:text-brand-700 text-sm transition-colors">
             ← Dashboard
           </Link>
         </div>
-        <div className="bg-yellow-50 text-yellow-800 px-4 py-3 rounded-lg">
+        <div className="bg-amber-50 text-amber-800 px-4 py-3 rounded-lg border border-amber-100">
           You don&apos;t currently have authority over any programmes. Ask your
           coach owner or club GM to assign you before using the Control Centre.
         </div>
@@ -68,53 +68,42 @@ export default function ControlCentrePage() {
       title: 'Create Promotion',
       description: 'Social event, refer-a-friend, holiday camp',
       href: '/dashboard/promotions/new',
-      colour: 'blue',
       enabled: true,
     },
     {
       title: 'Launch Poll',
       description: 'Quick attendance check, availability, kit order',
       href: '/dashboard/polls/new',
-      colour: 'purple',
       enabled: true,
     },
     {
       title: 'Publish Fixture',
       description: 'Match, friendly, cup, tournament',
       href: '/dashboard/fixtures/new',
-      colour: 'green',
       enabled: true,
     },
     {
       title: 'Cancel Session',
       description: 'Cancel a single training or fixture instance',
       href: '/dashboard/schedule',
-      colour: 'red',
       enabled: true,
     },
   ]
 
-  const colourClasses: Record<string, string> = {
-    blue: 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-900',
-    purple: 'bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-900',
-    green: 'bg-green-50 hover:bg-green-100 border-green-200 text-green-900',
-    red: 'bg-red-50 hover:bg-red-100 border-red-200 text-red-900',
-  }
-
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8 max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/dashboard" className="text-gray-500 hover:text-gray-700 text-sm">
+    <div className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-3xl mx-auto">
+      <div className="reveal reveal-1 flex items-center gap-3 mb-6">
+        <Link href="/dashboard" className="text-ink-muted hover:text-brand-700 text-sm transition-colors">
           ← Dashboard
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Control Centre</h1>
+        <h1 className="font-display text-2xl font-bold text-ink">Control Centre</h1>
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
+        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">{error}</div>
       )}
 
-      <p className="text-gray-600 mb-6">
+      <p className="text-ink-muted mb-6">
         Trigger outbound actions that the assistant will send to your group
         {programmes.length > 1 ? 's' : ''} on your behalf.
       </p>
@@ -124,16 +113,16 @@ export default function ControlCentrePage() {
           <Link
             key={action.title}
             href={action.href}
-            className={`block border rounded-xl p-5 transition-colors ${colourClasses[action.colour]}`}
+            className="group block rounded-xl border border-line bg-surface p-5 shadow-card transition-all duration-200 hover:-translate-y-1 hover:border-brand-300 hover:shadow-card-hover"
           >
-            <h3 className="font-semibold text-lg">{action.title}</h3>
-            <p className="text-sm mt-1 opacity-80">{action.description}</p>
+            <h3 className="font-display font-semibold text-lg text-ink group-hover:text-brand-700 transition-colors">{action.title}</h3>
+            <p className="text-sm mt-1 text-ink-muted">{action.description}</p>
           </Link>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-5">
-        <h2 className="font-semibold text-gray-900 mb-3">
+      <div className="card shadow-card">
+        <h2 className="font-display font-semibold text-ink mb-3">
           Your authorised programmes ({programmes.length})
         </h2>
         <ul className="space-y-2">
@@ -142,8 +131,8 @@ export default function ControlCentrePage() {
               key={p.programme_id}
               className="flex justify-between items-center text-sm"
             >
-              <span className="text-gray-900">{p.programme_name}</span>
-              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+              <span className="text-ink">{p.programme_name}</span>
+              <span className="text-xs bg-surface-muted text-ink-muted px-2 py-1 rounded">
                 {p.role.replace('_', ' ')}
               </span>
             </li>

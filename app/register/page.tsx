@@ -8,8 +8,6 @@ import Link from 'next/link'
 // Constants
 // ---------------------------------------------------------------------------
 
-const BRAND_GREEN = '#3D8B37'
-
 const SPORTS = [
   'Football', 'Rugby Union', 'Rugby League', 'Cricket', 'Tennis', 'Netball',
   'Hockey', 'Basketball', 'Yoga', 'Fitness/Gym', 'Boxing', 'Martial Arts',
@@ -118,9 +116,9 @@ function ProgressBar({ stage }: { stage: number }) {
               <div
                 className={cls(
                   'w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-colors',
-                  done && 'bg-[#3D8B37] text-white',
-                  active && 'bg-[#3D8B37] text-white ring-4 ring-green-200',
-                  !done && !active && 'bg-gray-200 text-gray-500',
+                  done && 'bg-brand-600 text-white',
+                  active && 'bg-brand-600 text-white ring-4 ring-brand-100',
+                  !done && !active && 'bg-surface-muted text-ink-muted',
                 )}
               >
                 {done ? (
@@ -129,16 +127,16 @@ function ProgressBar({ stage }: { stage: number }) {
                   step
                 )}
               </div>
-              <span className="text-[11px] mt-1 text-gray-500 hidden sm:block">{label}</span>
+              <span className="text-[11px] mt-1 text-ink-muted hidden sm:block">{label}</span>
             </div>
           )
         })}
       </div>
       {/* bar */}
-      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+      <div className="h-2 bg-surface-muted rounded-full overflow-hidden">
         <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${((stage - 1) / (STAGE_LABELS.length - 1)) * 100}%`, backgroundColor: BRAND_GREEN }}
+          className="h-full rounded-full bg-brand-600 transition-all duration-500"
+          style={{ width: `${((stage - 1) / (STAGE_LABELS.length - 1)) * 100}%` }}
         />
       </div>
     </div>
@@ -147,7 +145,7 @@ function ProgressBar({ stage }: { stage: number }) {
 
 function Label({ children, htmlFor, required }: { children: React.ReactNode; htmlFor?: string; required?: boolean }) {
   return (
-    <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">
+    <label htmlFor={htmlFor} className="block text-sm font-medium text-ink mb-1">
       {children}
       {required && <span className="text-red-500 ml-0.5">*</span>}
     </label>
@@ -159,8 +157,7 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className={cls(
-        'w-full px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm',
-        'focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37] outline-none transition',
+        'input-field py-2.5 text-sm',
         props.className,
       )}
     />
@@ -172,8 +169,7 @@ function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectEle
     <select
       {...props}
       className={cls(
-        'w-full px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm bg-white',
-        'focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37] outline-none transition',
+        'input-field py-2.5 text-sm',
         props.className,
       )}
     >
@@ -187,8 +183,7 @@ function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
     <textarea
       {...props}
       className={cls(
-        'w-full px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm',
-        'focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37] outline-none transition',
+        'input-field py-2.5 text-sm',
         props.className,
       )}
     />
@@ -200,11 +195,9 @@ function PrimaryButton({ children, ...props }: React.ButtonHTMLAttributes<HTMLBu
     <button
       {...props}
       className={cls(
-        'px-6 py-3 rounded-lg font-medium text-white text-sm transition-colors',
-        'disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]',
+        'btn-primary text-sm',
         props.className,
       )}
-      style={{ backgroundColor: BRAND_GREEN, ...(!props.disabled ? {} : {}) }}
     >
       {children}
     </button>
@@ -216,8 +209,7 @@ function SecondaryButton({ children, ...props }: React.ButtonHTMLAttributes<HTML
     <button
       {...props}
       className={cls(
-        'px-6 py-3 rounded-lg font-medium text-gray-700 text-sm border border-gray-300 bg-white',
-        'hover:bg-gray-50 transition-colors min-h-[44px]',
+        'btn-secondary text-sm',
         props.className,
       )}
     >
@@ -229,14 +221,14 @@ function SecondaryButton({ children, ...props }: React.ButtonHTMLAttributes<HTML
 function ErrorBanner({ message }: { message: string }) {
   if (!message) return null
   return (
-    <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+    <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">
       {message}
     </div>
   )
 }
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-base font-semibold text-gray-800 mt-6 mb-3 border-b pb-2">{children}</h3>
+  return <h3 className="font-display text-base font-semibold text-ink mt-6 mb-3 border-b border-line pb-2">{children}</h3>
 }
 
 function MultiSelect({ options, value, onChange }: { options: string[]; value: string[]; onChange: (v: string[]) => void }) {
@@ -254,8 +246,8 @@ function MultiSelect({ options, value, onChange }: { options: string[]; value: s
             className={cls(
               'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
               selected
-                ? 'border-[#3D8B37] bg-[#3D8B37]/10 text-[#3D8B37]'
-                : 'border-gray-300 text-gray-600 hover:border-gray-400',
+                ? 'border-brand-600 bg-brand-50 text-brand-700'
+                : 'border-line text-ink-muted hover:border-brand-300 hover:text-ink',
             )}
           >
             {opt}
@@ -287,11 +279,11 @@ function FAQEditor({ faqs, onChange }: { faqs: FAQ[]; onChange: (f: FAQ[]) => vo
   return (
     <div className="space-y-4">
       {faqs.map((faq, i) => (
-        <div key={i} className="border border-gray-200 rounded-lg p-4 relative">
+        <div key={i} className="border border-line rounded-lg p-4 relative bg-surface-muted/40">
           <button
             type="button"
             onClick={() => remove(i)}
-            className="absolute top-2 right-2 text-gray-400 hover:text-red-500 text-lg leading-none"
+            className="absolute top-2 right-2 text-ink-muted hover:text-red-500 text-lg leading-none"
             aria-label="Remove"
           >
             &times;
@@ -309,7 +301,7 @@ function FAQEditor({ faqs, onChange }: { faqs: FAQ[]; onChange: (f: FAQ[]) => vo
       <button
         type="button"
         onClick={add}
-        className="text-sm font-medium text-[#3D8B37] hover:underline"
+        className="text-sm font-semibold text-brand-700 hover:underline"
       >
         + Add another Q&amp;A
       </button>
@@ -643,8 +635,8 @@ export default function RegisterPage() {
     ]
     return (
       <>
-        <h2 className="text-xl font-bold text-gray-900 mb-1">What type of coaching do you run?</h2>
-        <p className="text-sm text-gray-500 mb-6">Select the option that best describes you.</p>
+        <h2 className="font-display text-xl font-bold text-ink mb-1">What type of coaching do you run?</h2>
+        <p className="text-sm text-ink-muted mb-6">Select the option that best describes you.</p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {cards.map((c) => (
             <button
@@ -660,16 +652,16 @@ export default function RegisterPage() {
               className={cls(
                 'relative rounded-xl border-2 p-6 text-left transition-all',
                 c.enabled
-                  ? 'border-gray-200 hover:border-[#3D8B37] hover:shadow-md cursor-pointer'
-                  : 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed',
+                  ? 'border-line hover:border-brand-600 hover:shadow-card-hover hover:-translate-y-0.5 cursor-pointer'
+                  : 'border-line bg-surface-muted opacity-60 cursor-not-allowed',
               )}
             >
-              <span className="text-sm font-semibold text-gray-900">{c.label}</span>
+              <span className="text-sm font-semibold text-ink">{c.label}</span>
               {c.description && c.enabled && (
-                <span className="block text-xs text-gray-500 mt-1">{c.description}</span>
+                <span className="block text-xs text-ink-muted mt-1">{c.description}</span>
               )}
               {!c.enabled && (
-                <span className="block text-xs text-gray-400 mt-1">Coming Soon</span>
+                <span className="block text-xs text-ink-muted mt-1">Coming Soon</span>
               )}
             </button>
           ))}
@@ -682,8 +674,8 @@ export default function RegisterPage() {
   function renderStage2() {
     return (
       <form onSubmit={submitDetails} className="space-y-4">
-        <h2 className="text-xl font-bold text-gray-900 mb-1">Your Details</h2>
-        <p className="text-sm text-gray-500 mb-4">Tell us about you so we can set up your account.</p>
+        <h2 className="font-display text-xl font-bold text-ink mb-1">Your Details</h2>
+        <p className="text-sm text-ink-muted mb-4">Tell us about you so we can set up your account.</p>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -709,7 +701,7 @@ export default function RegisterPage() {
         <div>
           <Label htmlFor="tradingName">Trading / Business Name</Label>
           <Input id="tradingName" value={tradingName} onChange={(e) => setTradingName(e.target.value)} />
-          <p className="text-xs text-gray-400 mt-1">If left blank, your full name is used.</p>
+          <p className="text-xs text-ink-muted mt-1">If left blank, your full name is used.</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -752,16 +744,16 @@ export default function RegisterPage() {
   function renderStage3() {
     return (
       <div className="text-center py-8">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#3D8B37]/10 flex items-center justify-center">
-          <svg className="w-8 h-8 text-[#3D8B37]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-brand-50 flex items-center justify-center">
+          <svg className="w-8 h-8 text-brand-700" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
         </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Check your inbox</h2>
-        <p className="text-sm text-gray-500 mb-1">
+        <h2 className="font-display text-xl font-bold text-ink mb-2">Check your inbox</h2>
+        <p className="text-sm text-ink-muted mb-1">
           We sent a verification link to:
         </p>
-        <p className="text-sm font-semibold text-gray-800 mb-6">{email}</p>
+        <p className="text-sm font-semibold text-ink mb-6">{email}</p>
 
         <ErrorBanner message={error} />
 
@@ -782,17 +774,17 @@ export default function RegisterPage() {
     const showDbs = ageGroups.includes('Under 18s') || ageGroups.includes('Both')
     return (
       <form onSubmit={submitCoach} className="space-y-4">
-        <h2 className="text-xl font-bold text-gray-900 mb-1">Coach Details</h2>
-        <p className="text-sm text-gray-500 mb-4">Tell us about the coach or instructor.</p>
+        <h2 className="font-display text-xl font-bold text-ink mb-1">Coach Details</h2>
+        <p className="text-sm text-ink-muted mb-4">Tell us about the coach or instructor.</p>
 
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
             checked={isAlsoCoach}
             onChange={(e) => setIsAlsoCoach(e.target.checked)}
-            className="w-4 h-4 rounded border-gray-300 text-[#3D8B37] focus:ring-[#3D8B37]"
+            className="w-4 h-4 rounded border-line text-brand-600 focus:ring-brand-600"
           />
-          <span className="text-sm text-gray-700">I am also the coach / instructor</span>
+          <span className="text-sm text-ink">I am also the coach / instructor</span>
         </label>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -881,13 +873,13 @@ export default function RegisterPage() {
     if (showAnotherPrompt) {
       return (
         <div className="text-center py-12">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#3D8B37]/10 flex items-center justify-center">
-            <svg className="w-8 h-8 text-[#3D8B37]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-brand-50 flex items-center justify-center">
+            <svg className="w-8 h-8 text-brand-700" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Programme saved!</h2>
-          <p className="text-sm text-gray-500 mb-8">Do you run another programme?</p>
+          <h2 className="font-display text-xl font-bold text-ink mb-2">Programme saved!</h2>
+          <p className="text-sm text-ink-muted mb-8">Do you run another programme?</p>
           <div className="flex justify-center gap-4">
             <PrimaryButton onClick={resetProgrammeFields}>
               Yes, add another
@@ -912,8 +904,8 @@ export default function RegisterPage() {
 
     return (
       <form onSubmit={submitProgramme} className="space-y-4">
-        <h2 className="text-xl font-bold text-gray-900 mb-1">{Noun} Details</h2>
-        <p className="text-sm text-gray-500 mb-2">This information powers your WhatsApp coaching bot.</p>
+        <h2 className="font-display text-xl font-bold text-ink mb-1">{Noun} Details</h2>
+        <p className="text-sm text-ink-muted mb-2">This information powers your WhatsApp coaching bot.</p>
 
         {/* 5A */}
         <SectionHeading>Age Group &amp; {Noun} Info</SectionHeading>
@@ -1148,7 +1140,7 @@ export default function RegisterPage() {
               <div>
                 <Label htmlFor="price" required>Price (GBP)</Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">£</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted text-sm">£</span>
                   <Input id="price" type="number" min={0} step="0.01" required value={price} onChange={(e) => setPrice(e.target.value)} className="pl-7" />
                 </div>
               </div>
@@ -1177,7 +1169,7 @@ export default function RegisterPage() {
 
         {/* 5G */}
         <SectionHeading>Custom Q&amp;A for Your Bot</SectionHeading>
-        <p className="text-xs text-gray-500 -mt-2 mb-3">Add questions and answers your WhatsApp bot should know.</p>
+        <p className="text-xs text-ink-muted -mt-2 mb-3">Add questions and answers your WhatsApp bot should know.</p>
 
         <FAQEditor faqs={faqs} onChange={setFaqs} />
 
@@ -1211,26 +1203,26 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-8 sm:py-12">
+    <div className="min-h-screen bg-canvas px-4 py-8 sm:py-12">
       <div className="max-w-2xl mx-auto">
         {/* Logo / title */}
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-            <span style={{ color: BRAND_GREEN }}>My</span>CoachingAssistant
+        <div className="reveal reveal-1 text-center mb-6">
+          <h1 className="font-display text-2xl font-bold text-ink">
+            <span className="text-brand-600">My</span>CoachingAssistant
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Set up your AI coaching bot in minutes</p>
+          <p className="text-sm text-ink-muted mt-1">Set up your AI coaching bot in minutes</p>
         </div>
 
         <ProgressBar stage={stage} />
 
-        <div className="bg-white rounded-xl shadow-sm p-6 md:p-8">
+        <div className="card shadow-card p-6 md:p-8">
           {stageRenderers[stage]?.()}
         </div>
 
         {/* Login link */}
-        <p className="text-center text-sm text-gray-500 mt-6">
+        <p className="text-center text-sm text-ink-muted mt-6">
           Already have an account?{' '}
-          <Link href="/auth/login" className="font-medium hover:underline" style={{ color: BRAND_GREEN }}>
+          <Link href="/auth/login" className="font-semibold text-brand-700 hover:underline">
             Log in
           </Link>
         </p>

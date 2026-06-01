@@ -318,16 +318,16 @@ export default function PromotionDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
+        <p className="text-ink-muted">Loading...</p>
       </div>
     )
   }
 
   if (!promotion) {
     return (
-      <div className="min-h-screen px-4 py-6 md:px-8 max-w-3xl mx-auto">
-        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg">Promotion not found</div>
+      <div className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-3xl mx-auto">
+        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg border border-red-100">Promotion not found</div>
       </div>
     )
   }
@@ -335,31 +335,31 @@ export default function PromotionDetailPage() {
   const isDraft = promotion.status === 'draft'
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8 max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
+    <div className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-3xl mx-auto">
+      <div className="reveal reveal-1 flex items-center gap-3 mb-6">
         <Link
           href="/dashboard/control-centre"
-          className="text-gray-500 hover:text-gray-700 text-sm"
+          className="text-ink-muted hover:text-brand-700 text-sm transition-colors"
         >
           ← Control Centre
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Promotion preview</h1>
+        <h1 className="font-display text-2xl font-bold text-ink">Promotion preview</h1>
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
+        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">{error}</div>
       )}
       {success && (
-        <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">{success}</div>
+        <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm border border-green-100">{success}</div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
+      <div className="card shadow-card mb-6">
         <div className="flex justify-between items-start mb-3">
           <div>
-            <h2 className="font-semibold text-gray-900">
+            <h2 className="font-display font-semibold text-ink">
               {promotion.title || `${promotion.promotion_type.replace(/_/g, ' ')}`}
             </h2>
-            <p className="text-xs text-gray-500 mt-1">Status: {promotion.status}</p>
+            <p className="text-xs text-ink-muted mt-1">Status: {promotion.status}</p>
           </div>
         </div>
 
@@ -369,7 +369,7 @@ export default function PromotionDetailPage() {
               value={editedMessage}
               onChange={(e) => setEditedMessage(e.target.value)}
               rows={Math.max(8, editedMessage.split('\n').length + 1)}
-              className="w-full bg-gray-50 rounded-lg p-4 text-sm text-gray-800 font-mono border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="input-field bg-surface-muted font-mono"
               placeholder="(no message generated yet — click Regenerate)"
             />
             {(() => {
@@ -379,21 +379,21 @@ export default function PromotionDetailPage() {
                   <button
                     onClick={handleRegenerate}
                     disabled={regenerating || sending || saving}
-                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
+                    className="bg-surface-muted text-ink px-4 py-2 rounded-lg text-sm font-medium hover:bg-line disabled:opacity-50 transition-colors"
                   >
                     {regenerating ? 'Regenerating...' : 'Regenerate'}
                   </button>
                   <button
                     onClick={handleSave}
                     disabled={!isDirty || saving || sending}
-                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
+                    className="bg-surface-muted text-ink px-4 py-2 rounded-lg text-sm font-medium hover:bg-line disabled:opacity-50 transition-colors"
                   >
                     {saving ? 'Saving...' : 'Save edits'}
                   </button>
                   <button
                     onClick={handleSend}
                     disabled={sending || saving}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                    className="bg-brand-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors"
                   >
                     {sending ? 'Sending...' : `Send to ${targets.length} group${targets.length === 1 ? '' : 's'}`}
                   </button>
@@ -405,22 +405,22 @@ export default function PromotionDetailPage() {
             })()}
           </>
         ) : (
-          <div className="bg-gray-50 rounded-lg p-4 whitespace-pre-wrap text-sm text-gray-800 font-mono">
+          <div className="bg-surface-muted rounded-lg p-4 whitespace-pre-wrap text-sm text-ink font-mono">
             {promotion.generated_message || '(no message generated)'}
           </div>
         )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-5">
-        <h2 className="font-semibold text-gray-900 mb-3">Target groups</h2>
+      <div className="card shadow-card">
+        <h2 className="font-display font-semibold text-ink mb-3">Target groups</h2>
         <ul className="space-y-2">
           {targets.map((t) => (
             <li key={t.id} className="flex justify-between items-center text-sm">
-              <span className="text-gray-900">{t.programme_name}</span>
+              <span className="text-ink">{t.programme_name}</span>
               <span className={`text-xs px-2 py-1 rounded ${
                 t.send_status === 'sent' ? 'bg-green-100 text-green-700' :
                 t.send_status === 'failed' ? 'bg-red-100 text-red-700' :
-                'bg-gray-100 text-gray-600'
+                'bg-surface-muted text-ink-muted'
               }`}>
                 {t.send_status}{t.error ? ` — ${t.error}` : ''}
               </span>
@@ -430,11 +430,11 @@ export default function PromotionDetailPage() {
       </div>
 
       {promotion.promotion_type === 'refer_a_friend' && (
-        <div className="bg-white rounded-xl shadow-sm p-5 mt-6">
+        <div className="card shadow-card mt-6">
           <div className="flex justify-between items-start mb-2">
             <div>
-              <h2 className="font-semibold text-gray-900">Send to individual members</h2>
-              <p className="text-xs text-gray-500 mt-1">
+              <h2 className="font-display font-semibold text-ink">Send to individual members</h2>
+              <p className="text-xs text-ink-muted mt-1">
                 DM the referral link straight to members in the group. Each message
                 includes a STOP opt-out, and the link is pre-tagged to the member so
                 their referrals are credited automatically.
@@ -443,16 +443,16 @@ export default function PromotionDetailPage() {
             <button
               onClick={handleSendDm}
               disabled={sendingDm || selectedMemberIds.size === 0}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 shrink-0"
+              className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 shrink-0 transition-colors"
             >
               {sendingDm ? 'Sending…' : `Send to ${selectedMemberIds.size}`}
             </button>
           </div>
 
           {membersLoading ? (
-            <p className="text-sm text-gray-500">Loading members…</p>
+            <p className="text-sm text-ink-muted">Loading members…</p>
           ) : members.length === 0 ? (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-ink-muted">
               No contactable members yet. Members appear here once they&apos;ve signed up
               and we have a usable phone number for them.
             </p>
@@ -460,13 +460,13 @@ export default function PromotionDetailPage() {
             <>
               <button
                 onClick={toggleSelectAll}
-                className="text-xs text-blue-600 hover:text-blue-700 mb-2"
+                className="text-xs text-brand-700 hover:underline mb-2"
               >
                 {selectedMemberIds.size === members.filter((m) => !m.opted_out).length
                   ? 'Clear selection'
                   : 'Select all'}
               </button>
-              <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
+              <ul className="divide-y divide-line border border-line rounded-lg">
                 {members.map((m) => (
                   <li key={m.id} className="flex items-center gap-3 px-3 py-2">
                     <input
@@ -474,13 +474,13 @@ export default function PromotionDetailPage() {
                       checked={selectedMemberIds.has(m.id)}
                       disabled={m.opted_out}
                       onChange={() => toggleMember(m.id)}
-                      className="h-4 w-4"
+                      className="h-4 w-4 accent-brand-600"
                     />
-                    <span className={`text-sm ${m.opted_out ? 'text-gray-400' : 'text-gray-900'}`}>
+                    <span className={`text-sm ${m.opted_out ? 'text-ink-muted/60' : 'text-ink'}`}>
                       {m.display_name}
                     </span>
                     {m.opted_out && (
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500">
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-surface-muted text-ink-muted">
                         opted out
                       </span>
                     )}
@@ -493,20 +493,20 @@ export default function PromotionDetailPage() {
       )}
 
       {promotion.promotion_type === 'holiday_camp' && (
-        <div className="bg-white rounded-xl shadow-sm p-5 mt-6">
+        <div className="card shadow-card mt-6">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="font-semibold text-gray-900">Camp bookings</h2>
+            <h2 className="font-display font-semibold text-ink">Camp bookings</h2>
             <button
               onClick={handleSendCohort}
               disabled={sendingCohort}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors"
             >
               {sendingCohort ? 'Sending invites…' : 'Send invites to cohort'}
             </button>
           </div>
 
           {promotion.camp_days && promotion.camp_days.length > 0 && (
-            <div className="text-xs text-gray-500 mb-4">
+            <div className="text-xs text-ink-muted mb-4">
               Days:{' '}
               {promotion.camp_days.map((d, i) => (
                 <span key={i} className="mr-2">
@@ -517,22 +517,22 @@ export default function PromotionDetailPage() {
           )}
 
           {bookingsLoading ? (
-            <p className="text-sm text-gray-500">Loading bookings…</p>
+            <p className="text-sm text-ink-muted">Loading bookings…</p>
           ) : bookings.length === 0 ? (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-ink-muted">
               No bookings yet. Click &quot;Send invites to cohort&quot; to message every parent in the targeted programmes.
             </p>
           ) : (
-            <div className="overflow-x-auto -mx-5">
+            <div className="overflow-x-auto -mx-6">
               <table className="w-full text-sm">
-                <thead className="text-xs text-gray-500 border-b border-gray-200">
+                <thead className="text-xs text-ink-muted border-b border-line">
                   <tr>
-                    <th className="text-left px-5 py-2 font-medium">Child</th>
+                    <th className="text-left px-6 py-2 font-medium">Child</th>
                     <th className="text-left px-2 py-2 font-medium">Parent</th>
                     <th className="text-left px-2 py-2 font-medium">Days</th>
                     <th className="text-right px-2 py-2 font-medium">Total</th>
                     <th className="text-left px-2 py-2 font-medium">Status</th>
-                    <th className="text-right px-5 py-2 font-medium">Action</th>
+                    <th className="text-right px-6 py-2 font-medium">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -544,32 +544,32 @@ export default function PromotionDetailPage() {
                       : '—'
                     const total = b.total_gbp ? `£${Number(b.total_gbp).toFixed(2)}` : '—'
                     return (
-                      <tr key={b.id} className="border-b border-gray-100">
-                        <td className="px-5 py-2 text-gray-900">{b.child_name || '—'}</td>
-                        <td className="px-2 py-2 text-gray-700">
+                      <tr key={b.id} className="border-b border-line">
+                        <td className="px-6 py-2 text-ink">{b.child_name || '—'}</td>
+                        <td className="px-2 py-2 text-ink">
                           <div>{b.parent_name || '—'}</div>
                           {b.parent_phone && (
-                            <div className="text-xs text-gray-400">{b.parent_phone}</div>
+                            <div className="text-xs text-ink-muted">{b.parent_phone}</div>
                           )}
                         </td>
-                        <td className="px-2 py-2 text-gray-700">{daysStr}</td>
-                        <td className="px-2 py-2 text-right text-gray-900 font-medium">{total}</td>
+                        <td className="px-2 py-2 text-ink">{daysStr}</td>
+                        <td className="px-2 py-2 text-right text-ink font-medium">{total}</td>
                         <td className="px-2 py-2">
                           <StateBadge state={b.state} />
                         </td>
-                        <td className="px-5 py-2 text-right">
+                        <td className="px-6 py-2 text-right">
                           {b.state === 'paid_self_reported' ? (
                             <button
                               onClick={() => handleConfirmBooking(b.id)}
                               disabled={confirmingId === b.id}
-                              className="bg-green-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50"
+                              className="bg-green-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
                             >
                               {confirmingId === b.id ? 'Confirming…' : 'Confirm payment'}
                             </button>
                           ) : b.state === 'confirmed' ? (
                             <span className="text-xs text-green-700">✓ Confirmed</span>
                           ) : (
-                            <span className="text-xs text-gray-400">—</span>
+                            <span className="text-xs text-ink-muted">—</span>
                           )}
                         </td>
                       </tr>
@@ -587,12 +587,12 @@ export default function PromotionDetailPage() {
 
 function StateBadge({ state }: { state: CampBooking['state'] }) {
   const map: Record<CampBooking['state'], { label: string; cls: string }> = {
-    awaiting_day_selection: { label: 'Awaiting days', cls: 'bg-gray-100 text-gray-600' },
-    awaiting_payment_confirmation: { label: 'Awaiting payment', cls: 'bg-yellow-100 text-yellow-700' },
-    paid_self_reported: { label: 'Self-reported paid', cls: 'bg-blue-100 text-blue-700' },
+    awaiting_day_selection: { label: 'Awaiting days', cls: 'bg-surface-muted text-ink-muted' },
+    awaiting_payment_confirmation: { label: 'Awaiting payment', cls: 'bg-amber-100 text-amber-700' },
+    paid_self_reported: { label: 'Self-reported paid', cls: 'bg-brand-50 text-brand-700' },
     confirmed: { label: 'Confirmed', cls: 'bg-green-100 text-green-700' },
     cancelled: { label: 'Cancelled', cls: 'bg-red-100 text-red-700' },
-    expired: { label: 'Expired', cls: 'bg-gray-100 text-gray-500' },
+    expired: { label: 'Expired', cls: 'bg-surface-muted text-ink-muted' },
   }
   const { label, cls } = map[state]
   return <span className={`text-xs px-2 py-1 rounded ${cls}`}>{label}</span>

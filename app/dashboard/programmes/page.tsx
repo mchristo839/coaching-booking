@@ -191,7 +191,7 @@ function capacityPercent(current: number, max: number): number {
 function capacityColor(pct: number): string {
   if (pct >= 95) return 'bg-red-500'
   if (pct >= 80) return 'bg-amber-500'
-  return 'bg-[#3D8B37]'
+  return 'bg-brand-600'
 }
 
 function statusBadgeStyle(status: string | null): { label: string; cls: string } {
@@ -200,16 +200,16 @@ function statusBadgeStyle(status: string | null): { label: string; cls: string }
   if (s.includes('full') && s.includes('no')) return { label: 'Full - Closed', cls: 'bg-red-100 text-red-700' }
   if (s === 'full') return { label: 'Full', cls: 'bg-red-100 text-red-700' }
   if (s.includes('almost')) return { label: 'Almost Full', cls: 'bg-amber-100 text-amber-700' }
-  if (s.includes('starting')) return { label: 'Starting Soon', cls: 'bg-blue-100 text-blue-700' }
-  if (s.includes('not currently')) return { label: 'Not Running', cls: 'bg-gray-100 text-gray-600' }
-  return { label: 'Open', cls: 'bg-green-100 text-green-700' }
+  if (s.includes('starting')) return { label: 'Starting Soon', cls: 'bg-brand-50 text-brand-700' }
+  if (s.includes('not currently')) return { label: 'Not Running', cls: 'bg-surface-muted text-ink-muted' }
+  return { label: 'Open', cls: 'bg-brand-50 text-brand-700' }
 }
 
 function faqStatusBadge(status: string): { label: string; cls: string } {
-  if (status === 'active') return { label: 'Active', cls: 'bg-green-100 text-green-700' }
+  if (status === 'active') return { label: 'Active', cls: 'bg-brand-50 text-brand-700' }
   if (status === 'pending_coach_approval') return { label: 'Pending', cls: 'bg-amber-100 text-amber-700' }
-  if (status === 'disabled') return { label: 'Disabled', cls: 'bg-gray-100 text-gray-500' }
-  return { label: status, cls: 'bg-gray-100 text-gray-500' }
+  if (status === 'disabled') return { label: 'Disabled', cls: 'bg-surface-muted text-ink-muted' }
+  return { label: status, cls: 'bg-surface-muted text-ink-muted' }
 }
 
 /* ------------------------------------------------------------------ */
@@ -230,22 +230,22 @@ function Section({
   const [open, setOpen] = useState(defaultOpen ?? false)
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="bg-surface rounded-xl border border-line shadow-card overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-surface-muted transition-colors"
       >
         <div className="flex items-center gap-2">
           {complete && (
-            <svg className="w-5 h-5 text-[#3D8B37] flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-5 h-5 text-brand-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
             </svg>
           )}
-          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+          <h3 className="font-display text-base font-semibold text-ink">{title}</h3>
         </div>
         <svg
-          className={`w-5 h-5 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`w-5 h-5 text-ink-muted transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -253,7 +253,7 @@ function Section({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {open && <div className="px-5 pb-5 space-y-4 border-t border-gray-100 pt-4">{children}</div>}
+      {open && <div className="px-5 pb-5 space-y-4 border-t border-line pt-4">{children}</div>}
     </div>
   )
 }
@@ -731,10 +731,10 @@ function ProgrammesPageInner() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-[#3D8B37] border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm">Loading programmes...</p>
+          <div className="w-8 h-8 border-[3px] border-brand-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-ink-muted text-sm">Loading programmes...</p>
         </div>
       </div>
     )
@@ -746,43 +746,43 @@ function ProgrammesPageInner() {
 
   if (view === 'list') {
     return (
-      <div className="min-h-screen bg-gray-50 px-4 py-6 md:px-8 max-w-4xl mx-auto">
+      <div className="min-h-screen bg-canvas px-4 py-6 md:px-8 max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="reveal flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1">
+            <Link href="/dashboard" className="text-ink-muted hover:text-ink transition-colors text-sm flex items-center gap-1">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
               Dashboard
             </Link>
-            <h1 className="text-2xl font-bold text-gray-900">Programmes</h1>
+            <h1 className="font-display text-2xl font-bold text-ink">Programmes</h1>
           </div>
           <button
             onClick={openCreate}
-            className="bg-[#3D8B37] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#346E30] transition-colors min-h-[44px] shadow-sm"
+            className="btn-primary text-sm"
           >
             + New Programme
           </button>
         </div>
 
-        {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>}
-        {successMsg && <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">{successMsg}</div>}
+        {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">{error}</div>}
+        {successMsg && <div className="bg-brand-50 text-brand-700 px-4 py-3 rounded-lg mb-4 text-sm border border-brand-100">{successMsg}</div>}
 
         {programmes.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-10 text-center">
-            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[#3D8B37]/10 flex items-center justify-center">
-              <svg className="w-7 h-7 text-[#3D8B37]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="card shadow-card p-10 text-center">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-brand-50 flex items-center justify-center">
+              <svg className="w-7 h-7 text-brand-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
             </div>
-            <p className="text-lg font-semibold text-gray-900 mb-2">No programmes yet</p>
-            <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
+            <p className="text-lg font-semibold text-ink mb-2">No programmes yet</p>
+            <p className="text-ink-muted text-sm mb-6 max-w-sm mx-auto">
               Create a programme, link a WhatsApp group, and your AI coaching assistant will be live in minutes.
             </p>
             <button
               onClick={openCreate}
-              className="inline-flex items-center bg-[#3D8B37] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#346E30] transition-colors shadow-sm"
+              className="btn-primary"
             >
               Create your first programme
             </button>
@@ -800,18 +800,18 @@ function ProgrammesPageInner() {
               const desc = (p.shortDescription || p.short_description || '') as string
 
               return (
-                <div key={prog.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col">
+                <div key={prog.id} className="card shadow-card transition-all duration-200 hover:-translate-y-1 hover:shadow-card-hover flex flex-col">
                   {/* Top row */}
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <h3 className="font-semibold text-gray-900">{name}</h3>
+                      <h3 className="font-display font-semibold text-ink">{name}</h3>
                       {desc && (
-                        <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{desc}</p>
+                        <p className="text-sm text-ink-muted mt-0.5 line-clamp-2">{desc}</p>
                       )}
                     </div>
                     <button
                       onClick={() => openEdit(prog)}
-                      className="text-[#3D8B37] text-sm font-medium hover:underline ml-3 whitespace-nowrap"
+                      className="text-brand-700 text-sm font-medium hover:underline ml-3 whitespace-nowrap"
                     >
                       Edit
                     </button>
@@ -820,10 +820,10 @@ function ProgrammesPageInner() {
                   {/* Sport / age badges */}
                   <div className="flex flex-wrap gap-1.5 mb-3">
                     {Boolean(p.skillLevel || p.skill_level) && (
-                      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{String(p.skillLevel || p.skill_level)}</span>
+                      <span className="text-xs bg-brand-50 text-brand-700 px-2 py-0.5 rounded">{String(p.skillLevel || p.skill_level)}</span>
                     )}
                     {Boolean(p.targetAudience || p.target_audience || p.specificAgeGroup || p.specific_age_group) && (
-                      <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
+                      <span className="text-xs bg-surface-muted text-ink-muted px-2 py-0.5 rounded">
                         {String(p.specificAgeGroup || p.specific_age_group || p.targetAudience || p.target_audience)}
                       </span>
                     )}
@@ -832,11 +832,11 @@ function ProgrammesPageInner() {
                   {/* Capacity bar */}
                   {max > 0 && (
                     <div className="mb-3">
-                      <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <div className="flex justify-between text-xs text-ink-muted mb-1">
                         <span>{current} / {max} members</span>
                         <span>{pct}%</span>
                       </div>
-                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-2 bg-surface-muted rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all ${capacityColor(pct)}`}
                           style={{ width: `${pct}%` }}
@@ -851,12 +851,12 @@ function ProgrammesPageInner() {
                       {badge.label}
                     </span>
                     {hasGroup ? (
-                      <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                      <span className="inline-flex items-center gap-1 bg-brand-50 text-brand-700 text-xs font-medium px-2 py-1 rounded">
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand-600 inline-block" />
                         WhatsApp linked
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-1 rounded">
+                      <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-xs font-medium px-2 py-1 rounded">
                         WhatsApp not linked
                       </span>
                     )}
@@ -875,57 +875,57 @@ function ProgrammesPageInner() {
   /* ================================================================ */
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-6 md:px-8 max-w-3xl mx-auto">
+    <div className="min-h-screen bg-canvas px-4 py-6 md:px-8 max-w-3xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="reveal flex items-center gap-3 mb-6">
         <button
           onClick={goBackToList}
-          className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1"
+          className="text-ink-muted hover:text-ink transition-colors text-sm flex items-center gap-1"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           Back
         </button>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="font-display text-2xl font-bold text-ink">
           {view === 'create' ? 'New Programme' : 'Edit Programme'}
         </h1>
       </div>
 
-      {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>}
+      {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">{error}</div>}
 
       <form onSubmit={view === 'create' ? handleCreate : handleUpdate} className="space-y-4">
 
         {/* ===== Section A: Age Group & Programme Info ===== */}
         <Section title="A - Programme Info" defaultOpen={true} complete={sectionAComplete}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Programme Name *</label>
+            <label className="block text-sm font-medium text-ink mb-1">Programme Name *</label>
             <input
               type="text"
               value={form.programmeName}
               onChange={(e) => updateField('programmeName', e.target.value)}
               required
               placeholder="e.g. Saturday Football Academy Under 12s"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Short Description</label>
+            <label className="block text-sm font-medium text-ink mb-1">Short Description</label>
             <textarea
               value={form.shortDescription}
               onChange={(e) => updateField('shortDescription', e.target.value)}
               rows={2}
               placeholder="2-3 sentences about this programme"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Who is this for?</label>
+              <label className="block text-sm font-medium text-ink mb-1">Who is this for?</label>
               <select
                 value={form.targetAudience}
                 onChange={(e) => updateField('targetAudience', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="under_18">Under 18s only</option>
@@ -935,11 +935,11 @@ function ProgrammesPageInner() {
             </div>
             {(form.targetAudience === 'under_18' || form.targetAudience === 'both') && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Specific Age Group</label>
+                <label className="block text-sm font-medium text-ink mb-1">Specific Age Group</label>
                 <select
                   value={form.specificAgeGroup}
                   onChange={(e) => updateField('specificAgeGroup', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                  className="input-field"
                 >
                   <option value="">Select...</option>
                   <option value="Under 5s">Under 5s</option>
@@ -961,8 +961,8 @@ function ProgrammesPageInner() {
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Skill Level</label>
-            <p className="text-xs text-gray-400 mb-2">Tick all that apply — coaches often run beginner and intermediate streams in the same programme.</p>
+            <label className="block text-sm font-medium text-ink mb-1">Skill Level</label>
+            <p className="text-xs text-ink-muted mb-2">Tick all that apply — coaches often run beginner and intermediate streams in the same programme.</p>
             <div className="flex flex-wrap gap-2">
               {[
                 'Complete beginners welcome',
@@ -986,8 +986,8 @@ function ProgrammesPageInner() {
                     }}
                     className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
                       checked
-                        ? 'bg-[#3D8B37] text-white border-[#3D8B37]'
-                        : 'bg-white text-gray-700 border-gray-300 hover:border-[#3D8B37]'
+                        ? 'bg-brand-600 text-white border-brand-600'
+                        : 'bg-surface text-ink border-line hover:border-brand-600'
                     }`}
                   >
                     {level}
@@ -1001,11 +1001,11 @@ function ProgrammesPageInner() {
         {/* ===== Section B: Schedule ===== */}
         <Section title="B - Schedule" complete={sectionBComplete}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Programme Type</label>
+            <label className="block text-sm font-medium text-ink mb-1">Programme Type</label>
             <select
               value={form.programmeType}
               onChange={(e) => updateField('programmeType', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             >
               <option value="">Select...</option>
               <option value="Ongoing">Ongoing</option>
@@ -1016,13 +1016,13 @@ function ProgrammesPageInner() {
             </select>
           </div>
           {form.programmeType === 'Seasonal' && (
-            <div className="ml-2 pl-4 border-l-2 border-[#3D8B37]/30 space-y-3">
+            <div className="ml-2 pl-4 border-l-2 border-brand-200 space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Season</label>
+                <label className="block text-sm font-medium text-ink mb-1">Season</label>
                 <select
                   value={form.seasonType}
                   onChange={(e) => updateField('seasonType', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                  className="input-field"
                 >
                   <option value="">Select...</option>
                   <option value="autumn_winter">Autumn / Winter (Sept–Mar)</option>
@@ -1034,21 +1034,21 @@ function ProgrammesPageInner() {
               {form.seasonType === 'custom' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Season start</label>
+                    <label className="block text-sm font-medium text-ink mb-1">Season start</label>
                     <input
                       type="date"
                       value={form.seasonStartDate}
                       onChange={(e) => updateField('seasonStartDate', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                      className="input-field"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Season end</label>
+                    <label className="block text-sm font-medium text-ink mb-1">Season end</label>
                     <input
                       type="date"
                       value={form.seasonEndDate}
                       onChange={(e) => updateField('seasonEndDate', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                      className="input-field"
                     />
                   </div>
                 </div>
@@ -1056,7 +1056,7 @@ function ProgrammesPageInner() {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Session Day(s)</label>
+            <label className="block text-sm font-medium text-ink mb-2">Session Day(s)</label>
             <div className="flex flex-wrap gap-2">
               {DAYS.map((day) => (
                 <button
@@ -1065,8 +1065,8 @@ function ProgrammesPageInner() {
                   onClick={() => toggleDay(day)}
                   className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
                     form.sessionDays.includes(day)
-                      ? 'bg-[#3D8B37] text-white border-[#3D8B37]'
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-[#3D8B37]'
+                      ? 'bg-brand-600 text-white border-brand-600'
+                      : 'bg-surface text-ink border-line hover:border-brand-600'
                   }`}
                 >
                   {day}
@@ -1079,29 +1079,29 @@ function ProgrammesPageInner() {
               day so coaches with split schedules (e.g. Mon 17:00 / Wed 18:30)
               can capture each one. */}
           {form.sessionDays.length === 0 ? (
-            <p className="text-xs text-gray-400">Pick a session day above to set start time and duration.</p>
+            <p className="text-xs text-ink-muted">Pick a session day above to set start time and duration.</p>
           ) : (
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Session times</label>
+              <label className="block text-sm font-medium text-ink">Session times</label>
               {form.sessionDays.map((day) => {
                 const row = form.sessionSchedule.find((r) => r.day === day)
                   || { day, startTime: '', durationMins: 60 }
                 return (
                   <div key={day} className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-3 sm:col-span-2 text-sm font-medium text-gray-700">{day}</div>
+                    <div className="col-span-3 sm:col-span-2 text-sm font-medium text-ink">{day}</div>
                     <div className="col-span-4 sm:col-span-5">
                       <input
                         type="time"
                         value={row.startTime}
                         onChange={(e) => updateScheduleRow(day, { startTime: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                        className="input-field py-2 text-sm"
                       />
                     </div>
                     <div className="col-span-5 sm:col-span-5">
                       <select
                         value={row.durationMins}
                         onChange={(e) => updateScheduleRow(day, { durationMins: parseInt(e.target.value, 10) })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                        className="input-field py-2 text-sm"
                       >
                         <option value={30}>30 mins</option>
                         <option value={45}>45 mins</option>
@@ -1119,11 +1119,11 @@ function ProgrammesPageInner() {
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">How often does the pattern repeat?</label>
+              <label className="block text-sm font-medium text-ink mb-1">How often does the pattern repeat?</label>
               <select
                 value={form.sessionFrequency}
                 onChange={(e) => updateField('sessionFrequency', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Weekly">Weekly</option>
@@ -1133,11 +1133,11 @@ function ProgrammesPageInner() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Holiday Schedule</label>
+              <label className="block text-sm font-medium text-ink mb-1">Holiday Schedule</label>
               <select
                 value={form.holidaySchedule}
                 onChange={(e) => updateField('holidaySchedule', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Sessions pause">Yes — sessions pause</option>
@@ -1148,22 +1148,22 @@ function ProgrammesPageInner() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Schedule Notes</label>
-            <p className="text-xs text-gray-400 mb-1">Describe anything flexible about your schedule — e.g. &quot;Sundays vary depending on fixtures. Coach confirms each week via WhatsApp.&quot;</p>
+            <label className="block text-sm font-medium text-ink mb-1">Schedule Notes</label>
+            <p className="text-xs text-ink-muted mb-1">Describe anything flexible about your schedule — e.g. &quot;Sundays vary depending on fixtures. Coach confirms each week via WhatsApp.&quot;</p>
             <textarea
               value={form.botNotes || ''}
               onChange={(e) => updateField('botNotes', e.target.value)}
               rows={3}
               placeholder="e.g. Training is every Wednesday 18:20-20:00. Sundays change weekly — sometimes a home match (14:00 KO), sometimes away, sometimes training at a different time. Coach will post the Sunday details in the group each week."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent text-sm"
+              className="input-field text-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Cancellation Notice Required</label>
+            <label className="block text-sm font-medium text-ink mb-1">Cancellation Notice Required</label>
             <select
               value={form.cancellationNotice}
               onChange={(e) => updateField('cancellationNotice', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             >
               <option value="">Select...</option>
               <option value="Same day">Same day</option>
@@ -1179,21 +1179,21 @@ function ProgrammesPageInner() {
         <Section title="C - Venue" complete={sectionCComplete}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Venue Name *</label>
+              <label className="block text-sm font-medium text-ink mb-1">Venue Name *</label>
               <input
                 type="text"
                 value={form.venueName}
                 onChange={(e) => updateField('venueName', e.target.value)}
                 placeholder="e.g. Victoria Park"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Parking</label>
+              <label className="block text-sm font-medium text-ink mb-1">Parking</label>
               <select
                 value={form.parking}
                 onChange={(e) => updateField('parking', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Free on site">Free on site</option>
@@ -1204,32 +1204,32 @@ function ProgrammesPageInner() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Full Address *</label>
+            <label className="block text-sm font-medium text-ink mb-1">Full Address *</label>
             <textarea
               value={form.venueAddress}
               onChange={(e) => updateField('venueAddress', e.target.value)}
               rows={2}
               placeholder="Full venue address including postcode"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nearest Public Transport</label>
+              <label className="block text-sm font-medium text-ink mb-1">Nearest Public Transport</label>
               <input
                 type="text"
                 value={form.nearestTransport}
                 onChange={(e) => updateField('nearestTransport', e.target.value)}
                 placeholder="e.g. Hackney Wick Overground"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Indoor or Outdoor</label>
+              <label className="block text-sm font-medium text-ink mb-1">Indoor or Outdoor</label>
               <select
                 value={form.indoorOutdoor}
                 onChange={(e) => updateField('indoorOutdoor', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Indoor">Indoor</option>
@@ -1240,11 +1240,11 @@ function ProgrammesPageInner() {
           </div>
           {(form.indoorOutdoor === 'Outdoor' || form.indoorOutdoor === 'Both') && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bad Weather Policy</label>
+              <label className="block text-sm font-medium text-ink mb-1">Bad Weather Policy</label>
               <select
                 value={form.badWeatherPolicy}
                 onChange={(e) => updateField('badWeatherPolicy', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Sessions go ahead">Sessions go ahead regardless</option>
@@ -1260,22 +1260,22 @@ function ProgrammesPageInner() {
         <Section title="D - Capacity & Availability" complete={sectionDComplete}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Max Capacity</label>
+              <label className="block text-sm font-medium text-ink mb-1">Max Capacity</label>
               <input
                 type="number"
                 min="1"
                 value={form.maxCapacity}
                 onChange={(e) => updateField('maxCapacity', e.target.value)}
                 placeholder="e.g. 20"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Threshold</label>
+              <label className="block text-sm font-medium text-ink mb-1">Full Threshold</label>
               <select
                 value={form.fullThreshold}
                 onChange={(e) => updateField('fullThreshold', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="at_100">At 100%</option>
                 <option value="at_90">At 90%</option>
@@ -1286,14 +1286,14 @@ function ProgrammesPageInner() {
           </div>
           <div className="flex items-center justify-between py-2">
             <div>
-              <label className="text-sm font-medium text-gray-700">Waitlist Enabled</label>
-              <p className="text-xs text-gray-500">Allow people to join a waitlist when full</p>
+              <label className="text-sm font-medium text-ink">Waitlist Enabled</label>
+              <p className="text-xs text-ink-muted">Allow people to join a waitlist when full</p>
             </div>
             <button
               type="button"
               onClick={() => updateField('waitlistEnabled', !form.waitlistEnabled)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                form.waitlistEnabled ? 'bg-[#3D8B37]' : 'bg-gray-300'
+                form.waitlistEnabled ? 'bg-brand-600' : 'bg-line'
               }`}
             >
               <span
@@ -1305,11 +1305,11 @@ function ProgrammesPageInner() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Referral Trigger</label>
+              <label className="block text-sm font-medium text-ink mb-1">Referral Trigger</label>
               <select
                 value={form.referralTrigger}
                 onChange={(e) => updateField('referralTrigger', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Below 80%">Below 80% full</option>
@@ -1321,24 +1321,24 @@ function ProgrammesPageInner() {
             </div>
             {form.referralTrigger && form.referralTrigger !== 'Manual' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Referral Incentive</label>
+                <label className="block text-sm font-medium text-ink mb-1">Referral Incentive</label>
                 <input
                   type="text"
                   value={form.referralIncentive}
                   onChange={(e) => updateField('referralIncentive', e.target.value)}
                   placeholder="e.g. Free session for both"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                  className="input-field"
                 />
               </div>
             )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Programme Status</label>
+              <label className="block text-sm font-medium text-ink mb-1">Programme Status</label>
               <select
                 value={form.programmeStatus}
                 onChange={(e) => updateField('programmeStatus', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="open">Open</option>
                 <option value="almost_full">Almost full</option>
@@ -1349,11 +1349,11 @@ function ProgrammesPageInner() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Trial Available</label>
+              <label className="block text-sm font-medium text-ink mb-1">Trial Available</label>
               <select
                 value={form.trialAvailable}
                 onChange={(e) => updateField('trialAvailable', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Free trial">Free trial</option>
@@ -1364,13 +1364,13 @@ function ProgrammesPageInner() {
           </div>
           {(form.trialAvailable === 'Free trial' || form.trialAvailable === 'Paid trial') && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Trial Instructions</label>
+              <label className="block text-sm font-medium text-ink mb-1">Trial Instructions</label>
               <input
                 type="text"
                 value={form.trialInstructions}
                 onChange={(e) => updateField('trialInstructions', e.target.value)}
                 placeholder="How to book a trial"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               />
             </div>
           )}
@@ -1379,22 +1379,22 @@ function ProgrammesPageInner() {
         {/* ===== Section E: What to Bring ===== */}
         <Section title="E - What to Bring" complete={sectionEComplete}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">What to Bring</label>
+            <label className="block text-sm font-medium text-ink mb-1">What to Bring</label>
             <textarea
               value={form.whatToBring}
               onChange={(e) => updateField('whatToBring', e.target.value)}
               rows={3}
               placeholder="e.g. Football boots, shin pads, water bottle, appropriate sports kit"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Equipment Provided</label>
+              <label className="block text-sm font-medium text-ink mb-1">Equipment Provided</label>
               <select
                 value={form.equipmentProvided}
                 onChange={(e) => updateField('equipmentProvided', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="All provided">All equipment provided</option>
@@ -1403,11 +1403,11 @@ function ProgrammesPageInner() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Kit / Uniform</label>
+              <label className="block text-sm font-medium text-ink mb-1">Kit / Uniform</label>
               <select
                 value={form.kitRequired}
                 onChange={(e) => updateField('kitRequired', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               >
                 <option value="">Select...</option>
                 <option value="Required">Required</option>
@@ -1418,13 +1418,13 @@ function ProgrammesPageInner() {
           </div>
           {(form.kitRequired === 'Required' || form.kitRequired === 'Recommended') && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Kit Details</label>
+              <label className="block text-sm font-medium text-ink mb-1">Kit Details</label>
               <input
                 type="text"
                 value={form.kitDetails}
                 onChange={(e) => updateField('kitDetails', e.target.value)}
                 placeholder="Where to buy, cost, colours etc."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                className="input-field"
               />
             </div>
           )}
@@ -1433,11 +1433,11 @@ function ProgrammesPageInner() {
         {/* ===== Section F: Cost & Payment ===== */}
         <Section title="F - Cost & Payment" complete={sectionFComplete}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Paid or Free</label>
+            <label className="block text-sm font-medium text-ink mb-1">Paid or Free</label>
             <select
               value={form.paidOrFree}
               onChange={(e) => updateField('paidOrFree', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             >
               <option value="paid">Paid</option>
               <option value="free">Free</option>
@@ -1448,11 +1448,11 @@ function ProgrammesPageInner() {
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Model</label>
+                  <label className="block text-sm font-medium text-ink mb-1">Payment Model</label>
                   <select
                     value={form.paymentModel}
                     onChange={(e) => updateField('paymentModel', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                    className="input-field"
                   >
                     <option value="">Select...</option>
                     <option value="Monthly">Monthly</option>
@@ -1464,9 +1464,9 @@ function ProgrammesPageInner() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price (GBP)</label>
+                  <label className="block text-sm font-medium text-ink mb-1">Price (GBP)</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">&#163;</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted">&#163;</span>
                     <input
                       type="number"
                       step="0.01"
@@ -1474,38 +1474,38 @@ function ProgrammesPageInner() {
                       value={form.priceGbp}
                       onChange={(e) => updateField('priceGbp', e.target.value)}
                       placeholder="0.00"
-                      className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                      className="input-field pl-8"
                     />
                   </div>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">What does the price include?</label>
+                <label className="block text-sm font-medium text-ink mb-1">What does the price include?</label>
                 <input
                   type="text"
                   value={form.priceIncludes}
                   onChange={(e) => updateField('priceIncludes', e.target.value)}
                   placeholder="e.g. Coaching, equipment hire, match fees"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                  className="input-field"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sibling / Family Discount</label>
+                <label className="block text-sm font-medium text-ink mb-1">Sibling / Family Discount</label>
                 <input
                   type="text"
                   value={form.siblingDiscount}
                   onChange={(e) => updateField('siblingDiscount', e.target.value)}
                   placeholder="e.g. 10% off for siblings"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                  className="input-field"
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Refund Policy</label>
+                  <label className="block text-sm font-medium text-ink mb-1">Refund Policy</label>
                   <select
                     value={form.refundPolicy}
                     onChange={(e) => updateField('refundPolicy', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                    className="input-field"
                   >
                     <option value="">Select...</option>
                     <option value="Full refund">Full refund</option>
@@ -1516,19 +1516,19 @@ function ProgrammesPageInner() {
                 </div>
                 {(form.refundPolicy === 'Partial refund' || form.refundPolicy === 'Coach discretion') && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Refund Details</label>
+                    <label className="block text-sm font-medium text-ink mb-1">Refund Details</label>
                     <input
                       type="text"
                       value={form.refundDetails}
                       onChange={(e) => updateField('refundDetails', e.target.value)}
                       placeholder="Explain refund conditions"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                      className="input-field"
                     />
                   </div>
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Methods</label>
+                <label className="block text-sm font-medium text-ink mb-2">Payment Methods</label>
                 <div className="flex flex-wrap gap-2">
                   {PAYMENT_METHOD_OPTIONS.map((method) => (
                     <button
@@ -1537,8 +1537,8 @@ function ProgrammesPageInner() {
                       onClick={() => togglePaymentMethod(method)}
                       className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
                         form.paymentMethods.includes(method)
-                          ? 'bg-[#3D8B37] text-white border-[#3D8B37]'
-                          : 'bg-white text-gray-700 border-gray-300 hover:border-[#3D8B37]'
+                          ? 'bg-brand-600 text-white border-brand-600'
+                          : 'bg-surface text-ink border-line hover:border-brand-600'
                       }`}
                     >
                       {method}
@@ -1547,11 +1547,11 @@ function ProgrammesPageInner() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Reminder Schedule</label>
+                <label className="block text-sm font-medium text-ink mb-1">Payment Reminder Schedule</label>
                 <select
                   value={form.paymentReminderSchedule}
                   onChange={(e) => updateField('paymentReminderSchedule', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                  className="input-field"
                 >
                   <option value="">Select...</option>
                   <option value="3 days before">3 days before due</option>
@@ -1570,40 +1570,40 @@ function ProgrammesPageInner() {
           {/* Existing FAQs (edit mode) */}
           {view === 'edit' && faqs.length > 0 && (
             <div className="space-y-3">
-              <p className="text-sm font-medium text-gray-700">Existing FAQs ({faqs.length})</p>
+              <p className="text-sm font-medium text-ink">Existing FAQs ({faqs.length})</p>
               {faqs.map((faq) => {
                 const fb = faqStatusBadge(faq.status)
                 const isEditing = editingFaqId === faq.id
 
                 if (isEditing) {
                   return (
-                    <div key={faq.id} className="border border-[#3D8B37] rounded-lg p-4 space-y-2 bg-green-50/30">
+                    <div key={faq.id} className="border border-brand-600 rounded-lg p-4 space-y-2 bg-brand-50/40">
                       <input
                         type="text"
                         value={editFaqQ}
                         onChange={(e) => setEditFaqQ(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
+                        className="input-field py-2 text-sm"
                         placeholder="Question"
                       />
                       <textarea
                         value={editFaqA}
                         onChange={(e) => setEditFaqA(e.target.value)}
                         rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
+                        className="input-field py-2 text-sm"
                         placeholder="Answer"
                       />
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => saveFaqEdit(faq.id)}
-                          className="text-sm font-medium text-[#3D8B37] hover:underline"
+                          className="text-sm font-medium text-brand-700 hover:underline"
                         >
                           Save
                         </button>
                         <button
                           type="button"
                           onClick={() => setEditingFaqId(null)}
-                          className="text-sm font-medium text-gray-500 hover:underline"
+                          className="text-sm font-medium text-ink-muted hover:underline"
                         >
                           Cancel
                         </button>
@@ -1613,11 +1613,11 @@ function ProgrammesPageInner() {
                 }
 
                 return (
-                  <div key={faq.id} className="border border-gray-200 rounded-lg p-4">
+                  <div key={faq.id} className="border border-line rounded-lg p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{faq.question}</p>
-                        <p className="text-sm text-gray-600 mt-1">{faq.answer}</p>
+                        <p className="text-sm font-medium text-ink">{faq.question}</p>
+                        <p className="text-sm text-ink-muted mt-1">{faq.answer}</p>
                       </div>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded whitespace-nowrap ${fb.cls}`}>
                         {fb.label}
@@ -1631,7 +1631,7 @@ function ProgrammesPageInner() {
                           setEditFaqQ(faq.question)
                           setEditFaqA(faq.answer)
                         }}
-                        className="text-xs font-medium text-[#3D8B37] hover:underline"
+                        className="text-xs font-medium text-brand-700 hover:underline"
                       >
                         Edit
                       </button>
@@ -1643,7 +1643,7 @@ function ProgrammesPageInner() {
                         Delete
                       </button>
                       {faq.times_asked > 0 && (
-                        <span className="text-xs text-gray-400">Asked {faq.times_asked} times</span>
+                        <span className="text-xs text-ink-muted">Asked {faq.times_asked} times</span>
                       )}
                     </div>
                   </div>
@@ -1655,11 +1655,11 @@ function ProgrammesPageInner() {
           {/* Local FAQs (create mode) */}
           {view === 'create' && localFaqs.length > 0 && (
             <div className="space-y-3">
-              <p className="text-sm font-medium text-gray-700">FAQs to create ({localFaqs.length})</p>
+              <p className="text-sm font-medium text-ink">FAQs to create ({localFaqs.length})</p>
               {localFaqs.map((faq, i) => (
-                <div key={i} className="border border-gray-200 rounded-lg p-4">
-                  <p className="text-sm font-medium text-gray-900">{faq.question}</p>
-                  <p className="text-sm text-gray-600 mt-1">{faq.answer}</p>
+                <div key={i} className="border border-line rounded-lg p-4">
+                  <p className="text-sm font-medium text-ink">{faq.question}</p>
+                  <p className="text-sm text-ink-muted mt-1">{faq.answer}</p>
                   <button
                     type="button"
                     onClick={() => setLocalFaqs((prev) => prev.filter((_, idx) => idx !== i))}
@@ -1673,21 +1673,21 @@ function ProgrammesPageInner() {
           )}
 
           {/* Add new FAQ */}
-          <div className="border border-dashed border-gray-300 rounded-lg p-4 space-y-3">
-            <p className="text-sm font-medium text-gray-700">Add a new FAQ</p>
+          <div className="border border-dashed border-line rounded-lg p-4 space-y-3">
+            <p className="text-sm font-medium text-ink">Add a new FAQ</p>
             <input
               type="text"
               value={newFaqQ}
               onChange={(e) => setNewFaqQ(e.target.value)}
               placeholder="Question parents often ask"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field py-2 text-sm"
             />
             <textarea
               value={newFaqA}
               onChange={(e) => setNewFaqA(e.target.value)}
               rows={2}
               placeholder="Your answer"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field py-2 text-sm"
             />
             <button
               type="button"
@@ -1703,14 +1703,14 @@ function ProgrammesPageInner() {
                 }
               }}
               disabled={!newFaqQ.trim() || !newFaqA.trim()}
-              className="bg-[#3D8B37] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#346E30] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="btn-primary text-sm disabled:opacity-40"
             >
               + Add FAQ
             </button>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink mb-1">
               Anything else the bot should know?
             </label>
             <textarea
@@ -1718,18 +1718,18 @@ function ProgrammesPageInner() {
               onChange={(e) => updateField('botNotes', e.target.value)}
               rows={3}
               placeholder="Any extra context, rules, or instructions for the bot when answering questions about this programme"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field"
             />
           </div>
         </Section>
 
         {/* ===== WhatsApp Group Linking ===== */}
         <Section title="WhatsApp Group Linking" complete={!!form.whatsappGroupId}>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800 space-y-2">
+          <div className="bg-brand-50 border border-brand-100 rounded-lg p-4 text-sm text-ink space-y-2">
             <p className="font-medium">How to link your WhatsApp group:</p>
-            <ol className="list-decimal list-inside space-y-1 text-blue-700">
+            <ol className="list-decimal list-inside space-y-1 text-ink-muted">
               <li>
-                Add the bot number <strong className="font-mono">+447458164754</strong> to your WhatsApp group
+                Add the bot number <strong className="font-mono text-ink">+447458164754</strong> to your WhatsApp group
               </li>
               <li>Send any message in the group</li>
               <li>The bot will reply with the group ID</li>
@@ -1737,13 +1737,13 @@ function ProgrammesPageInner() {
             </ol>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Group ID</label>
+            <label className="block text-sm font-medium text-ink mb-1">WhatsApp Group ID</label>
             <input
               type="text"
               value={form.whatsappGroupId}
               onChange={(e) => updateField('whatsappGroupId', e.target.value)}
               placeholder="e.g. 120363422695360945@g.us"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-mono text-sm focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field font-mono text-sm"
             />
           </div>
         </Section>
@@ -1753,14 +1753,14 @@ function ProgrammesPageInner() {
           <button
             type="submit"
             disabled={saving || !form.programmeName.trim()}
-            className="bg-[#3D8B37] text-white px-8 py-3 rounded-lg font-medium hover:bg-[#346E30] transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] shadow-sm"
+            className="btn-primary px-8"
           >
             {saving ? 'Saving...' : view === 'create' ? 'Create Programme' : 'Save Changes'}
           </button>
           <button
             type="button"
             onClick={goBackToList}
-            className="bg-white text-gray-700 px-6 py-3 rounded-lg font-medium border border-gray-200 hover:bg-gray-50 transition-colors min-h-[44px]"
+            className="btn-secondary"
           >
             Cancel
           </button>
@@ -1772,7 +1772,7 @@ function ProgrammesPageInner() {
 
 export default function ProgrammesPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Loading...</p></div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-canvas"><p className="text-ink-muted">Loading...</p></div>}>
       <ProgrammesPageInner />
     </Suspense>
   )

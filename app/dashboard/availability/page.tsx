@@ -122,50 +122,50 @@ export default function AvailabilityPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Loading…</p>
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
+        <p className="text-ink-muted">Loading…</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/dashboard" className="text-gray-500 hover:text-gray-700 text-sm">
+    <div className="min-h-screen bg-canvas px-4 py-6 md:px-8 max-w-4xl mx-auto">
+      <div className="reveal reveal-1 flex items-center gap-3 mb-6">
+        <Link href="/dashboard" className="text-ink-muted hover:text-brand-700 transition-colors text-sm">
           ← Dashboard
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">PT availability</h1>
+        <h1 className="font-display text-2xl font-bold text-ink">PT availability</h1>
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
+        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">{error}</div>
       )}
       {toast && (
-        <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">{toast}</div>
+        <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm border border-green-100">{toast}</div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+      <div className="card shadow-card mb-6">
         <div className="flex items-center gap-3 mb-4">
           <button
             onClick={() => setWeekCommencing((wc) => addWeeks(wc, -1))}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+            className="px-3 py-1.5 text-sm bg-surface-muted text-ink hover:bg-line rounded-lg transition-colors"
           >
             ← Previous
           </button>
-          <div className="text-sm font-medium text-gray-900">
+          <div className="text-sm font-medium text-ink">
             Week of {new Date(weekCommencing + 'T00:00:00').toLocaleDateString('en-GB', {
               weekday: 'long', day: 'numeric', month: 'short', year: 'numeric',
             })}
           </div>
           <button
             onClick={() => setWeekCommencing((wc) => addWeeks(wc, 1))}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+            className="px-3 py-1.5 text-sm bg-surface-muted text-ink hover:bg-line rounded-lg transition-colors"
           >
             Next →
           </button>
           <button
             onClick={() => setWeekCommencing(mondayOfToday())}
-            className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700"
+            className="px-3 py-1.5 text-sm text-brand-700 hover:underline font-medium"
           >
             Today
           </button>
@@ -173,13 +173,13 @@ export default function AvailabilityPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink mb-1.5">
               Session duration (minutes)
             </label>
             <select
               value={durationMin}
               onChange={(e) => setDurationMin(parseInt(e.target.value, 10))}
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+              className="input-field"
             >
               <option value={30}>30 min</option>
               <option value={45}>45 min</option>
@@ -189,7 +189,7 @@ export default function AvailabilityPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink mb-1.5">
               Price per session (£) — optional
             </label>
             <input
@@ -199,25 +199,25 @@ export default function AvailabilityPage() {
               value={pricePerSlot}
               onChange={(e) => setPricePerSlot(e.target.value)}
               placeholder="e.g. 45"
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+              className="input-field"
             />
           </div>
         </div>
 
         <div className="space-y-3">
           {DAYS.map((dayLabel, day) => (
-            <div key={day} className="border border-gray-100 rounded-lg p-3">
+            <div key={day} className="border border-line rounded-lg p-3">
               <div className="flex justify-between items-center mb-2">
-                <div className="font-medium text-sm text-gray-900">{dayLabel}</div>
+                <div className="font-medium text-sm text-ink">{dayLabel}</div>
                 <button
                   onClick={() => addBlock(day)}
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                  className="text-xs text-brand-700 hover:underline font-medium"
                 >
                   + Add block
                 </button>
               </div>
               {blocksByDay[day].length === 0 ? (
-                <div className="text-xs text-gray-400 italic">No availability</div>
+                <div className="text-xs text-ink-muted italic">No availability</div>
               ) : (
                 <div className="space-y-2">
                   {blocksByDay[day].map((b, _i) => {
@@ -228,18 +228,18 @@ export default function AvailabilityPage() {
                           type="time"
                           value={b.start_time}
                           onChange={(e) => updateBlock(idx, { start_time: e.target.value })}
-                          className="px-2 py-1 border border-gray-300 rounded"
+                          className="px-2 py-1 border border-line rounded-lg bg-surface text-ink focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/30"
                         />
-                        <span className="text-gray-400">to</span>
+                        <span className="text-ink-muted">to</span>
                         <input
                           type="time"
                           value={b.end_time}
                           onChange={(e) => updateBlock(idx, { end_time: e.target.value })}
-                          className="px-2 py-1 border border-gray-300 rounded"
+                          className="px-2 py-1 border border-line rounded-lg bg-surface text-ink focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-600/30"
                         />
                         <button
                           onClick={() => removeBlock(idx)}
-                          className="text-gray-400 hover:text-red-600 px-1"
+                          className="text-ink-muted hover:text-red-600 px-1 transition-colors"
                           title="Remove"
                         >
                           ×
@@ -253,21 +253,21 @@ export default function AvailabilityPage() {
           ))}
         </div>
 
-        <div className="mt-6 flex justify-between items-center">
-          <p className="text-xs text-gray-500">
+        <div className="mt-6 flex justify-between items-center gap-4">
+          <p className="text-xs text-ink-muted">
             Saving regenerates bookable slots for this week. Existing booked slots are preserved.
           </p>
           <button
             onClick={save}
             disabled={saving}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+            className="btn-primary"
           >
             {saving ? 'Saving…' : 'Save availability'}
           </button>
         </div>
       </div>
 
-      <div className="text-xs text-gray-500 px-2">
+      <div className="text-xs text-ink-muted px-2">
         <p>
           Clients book sessions by messaging your WhatsApp bot — they say something like
           &quot;book a session&quot; or &quot;PT availability&quot; and the bot offers them the

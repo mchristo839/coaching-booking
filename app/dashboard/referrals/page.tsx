@@ -46,11 +46,11 @@ const PIPELINE: Array<{ status: string; label: string }> = [
 ]
 
 const STATUS_COLOURS: Record<string, string> = {
-  referral_pending: 'bg-yellow-100 text-yellow-700',
-  confirmed: 'bg-blue-100 text-blue-700',
-  attended: 'bg-purple-100 text-purple-700',
+  referral_pending: 'bg-amber-100 text-amber-700',
+  confirmed: 'bg-brand-50 text-brand-700',
+  attended: 'bg-brand-100 text-brand-800',
   converted: 'bg-green-100 text-green-700',
-  lapsed: 'bg-gray-100 text-gray-600',
+  lapsed: 'bg-surface-muted text-ink-muted',
 }
 
 // "Today's actions" criteria per spec §5.2: any lead whose taster date is
@@ -124,19 +124,19 @@ export default function ReferralsPage() {
     }
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-600">Loading...</p></div>
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-canvas"><p className="text-ink-muted">Loading...</p></div>
 
   const todays = referrals.filter(isTodayAction)
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8 max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/dashboard/control-centre" className="text-gray-500 hover:text-gray-700 text-sm">← Control Centre</Link>
-        <h1 className="text-2xl font-bold text-gray-900">Referrals</h1>
+    <div className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-3xl mx-auto">
+      <div className="reveal reveal-1 flex items-center gap-3 mb-6">
+        <Link href="/dashboard/control-centre" className="text-ink-muted hover:text-brand-700 text-sm transition-colors">← Control Centre</Link>
+        <h1 className="font-display text-2xl font-bold text-ink">Referrals</h1>
       </div>
 
       {toast && (
-        <div className="bg-blue-50 text-blue-700 px-4 py-3 rounded-lg mb-4 text-sm">{toast}</div>
+        <div className="bg-brand-50 text-brand-700 px-4 py-3 rounded-lg mb-4 text-sm border border-brand-100">{toast}</div>
       )}
 
       {todays.length > 0 && (
@@ -147,23 +147,23 @@ export default function ReferralsPage() {
           </p>
           <div className="space-y-2">
             {todays.map((r) => (
-              <div key={r.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
+              <div key={r.id} className="flex items-center justify-between bg-surface rounded-lg px-3 py-2 border border-line">
                 <div className="text-sm">
-                  <span className="font-medium text-gray-900">{r.child_name || r.friend_first_name}</span>
-                  <span className="text-gray-500">  taster {r.first_session_at ? new Date(r.first_session_at).toLocaleDateString('en-GB') : ''}</span>
+                  <span className="font-medium text-ink">{r.child_name || r.friend_first_name}</span>
+                  <span className="text-ink-muted">  taster {r.first_session_at ? new Date(r.first_session_at).toLocaleDateString('en-GB') : ''}</span>
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => updateStatus(r.id, 'attended')}
                     disabled={busyId === r.id}
-                    className="text-xs bg-green-600 text-white px-3 py-1.5 rounded font-medium hover:bg-green-700 disabled:opacity-50"
+                    className="text-xs bg-green-600 text-white px-3 py-1.5 rounded font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
                   >
                     Attended
                   </button>
                   <button
                     onClick={() => updateStatus(r.id, 'lapsed')}
                     disabled={busyId === r.id}
-                    className="text-xs bg-gray-300 text-gray-700 px-3 py-1.5 rounded font-medium hover:bg-gray-400 disabled:opacity-50"
+                    className="text-xs bg-surface-muted text-ink px-3 py-1.5 rounded font-medium hover:bg-line disabled:opacity-50 transition-colors"
                   >
                     Did not attend
                   </button>
@@ -174,59 +174,59 @@ export default function ReferralsPage() {
         </div>
       )}
 
-      <p className="text-gray-600 mb-6 text-sm">
+      <p className="text-ink-muted mb-6 text-sm">
         Referrals are generated from &quot;Refer a friend&quot; promotions. The public
-        landing page at <code className="bg-gray-100 px-1 rounded text-xs">/refer/[slug]</code>
+        landing page at <code className="bg-surface-muted px-1 rounded text-xs">/refer/[slug]</code>
         collects submissions.
       </p>
 
       {campaigns.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
-          <h2 className="font-semibold text-gray-900 mb-3 text-sm">Active campaigns</h2>
+        <div className="card shadow-card mb-6">
+          <h2 className="font-display font-semibold text-ink mb-3 text-sm">Active campaigns</h2>
           <div className="space-y-3">
             {campaigns.map((c) => {
               const conversionRate = c.attended > 0
                 ? Math.round((c.converted / c.attended) * 100)
                 : 0
               return (
-                <div key={c.promotion_id} className="border border-gray-100 rounded-lg p-3">
+                <div key={c.promotion_id} className="border border-line rounded-lg p-3">
                   <div className="flex justify-between items-start gap-3 mb-2">
                     <div className="min-w-0">
-                      <div className="font-medium text-gray-900 text-sm truncate">
+                      <div className="font-medium text-ink text-sm truncate">
                         {c.title || 'Untitled campaign'}
                       </div>
-                      <div className="text-xs text-gray-500 truncate">
+                      <div className="text-xs text-ink-muted truncate">
                         {c.programme_name || '—'} · launched {new Date(c.created_at).toLocaleDateString('en-GB')}
                       </div>
                     </div>
                     <span className={`text-[10px] px-2 py-0.5 rounded shrink-0 ${
                       c.status === 'sent' ? 'bg-green-100 text-green-700' :
-                      c.status === 'draft' ? 'bg-gray-100 text-gray-600' :
-                      'bg-gray-100 text-gray-500'
+                      c.status === 'draft' ? 'bg-surface-muted text-ink-muted' :
+                      'bg-surface-muted text-ink-muted'
                     }`}>
                       {c.status}
                     </span>
                   </div>
                   <div className="grid grid-cols-5 gap-1 text-center mt-2">
                     <div>
-                      <div className="text-base font-semibold text-gray-900">{c.leads_total}</div>
-                      <div className="text-[10px] text-gray-500 uppercase tracking-wide">Leads</div>
+                      <div className="text-base font-semibold text-ink">{c.leads_total}</div>
+                      <div className="text-[10px] text-ink-muted uppercase tracking-wide">Leads</div>
                     </div>
                     <div>
-                      <div className="text-base font-semibold text-gray-900">{c.attended}</div>
-                      <div className="text-[10px] text-gray-500 uppercase tracking-wide">Attended</div>
+                      <div className="text-base font-semibold text-ink">{c.attended}</div>
+                      <div className="text-[10px] text-ink-muted uppercase tracking-wide">Attended</div>
                     </div>
                     <div>
-                      <div className="text-base font-semibold text-gray-900">{c.converted}</div>
-                      <div className="text-[10px] text-gray-500 uppercase tracking-wide">Converted</div>
+                      <div className="text-base font-semibold text-ink">{c.converted}</div>
+                      <div className="text-[10px] text-ink-muted uppercase tracking-wide">Converted</div>
                     </div>
                     <div>
-                      <div className="text-base font-semibold text-gray-900">{conversionRate}%</div>
-                      <div className="text-[10px] text-gray-500 uppercase tracking-wide">Conv rate</div>
+                      <div className="text-base font-semibold text-ink">{conversionRate}%</div>
+                      <div className="text-[10px] text-ink-muted uppercase tracking-wide">Conv rate</div>
                     </div>
                     <div>
-                      <div className="text-base font-semibold text-gray-900">{c.credits_issued}</div>
-                      <div className="text-[10px] text-gray-500 uppercase tracking-wide">Credits</div>
+                      <div className="text-base font-semibold text-ink">{c.credits_issued}</div>
+                      <div className="text-[10px] text-ink-muted uppercase tracking-wide">Credits</div>
                     </div>
                   </div>
                 </div>
@@ -242,7 +242,7 @@ export default function ReferralsPage() {
           if (bucket.length === 0) return null
           return (
             <div key={status}>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-2">
                 {label} ({bucket.length})
               </h3>
               <div className="space-y-3">
@@ -250,30 +250,30 @@ export default function ReferralsPage() {
                   const showIssueCredit = r.status === 'attended' && r.referrer_reward_status === 'notified' && r.referrer_resolved
                   const referrerLabel = r.referrer_parent_name || r.referred_by_name
                   return (
-                    <div key={r.id} className="bg-white rounded-xl shadow-sm p-4">
+                    <div key={r.id} className="card shadow-card transition-all duration-200 hover:shadow-card-hover">
                       <div className="flex justify-between items-start mb-2">
                         <div>
-                          <h4 className="font-semibold text-gray-900">
+                          <h4 className="font-display font-semibold text-ink">
                             {r.friend_first_name}
-                            {r.child_name && <span className="text-gray-500 font-normal"> · child: {r.child_name}</span>}
+                            {r.child_name && <span className="text-ink-muted font-normal"> · child: {r.child_name}</span>}
                           </h4>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-ink-muted mt-1">
                             {r.programme_name}{r.promotion_title ? ` · ${r.promotion_title}` : ''}
                           </p>
                         </div>
-                        <span className={`text-xs px-2 py-1 rounded ${STATUS_COLOURS[r.status] || 'bg-gray-100'}`}>
+                        <span className={`text-xs px-2 py-1 rounded ${STATUS_COLOURS[r.status] || 'bg-surface-muted text-ink-muted'}`}>
                           {r.status.replace('_', ' ')}
                         </span>
                       </div>
-                      <div className="text-sm text-gray-700 space-y-1">
+                      <div className="text-sm text-ink space-y-1">
                         <p>📞 {r.friend_phone}</p>
                         {r.friend_email && <p>✉️ {r.friend_email}</p>}
                         {referrerLabel && (
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-ink-muted">
                             Referred by: {referrerLabel}
                             {!r.referrer_resolved && <span className="ml-1 text-amber-600">(unresolved)</span>}
                             {r.referrer_resolved && r.referrer_credits_balance != null && (
-                              <span className="ml-1 text-gray-400">· {r.referrer_credits_balance} credit{r.referrer_credits_balance === 1 ? '' : 's'} on file</span>
+                              <span className="ml-1 text-ink-muted">· {r.referrer_credits_balance} credit{r.referrer_credits_balance === 1 ? '' : 's'} on file</span>
                             )}
                           </p>
                         )}
@@ -283,7 +283,7 @@ export default function ReferralsPage() {
                           <button
                             onClick={() => updateStatus(r.id, 'confirmed')}
                             disabled={busyId === r.id}
-                            className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+                            className="text-xs bg-brand-600 text-white px-3 py-1 rounded hover:bg-brand-700 disabled:opacity-50 transition-colors"
                           >
                             Confirm
                           </button>
@@ -292,7 +292,7 @@ export default function ReferralsPage() {
                           <button
                             onClick={() => updateStatus(r.id, 'attended')}
                             disabled={busyId === r.id}
-                            className="text-xs bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 disabled:opacity-50"
+                            className="text-xs bg-brand-700 text-white px-3 py-1 rounded hover:bg-brand-800 disabled:opacity-50 transition-colors"
                           >
                             Mark attended
                           </button>
@@ -301,7 +301,7 @@ export default function ReferralsPage() {
                           <button
                             onClick={() => issueCredit(r.id)}
                             disabled={busyId === r.id}
-                            className="text-xs bg-amber-500 text-white px-3 py-1 rounded hover:bg-amber-600 disabled:opacity-50 font-medium"
+                            className="text-xs bg-amber-500 text-white px-3 py-1 rounded hover:bg-amber-600 disabled:opacity-50 font-medium transition-colors"
                           >
                             Issue credit to {r.referrer_parent_name?.split(/\s+/)[0] || 'referrer'}
                           </button>
@@ -313,7 +313,7 @@ export default function ReferralsPage() {
                           <button
                             onClick={() => updateStatus(r.id, 'converted')}
                             disabled={busyId === r.id}
-                            className="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 disabled:opacity-50"
+                            className="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
                           >
                             Mark converted
                           </button>
@@ -322,7 +322,7 @@ export default function ReferralsPage() {
                           <button
                             onClick={() => updateStatus(r.id, 'lapsed')}
                             disabled={busyId === r.id}
-                            className="text-xs bg-gray-400 text-white px-3 py-1 rounded hover:bg-gray-500 disabled:opacity-50"
+                            className="text-xs bg-ink-muted text-white px-3 py-1 rounded hover:bg-ink disabled:opacity-50 transition-colors"
                           >
                             Mark lapsed
                           </button>
@@ -336,7 +336,7 @@ export default function ReferralsPage() {
           )
         })}
         {referrals.length === 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-6 text-center text-gray-500">
+          <div className="card shadow-card text-center text-ink-muted">
             <p>No referrals yet. Create a &quot;Refer a friend&quot; promotion to get started.</p>
           </div>
         )}

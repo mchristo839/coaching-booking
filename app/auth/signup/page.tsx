@@ -52,21 +52,25 @@ function SignupForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12">
-      <div className="bg-white rounded-xl shadow-sm w-full max-w-md p-6 md:p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-          Coach Sign Up
-        </h1>
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-canvas">
+      <div className="reveal reveal-1 card shadow-card w-full max-w-md p-6 md:p-8">
+        <div className="mb-6 text-center">
+          <span className="eyebrow">MyCoachingAssistant</span>
+          <h1 className="mt-3 font-display text-2xl font-bold text-ink">
+            Create your account
+          </h1>
+          <p className="mt-1 text-sm text-ink-muted">Get your coaching assistant set up.</p>
+        </div>
 
         {error && (
-          <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+          <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="invite" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="invite" className="block text-sm font-medium text-ink mb-1.5">
               Invite Code *
             </label>
             <input
@@ -75,14 +79,14 @@ function SignupForm() {
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 font-mono tracking-wider"
+              className="input-field font-mono tracking-wider"
               placeholder="ABCD1234"
             />
-            <p className="text-xs text-gray-500 mt-1">Required during beta. Ask your inviter for a code.</p>
+            <p className="text-xs text-ink-muted mt-1.5">Required during beta. Ask your inviter for a code.</p>
           </div>
 
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="name" className="block text-sm font-medium text-ink mb-1.5">
               Full Name
             </label>
             <input
@@ -91,13 +95,13 @@ function SignupForm() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+              className="input-field"
               placeholder="John Smith"
             />
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium text-ink mb-1.5">
               Email
             </label>
             <input
@@ -106,13 +110,13 @@ function SignupForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+              className="input-field"
               placeholder="coach@example.com"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="password" className="block text-sm font-medium text-ink mb-1.5">
               Password
             </label>
             <input
@@ -122,7 +126,7 @@ function SignupForm() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+              className="input-field"
               placeholder="Min 6 characters"
             />
           </div>
@@ -130,15 +134,15 @@ function SignupForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+            className="btn-primary w-full"
           >
             {loading ? 'Creating account...' : 'Sign Up'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-600 mt-6">
+        <p className="text-center text-sm text-ink-muted mt-6">
           Already have an account?{' '}
-          <Link href="/auth/login" className="text-blue-600 hover:underline">
+          <Link href="/auth/login" className="font-semibold text-brand-700 hover:underline">
             Log in
           </Link>
         </p>
@@ -150,8 +154,8 @@ function SignupForm() {
 export default function SignupPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
+        <p className="text-ink-muted">Loading...</p>
       </div>
     }>
       <SignupForm />
