@@ -32,6 +32,16 @@ interface TopCategory {
   count: number
 }
 
+interface Escalation {
+  id: string
+  sender_name: string | null
+  message_text: string
+  category: string | null
+  escalation_type: string | null
+  created_at: string
+  programme_name: string | null
+}
+
 interface DashboardStats {
   activeMembers: number
   activeProgrammes: number
@@ -267,6 +277,8 @@ export default function DashboardPage() {
     if (typeof window === 'undefined') return 'sport'
     return (window.localStorage.getItem('coachVertical') === 'fitness' ? 'fitness' : 'sport')
   })
+  const [escalations, setEscalations] = useState<Escalation[]>([])
+  const [ackingId, setAckingId] = useState<string | null>(null)
 
   /* ---------- handlers ---------- */
 
@@ -282,12 +294,18 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(async (coachId: string) => {
     try {
-      const [statsRes, progsRes, authProgsRes, meRes] = await Promise.all([
+      const [statsRes, progsRes, authProgsRes, meRes, escRes] = await Promise.all([
         fetch(`/api/dashboard/stats?coachId=${encodeURIComponent(coachId)}`),
         fetch('/api/programmes/list'),
         fetch('/api/auth/authorised-programmes', { credentials: 'include' }),
         fetch('/api/auth/me', { credentials: 'include' }),
+        fetch('/api/escalations', { credentials: 'include' }),
       ])
+
+      if (escRes.ok) {
+        const d = await escRes.json()
+        setEscalations(d.escalations ?? [])
+      }
 
       if (meRes.ok) {
         const d = await meRes.json()
@@ -331,6 +349,28 @@ export default function DashboardPage() {
   }, [router, fetchData])
 
   /* ---------- handlers ---------- */
+
+  async function acknowledgeEscalations(ids?: string[]) {
+    const body = ids ? { ids } : { all: true }
+    setAckingId(ids && ids.length === 1 ? ids[0] : 'all')
+    try {
+      const res = await fetch('/api/escalations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      })
+      if (res.ok) {
+        setEscalations((prev) =>
+          ids ? prev.filter((e) => !ids.includes(e.id)) : []
+        )
+      }
+    } catch {
+      // leave the list as-is; coach can retry
+    } finally {
+      setAckingId(null)
+    }
+  }
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
@@ -403,6 +443,57 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        {/* ===== Escalations needing acknowledgement ===== */}
+        {escalations.length > 0 && (
+          <div className="reveal mb-8 rounded-xl border border-amber-300 bg-amber-50 shadow-card overflow-hidden">
+            <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-amber-200">
+              <div className="flex items-center gap-2">
+                <span aria-hidden="true">🟡</span>
+                <h2 className="font-display font-semibold text-ink text-sm">
+                  {escalations.length} escalation{escalations.length === 1 ? '' : 's'} need your attention
+                </h2>
+              </div>
+              <button
+                onClick={() => acknowledgeEscalations()}
+                disabled={ackingId !== null}
+                className="text-xs font-semibold text-brand-700 hover:underline disabled:opacity-50"
+              >
+                {ackingId === 'all' ? 'Clearing…' : 'Acknowledge all'}
+              </button>
+            </div>
+            <ul className="divide-y divide-amber-200">
+              {escalations.map((e) => (
+                <li key={e.id} className="flex items-start justify-between gap-3 px-5 py-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                      <span className="text-sm font-medium text-ink">{e.sender_name || 'Someone'}</span>
+                      {e.escalation_type && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-200 text-amber-800">
+                          {e.escalation_type}
+                        </span>
+                      )}
+                      {e.programme_name && (
+                        <span className="text-[10px] text-ink-muted">· {e.programme_name}</span>
+                      )}
+                      <span className="text-[10px] text-ink-muted">
+                        · {new Date(e.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-ink-muted truncate">{e.message_text}</p>
+                  </div>
+                  <button
+                    onClick={() => acknowledgeEscalations([e.id])}
+                    disabled={ackingId !== null}
+                    className="btn-secondary text-xs shrink-0 px-3 py-1.5 min-h-0"
+                  >
+                    {ackingId === e.id ? '…' : 'Acknowledge'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* ===== Stats Row ===== */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

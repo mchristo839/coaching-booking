@@ -726,3 +726,54 @@ export async function createLegacyCoach(email: string, name: string, passwordHas
   const { rows } = await sql`INSERT INTO coaches (email, name, password_hash) VALUES (${email}, ${name}, ${passwordHash}) RETURNING *`
   return rows[0]
 }
+
+// ─── Escalation acknowledgement ───
+// Escalated conversations (escalated = true, escalation_acked_at IS NULL) are
+// what the ops health check counts and alerts on. These let a coach see and
+// clear them so the metric reflects "still needs a human" rather than growing
+// forever. Scoped to the coach via programme ownership (conversations carry a
+// programme_id, not a coach_id).
+
+export async function listUnackedEscalations(coachId: string, limit = 50) {
+  const { rows } = await sql`
+    SELECT c.id, c.sender_name, c.message_text, c.category, c.escalation_type,
+           c.created_at, c.group_jid, p.programme_name
+    FROM conversations c
+    JOIN programmes p ON p.id = c.programme_id
+    WHERE p.coach_id = ${coachId}
+      AND c.escalated = true
+      AND c.escalation_acked_at IS NULL
+    ORDER BY c.created_at ASC
+    LIMIT ${limit}
+  `
+  return rows
+}
+
+// Marks the given escalations acknowledged. Always scoped to the coach's own
+// programmes so a coach can't ack another coach's escalations. Pass no ids to
+// acknowledge all of the coach's outstanding escalations. Returns the count.
+export async function ackEscalations(coachId: string, ids?: string[]): Promise<number> {
+  if (ids && ids.length === 0) return 0
+  const res =
+    ids && ids.length > 0
+      ? await sql`
+          UPDATE conversations c
+          SET escalation_acked_at = NOW()
+          FROM programmes p
+          WHERE c.programme_id = p.id
+            AND p.coach_id = ${coachId}
+            AND c.escalated = true
+            AND c.escalation_acked_at IS NULL
+            AND c.id = ANY(${ids}::uuid[])
+        `
+      : await sql`
+          UPDATE conversations c
+          SET escalation_acked_at = NOW()
+          FROM programmes p
+          WHERE c.programme_id = p.id
+            AND p.coach_id = ${coachId}
+            AND c.escalated = true
+            AND c.escalation_acked_at IS NULL
+        `
+  return res.rowCount ?? 0
+}
