@@ -289,7 +289,7 @@ export default function NewPromotionPage() {
                 type="url"
                 value={paymentLink}
                 onChange={(e) => setPaymentLink(e.target.value)}
-                placeholder={promotionType === 'holiday_camp' ? 'https://monzo.me/yourname or Revolut link' : 'https://...'}
+                placeholder={promotionType === 'holiday_camp' ? 'https://monzo.me/yourname, Revolut or PayPal.me link' : 'https://...'}
                 className="input-field"
               />
               {promotionType === 'holiday_camp' && (
