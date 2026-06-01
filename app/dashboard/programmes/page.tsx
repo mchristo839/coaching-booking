@@ -1725,11 +1725,11 @@ function ProgrammesPageInner() {
 
         {/* ===== WhatsApp Group Linking ===== */}
         <Section title="WhatsApp Group Linking" complete={!!form.whatsappGroupId}>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800 space-y-2">
+          <div className="bg-brand-50 border border-brand-100 rounded-lg p-4 text-sm text-ink space-y-2">
             <p className="font-medium">How to link your WhatsApp group:</p>
-            <ol className="list-decimal list-inside space-y-1 text-blue-700">
+            <ol className="list-decimal list-inside space-y-1 text-ink-muted">
               <li>
-                Add the bot number <strong className="font-mono">+447458164754</strong> to your WhatsApp group
+                Add the bot number <strong className="font-mono text-ink">+447458164754</strong> to your WhatsApp group
               </li>
               <li>Send any message in the group</li>
               <li>The bot will reply with the group ID</li>
@@ -1743,7 +1743,7 @@ function ProgrammesPageInner() {
               value={form.whatsappGroupId}
               onChange={(e) => updateField('whatsappGroupId', e.target.value)}
               placeholder="e.g. 120363422695360945@g.us"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-mono text-sm focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+              className="input-field font-mono text-sm"
             />
           </div>
         </Section>
@@ -1753,14 +1753,14 @@ function ProgrammesPageInner() {
           <button
             type="submit"
             disabled={saving || !form.programmeName.trim()}
-            className="bg-[#3D8B37] text-white px-8 py-3 rounded-lg font-medium hover:bg-[#346E30] transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] shadow-sm"
+            className="btn-primary px-8"
           >
             {saving ? 'Saving...' : view === 'create' ? 'Create Programme' : 'Save Changes'}
           </button>
           <button
             type="button"
             onClick={goBackToList}
-            className="bg-white text-gray-700 px-6 py-3 rounded-lg font-medium border border-gray-200 hover:bg-gray-50 transition-colors min-h-[44px]"
+            className="btn-secondary"
           >
             Cancel
           </button>
@@ -1772,7 +1772,7 @@ function ProgrammesPageInner() {
 
 export default function ProgrammesPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Loading...</p></div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-canvas"><p className="text-ink-muted">Loading...</p></div>}>
       <ProgrammesPageInner />
     </Suspense>
   )
