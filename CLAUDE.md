@@ -16,6 +16,7 @@ First live coach: Paul (coach ID `481181c9`, programme ID `89557f36`, group `120
 6. **British spelling.** `programmes` not `programs`, `register` not `signup` in routes.
 7. **No new dependencies without asking.** If you think a package is needed, explain why first.
 8. **Keep responses short.** WhatsApp messages from the bot max out at 300 tokens for a reason.
+9. **Follow the design system.** Before writing or changing any UI, read `DESIGN.md` — it is the single source of truth for colours, type, spacing, and motion. Use the named Tailwind tokens (`brand-*`, `ink`, `canvas`, `line`, `.btn-primary`, `.input-field`, etc.), never ad-hoc hex or stray colours. Keep every page consistent. Skills live in `.claude/skills/`: `design-intake`, `web-design-system`, `copywriting`, `special-effects`. If asked to change the look/branding, run `design-intake` and update `DESIGN.md`.
 
 ## Tech stack
 

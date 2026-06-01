@@ -51,21 +51,25 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12">
-      <div className="bg-white rounded-xl shadow-sm w-full max-w-md p-6 md:p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-          Log In to MyCoachingAssistant
-        </h1>
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-canvas">
+      <div className="reveal reveal-1 card shadow-card w-full max-w-md p-6 md:p-8">
+        <div className="mb-6 text-center">
+          <span className="eyebrow">MyCoachingAssistant</span>
+          <h1 className="mt-3 font-display text-2xl font-bold text-ink">
+            Welcome back
+          </h1>
+          <p className="mt-1 text-sm text-ink-muted">Log in to your coaching assistant.</p>
+        </div>
 
         {error && (
-          <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+          <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium text-ink mb-1.5">
               Email
             </label>
             <input
@@ -74,13 +78,13 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent text-gray-900"
+              className="input-field"
               placeholder="coach@example.com"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="password" className="block text-sm font-medium text-ink mb-1.5">
               Password
             </label>
             <input
@@ -89,7 +93,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent text-gray-900"
+              className="input-field"
               placeholder="Your password"
             />
           </div>
@@ -97,15 +101,15 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#3D8B37] text-white py-3 rounded-lg font-medium hover:bg-[#346F2F] transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+            className="btn-primary w-full"
           >
             {loading ? 'Logging in...' : 'Log In'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-600 mt-6">
+        <p className="text-center text-sm text-ink-muted mt-6">
           Don&apos;t have an account?{' '}
-          <Link href="/register" className="text-[#3D8B37] hover:underline">
+          <Link href="/register" className="font-semibold text-brand-700 hover:underline">
             Sign up
           </Link>
         </p>
