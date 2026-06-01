@@ -1293,7 +1293,7 @@ function ProgrammesPageInner() {
               type="button"
               onClick={() => updateField('waitlistEnabled', !form.waitlistEnabled)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                form.waitlistEnabled ? 'bg-[#3D8B37]' : 'bg-gray-300'
+                form.waitlistEnabled ? 'bg-brand-600' : 'bg-line'
               }`}
             >
               <span
@@ -1466,7 +1466,7 @@ function ProgrammesPageInner() {
                 <div>
                   <label className="block text-sm font-medium text-ink mb-1">Price (GBP)</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">&#163;</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted">&#163;</span>
                     <input
                       type="number"
                       step="0.01"
@@ -1474,7 +1474,7 @@ function ProgrammesPageInner() {
                       value={form.priceGbp}
                       onChange={(e) => updateField('priceGbp', e.target.value)}
                       placeholder="0.00"
-                      className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-[#3D8B37] focus:border-transparent"
+                      className="input-field pl-8"
                     />
                   </div>
                 </div>
