@@ -277,7 +277,7 @@ function AddFaqForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-[#3D8B37] text-sm font-medium hover:underline"
+        className="text-brand-700 text-sm font-medium hover:underline"
       >
         + Add FAQ
       </button>
@@ -285,33 +285,33 @@ function AddFaqForm({
   }
 
   return (
-    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-      <label className="block text-xs font-medium text-gray-500 mb-1">Question</label>
+    <div className="bg-surface-muted rounded-lg p-4 border border-line">
+      <label className="block text-xs font-medium text-ink-muted mb-1">Question</label>
       <input
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         placeholder="e.g. What should my child wear?"
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37] mb-3 bg-white"
+        className="input-field mb-3"
       />
-      <label className="block text-xs font-medium text-gray-500 mb-1">Answer</label>
+      <label className="block text-xs font-medium text-ink-muted mb-1">Answer</label>
       <textarea
         value={answer}
         onChange={(e) => setAnswer(e.target.value)}
         rows={3}
         placeholder="Your answer..."
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3D8B37]/40 focus:border-[#3D8B37] mb-3 resize-y bg-white"
+        className="input-field mb-3 resize-y"
       />
       <div className="flex gap-2">
         <button
           onClick={handleSubmit}
           disabled={saving || !question.trim() || !answer.trim()}
-          className="bg-[#3D8B37] text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-[#346E30] transition-colors disabled:opacity-50"
+          className="btn-primary text-sm px-3 py-1.5 min-h-0"
         >
           {saving ? 'Adding...' : 'Add FAQ'}
         </button>
         <button
           onClick={() => { setOpen(false); setQuestion(''); setAnswer('') }}
-          className="text-gray-500 hover:text-gray-700 text-sm font-medium px-3 py-1.5"
+          className="text-ink-muted hover:text-ink text-sm font-medium px-3 py-1.5 transition-colors"
         >
           Cancel
         </button>

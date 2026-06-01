@@ -191,7 +191,7 @@ function capacityPercent(current: number, max: number): number {
 function capacityColor(pct: number): string {
   if (pct >= 95) return 'bg-red-500'
   if (pct >= 80) return 'bg-amber-500'
-  return 'bg-[#3D8B37]'
+  return 'bg-brand-600'
 }
 
 function statusBadgeStyle(status: string | null): { label: string; cls: string } {
@@ -200,16 +200,16 @@ function statusBadgeStyle(status: string | null): { label: string; cls: string }
   if (s.includes('full') && s.includes('no')) return { label: 'Full - Closed', cls: 'bg-red-100 text-red-700' }
   if (s === 'full') return { label: 'Full', cls: 'bg-red-100 text-red-700' }
   if (s.includes('almost')) return { label: 'Almost Full', cls: 'bg-amber-100 text-amber-700' }
-  if (s.includes('starting')) return { label: 'Starting Soon', cls: 'bg-blue-100 text-blue-700' }
-  if (s.includes('not currently')) return { label: 'Not Running', cls: 'bg-gray-100 text-gray-600' }
-  return { label: 'Open', cls: 'bg-green-100 text-green-700' }
+  if (s.includes('starting')) return { label: 'Starting Soon', cls: 'bg-brand-50 text-brand-700' }
+  if (s.includes('not currently')) return { label: 'Not Running', cls: 'bg-surface-muted text-ink-muted' }
+  return { label: 'Open', cls: 'bg-brand-50 text-brand-700' }
 }
 
 function faqStatusBadge(status: string): { label: string; cls: string } {
-  if (status === 'active') return { label: 'Active', cls: 'bg-green-100 text-green-700' }
+  if (status === 'active') return { label: 'Active', cls: 'bg-brand-50 text-brand-700' }
   if (status === 'pending_coach_approval') return { label: 'Pending', cls: 'bg-amber-100 text-amber-700' }
-  if (status === 'disabled') return { label: 'Disabled', cls: 'bg-gray-100 text-gray-500' }
-  return { label: status, cls: 'bg-gray-100 text-gray-500' }
+  if (status === 'disabled') return { label: 'Disabled', cls: 'bg-surface-muted text-ink-muted' }
+  return { label: status, cls: 'bg-surface-muted text-ink-muted' }
 }
 
 /* ------------------------------------------------------------------ */
@@ -230,22 +230,22 @@ function Section({
   const [open, setOpen] = useState(defaultOpen ?? false)
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="bg-surface rounded-xl border border-line shadow-card overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-surface-muted transition-colors"
       >
         <div className="flex items-center gap-2">
           {complete && (
-            <svg className="w-5 h-5 text-[#3D8B37] flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-5 h-5 text-brand-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
             </svg>
           )}
-          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+          <h3 className="font-display text-base font-semibold text-ink">{title}</h3>
         </div>
         <svg
-          className={`w-5 h-5 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`w-5 h-5 text-ink-muted transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -253,7 +253,7 @@ function Section({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {open && <div className="px-5 pb-5 space-y-4 border-t border-gray-100 pt-4">{children}</div>}
+      {open && <div className="px-5 pb-5 space-y-4 border-t border-line pt-4">{children}</div>}
     </div>
   )
 }

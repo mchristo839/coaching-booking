@@ -318,16 +318,16 @@ export default function PromotionDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
+        <p className="text-ink-muted">Loading...</p>
       </div>
     )
   }
 
   if (!promotion) {
     return (
-      <div className="min-h-screen px-4 py-6 md:px-8 max-w-3xl mx-auto">
-        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg">Promotion not found</div>
+      <div className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-3xl mx-auto">
+        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg border border-red-100">Promotion not found</div>
       </div>
     )
   }
@@ -335,31 +335,31 @@ export default function PromotionDetailPage() {
   const isDraft = promotion.status === 'draft'
 
   return (
-    <div className="min-h-screen px-4 py-6 md:px-8 max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
+    <div className="min-h-screen bg-canvas px-4 py-8 md:px-8 max-w-3xl mx-auto">
+      <div className="reveal reveal-1 flex items-center gap-3 mb-6">
         <Link
           href="/dashboard/control-centre"
-          className="text-gray-500 hover:text-gray-700 text-sm"
+          className="text-ink-muted hover:text-brand-700 text-sm transition-colors"
         >
           ← Control Centre
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Promotion preview</h1>
+        <h1 className="font-display text-2xl font-bold text-ink">Promotion preview</h1>
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
+        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm border border-red-100">{error}</div>
       )}
       {success && (
-        <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">{success}</div>
+        <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm border border-green-100">{success}</div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
+      <div className="card shadow-card mb-6">
         <div className="flex justify-between items-start mb-3">
           <div>
-            <h2 className="font-semibold text-gray-900">
+            <h2 className="font-display font-semibold text-ink">
               {promotion.title || `${promotion.promotion_type.replace(/_/g, ' ')}`}
             </h2>
-            <p className="text-xs text-gray-500 mt-1">Status: {promotion.status}</p>
+            <p className="text-xs text-ink-muted mt-1">Status: {promotion.status}</p>
           </div>
         </div>
 
@@ -369,7 +369,7 @@ export default function PromotionDetailPage() {
               value={editedMessage}
               onChange={(e) => setEditedMessage(e.target.value)}
               rows={Math.max(8, editedMessage.split('\n').length + 1)}
-              className="w-full bg-gray-50 rounded-lg p-4 text-sm text-gray-800 font-mono border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="input-field bg-surface-muted font-mono"
               placeholder="(no message generated yet — click Regenerate)"
             />
             {(() => {
@@ -379,21 +379,21 @@ export default function PromotionDetailPage() {
                   <button
                     onClick={handleRegenerate}
                     disabled={regenerating || sending || saving}
-                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
+                    className="bg-surface-muted text-ink px-4 py-2 rounded-lg text-sm font-medium hover:bg-line disabled:opacity-50 transition-colors"
                   >
                     {regenerating ? 'Regenerating...' : 'Regenerate'}
                   </button>
                   <button
                     onClick={handleSave}
                     disabled={!isDirty || saving || sending}
-                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
+                    className="bg-surface-muted text-ink px-4 py-2 rounded-lg text-sm font-medium hover:bg-line disabled:opacity-50 transition-colors"
                   >
                     {saving ? 'Saving...' : 'Save edits'}
                   </button>
                   <button
                     onClick={handleSend}
                     disabled={sending || saving}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                    className="bg-brand-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors"
                   >
                     {sending ? 'Sending...' : `Send to ${targets.length} group${targets.length === 1 ? '' : 's'}`}
                   </button>
@@ -405,22 +405,22 @@ export default function PromotionDetailPage() {
             })()}
           </>
         ) : (
-          <div className="bg-gray-50 rounded-lg p-4 whitespace-pre-wrap text-sm text-gray-800 font-mono">
+          <div className="bg-surface-muted rounded-lg p-4 whitespace-pre-wrap text-sm text-ink font-mono">
             {promotion.generated_message || '(no message generated)'}
           </div>
         )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-5">
-        <h2 className="font-semibold text-gray-900 mb-3">Target groups</h2>
+      <div className="card shadow-card">
+        <h2 className="font-display font-semibold text-ink mb-3">Target groups</h2>
         <ul className="space-y-2">
           {targets.map((t) => (
             <li key={t.id} className="flex justify-between items-center text-sm">
-              <span className="text-gray-900">{t.programme_name}</span>
+              <span className="text-ink">{t.programme_name}</span>
               <span className={`text-xs px-2 py-1 rounded ${
                 t.send_status === 'sent' ? 'bg-green-100 text-green-700' :
                 t.send_status === 'failed' ? 'bg-red-100 text-red-700' :
-                'bg-gray-100 text-gray-600'
+                'bg-surface-muted text-ink-muted'
               }`}>
                 {t.send_status}{t.error ? ` — ${t.error}` : ''}
               </span>
