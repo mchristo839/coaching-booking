@@ -156,6 +156,51 @@ export async function findOpenCampBooking(parentJid: string): Promise<CampBookin
   return (rows[0] as CampBookingRow | undefined) || null
 }
 
+function firstWord(s: string | null | undefined): string {
+  return (s || '').trim().split(/\s+/)[0].toLowerCase()
+}
+
+// Find the active booking for a 1:1 reply, bridging the WhatsApp LID↔phone gap.
+//
+// A parent who votes YES on a GROUP poll is only known by their group `@lid`,
+// so the booking is created keyed to that lid. But their 1:1 replies arrive
+// from their PHONE jid — a different string — so an exact lookup misses and the
+// message wrongly falls through to other handlers. On the first such reply we
+// "adopt" a recent open lid-keyed booking whose WhatsApp name matches the
+// sender, re-keying it to the phone jid. After that every reply matches exactly.
+// The name match disambiguates concurrent voters and stops strangers hijacking.
+export async function findOrAdoptOpenCampBooking(
+  senderJid: string,
+  senderName?: string | null
+): Promise<CampBookingRow | null> {
+  const exact = await findOpenCampBooking(senderJid)
+  if (exact) return exact
+
+  // Only bridge phone→lid (don't re-key when the reply itself is a lid).
+  if (senderJid.endsWith('@lid')) return null
+  const name = firstWord(senderName)
+  if (!name || name === 'there') return null
+
+  const { rows } = await sql.query(
+    `SELECT ${CAMP_SELECT} FROM camp_bookings
+     WHERE parent_jid LIKE '%@lid'
+       AND conversation_step IN ('awaiting_parent_name','awaiting_child_name')
+       AND state NOT IN ('confirmed','cancelled','expired')
+       AND expires_at > NOW()
+       AND created_at > NOW() - INTERVAL '2 hours'
+     ORDER BY created_at DESC`,
+    []
+  )
+  const candidates = (rows as CampBookingRow[]).filter((r) => firstWord(r.parent_name) === name)
+  if (candidates.length !== 1) return null
+
+  const adopted = candidates[0]
+  await sql`UPDATE camp_bookings SET parent_jid = ${senderJid}, updated_at = NOW() WHERE id = ${adopted.id}`
+  console.log(`[CAMP] adopted booking ${adopted.id}: ${adopted.parent_jid} → ${senderJid} (name "${name}")`)
+  adopted.parent_jid = senderJid
+  return adopted
+}
+
 export async function getCampPromotion(promotionId: string): Promise<CampPromotionRow | null> {
   const { rows } = await sql`
     SELECT id, title, detail, venue, payment_link, camp_days, created_by
@@ -449,9 +494,10 @@ export function parseCancelReply(text: string): boolean {
 
 export async function tryHandleCampBookingReply(
   senderJid: string,
-  messageText: string
+  messageText: string,
+  senderName?: string | null
 ): Promise<boolean> {
-  const booking = await findOpenCampBooking(senderJid)
+  const booking = await findOrAdoptOpenCampBooking(senderJid, senderName)
   if (!booking) return false
 
   const groupId = booking.booking_group_id || booking.id

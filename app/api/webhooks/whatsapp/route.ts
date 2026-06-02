@@ -344,7 +344,7 @@ export async function POST(request: NextRequest) {
 
         if (!consumedBy) {
           try {
-            if (await tryHandleCampBookingReply(remoteJid, inboundText)) {
+            if (await tryHandleCampBookingReply(remoteJid, inboundText, data?.pushName)) {
               consumedBy = 'camp_booking'
             }
           } catch (e) {
