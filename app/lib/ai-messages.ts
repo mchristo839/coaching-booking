@@ -581,6 +581,172 @@ export function buildCampDayUnparseableNudge(childName: string, dayList: CampDay
   return `Sorry, didn't catch which days you'd like for ${childName}. Please reply with the letters (e.g. "a, b") or day names from the list below — or "all" for every day.\n\n${lettered}`
 }
 
+// ─── Camp 1:1 conversation (revised spec) — pure message builders ───
+// All deterministic templates (no LLM) so they're cheap and unit-testable.
+
+export interface CampDayAvailLite {
+  index: number
+  label: string
+  price_gbp: number
+  remaining: number | null   // null = uncapped
+}
+
+export interface CampChildSummary {
+  childName: string
+  age: number | null
+  dayLabels: string[]
+  total: number
+}
+
+// Message 1 — opening. If the parent's name is unknown, ask for it first.
+export function buildCampOpening(campName: string, parentFirstName: string | null): string {
+  if (!parentFirstName) {
+    return `Hi! 👋 Great that you're interested in ${campName}.\n\nLet me get your child booked in — takes about a minute. First, what's your name?`
+  }
+  return `Hey ${parentFirstName}! 👋 Great that you're interested in ${campName}.\n\nLet me get your child booked in — takes about a minute.\n\nWhat's your child's first name?`
+}
+
+export function buildCampAskChildName(parentFirstName: string | null): string {
+  const name = parentFirstName ? ` ${parentFirstName}` : ''
+  return `Lovely to meet you${name}! And what's your child's first name?`
+}
+
+export function buildCampAskAge(childName: string): string {
+  return `Nice! How old is ${childName}?`
+}
+
+export function buildCampAgeRetry(childName: string): string {
+  return `Just to check — how old is ${childName} in years? (a number between 4 and 17)`
+}
+
+// Message 3 — day selection. Only days with capacity are passed in.
+export function buildCampDaySelection(childName: string, campName: string, availableDays: CampDayAvailLite[]): string {
+  const lines = availableDays.map((d) => {
+    const letter = String.fromCharCode(97 + d.index)
+    const spots = d.remaining != null ? ` (${d.remaining} spot${d.remaining === 1 ? '' : 's'} left)` : ''
+    return `${letter}) ${d.label} — £${Number(d.price_gbp).toFixed(2)}${spots}`
+  })
+  return `Great! Here are the available days for ${campName}:\n\n${lines.join('\n')}\n\nWhich days would you like ${childName} to attend? Reply with the letters, e.g. "a c" for the first and third.`
+}
+
+export function buildCampAllFull(campName: string): string {
+  return `Sorry — ${campName} is fully booked right now. Want me to add you to the waitlist? Reply "yes" and I'll let you know the moment a spot opens up.`
+}
+
+export function buildCampDayJustFilled(filledLabel: string, stillAvailable: CampDayAvailLite[]): string {
+  if (stillAvailable.length === 0) {
+    return `Sorry — ${filledLabel} just filled up, and the rest of the camp is now full too. I can add you to the waitlist if you'd like — reply "yes".`
+  }
+  const lines = stillAvailable.map((d) => `${String.fromCharCode(97 + d.index)}) ${d.label}`).join('\n')
+  return `Sorry — ${filledLabel} just filled up since you started! These are still available:\n\n${lines}\n\nWhich would you like? Reply with the letters.`
+}
+
+// Message 4 — checkout recap. Handles single and multiple children.
+export function buildCampCheckoutRecap(children: CampChildSummary[]): string {
+  const grandTotal = children.reduce((s, c) => s + c.total, 0)
+  if (children.length === 1) {
+    const c = children[0]
+    const ageBit = c.age != null ? ` (age ${c.age})` : ''
+    const daysLine = c.dayLabels.join(' + ')
+    const n = c.dayLabels.length
+    return `Here's what I've got:\n\n👦 ${c.childName}${ageBit}\n📅 ${daysLine}\n💰 ${n} day${n === 1 ? '' : 's'} = £${c.total.toFixed(2)}\n\nDoes that look right? Reply "yes" to get the payment link, "add" to book another child, or "change" to update anything.`
+  }
+  const lines = children.map((c) => {
+    const ageBit = c.age != null ? ` (age ${c.age})` : ''
+    return `• ${c.childName}${ageBit} — ${c.dayLabels.join(' + ')} — £${c.total.toFixed(2)}`
+  })
+  return `Here's your booking:\n\n${lines.join('\n')}\n\nTotal: £${grandTotal.toFixed(2)}\n\nReply "yes" for the payment link, "add" to book another child, or "change" to update anything.`
+}
+
+// Message 5 — combined payment link (single or multiple children).
+export function buildCampPaymentMessage(input: {
+  children: CampChildSummary[]
+  paymentLink: string | null
+  paymentReference: string
+  campName: string
+}): string {
+  const total = input.children.reduce((s, c) => s + c.total, 0)
+  const names = input.children.map((c) => c.childName).join(' & ')
+  const lines: string[] = []
+  lines.push(`Here's your payment link:`)
+  lines.push('')
+  lines.push(`£${total.toFixed(2)} for ${names} — ${input.campName}`)
+  if (input.paymentLink) {
+    lines.push('')
+    lines.push(input.paymentLink)
+  }
+  lines.push('')
+  lines.push(`Please use "${input.paymentReference}" as the payment reference.`)
+  lines.push('')
+  lines.push(`Once you've paid, reply "done" and I'll confirm your spot${input.children.length === 1 ? '' : 's'}.`)
+  return lines.join('\n')
+}
+
+// Sent when the parent messages while we're waiting on the coach to confirm.
+export function buildCampWaitingOnCoach(coachName: string | null): string {
+  const who = coachName && coachName.trim() ? coachName.trim() : 'the coach'
+  return `You're all set on my end — I'm just waiting for ${who} to confirm your payment. You'll get a confirmation here as soon as that's done 👍`
+}
+
+// Message 8 — booking confirmed (sent after coach confirms). One per group.
+export function buildCampConfirmed(input: {
+  children: CampChildSummary[]
+  venue: string | null
+}): string {
+  const total = input.children.reduce((s, c) => s + c.total, 0)
+  const lines: string[] = []
+  lines.push(`All booked! ✓`)
+  lines.push('')
+  for (const c of input.children) {
+    lines.push(`${c.childName} is confirmed for:`)
+    for (const d of c.dayLabels) lines.push(`📅 ${d}`)
+  }
+  if (input.venue && input.venue.trim()) {
+    lines.push('')
+    lines.push(`📍 ${input.venue.trim()}`)
+  }
+  lines.push(`💰 £${total.toFixed(2)} — payment received`)
+  lines.push('')
+  lines.push(`What to bring: comfy kit, trainers, a water bottle and a packed lunch.`)
+  lines.push('')
+  lines.push(`See you there! 💪`)
+  return lines.join('\n')
+}
+
+// Reject — coach flags a payment issue.
+export function buildCampRejected(coachName: string | null): string {
+  const who = coachName && coachName.trim() ? coachName.trim() : 'the coach'
+  return `There's a small issue with the payment — ${who} will be in touch shortly to sort it out. 🙏`
+}
+
+// ─── Pure parsers for the camp conversation ───
+
+// Extract a plausible child age (4–17) from a free-text reply.
+export function parseCampAge(text: string): number | null {
+  const m = text.match(/\b(\d{1,2})\b/)
+  if (!m) return null
+  const n = parseInt(m[1], 10)
+  return n >= 4 && n <= 17 ? n : null
+}
+
+export type CheckoutReply = 'confirm' | 'change' | 'add' | 'unknown'
+
+// Classify the reply to the checkout recap.
+export function parseCheckoutReply(text: string): CheckoutReply {
+  const t = text.trim().toLowerCase()
+  if (!t) return 'unknown'
+  if (/\b(add|another|more|second child|sibling|also)\b/.test(t)) return 'add'
+  if (/\b(change|wrong|edit|update|amend|no\b|incorrect|not right)\b/.test(t)) return 'change'
+  if (/\b(yes|yep|yeah|yes please|correct|looks good|that's right|thats right|perfect|👍|confirm|go ahead|send)\b/.test(t) || t === 'y' || t === '✅') return 'confirm'
+  return 'unknown'
+}
+
+// Affirmative yes (used for waitlist offers etc).
+export function parseAffirmative(text: string): boolean {
+  const t = text.trim().toLowerCase()
+  return /^(y|yes|yep|yeah|yes please|ok|okay|sure|go on|please|👍|✅)\b/.test(t) || t === '👍' || t === '✅'
+}
+
 // ─── PT booking flow (Paul's spec Flow 2 — Private Lesson Booking) ───
 
 interface PtSlotLite {

@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthFromRequest } from '@/app/lib/auth'
 import { getPromotion } from '@/app/lib/control-centre-db'
-import { listCampBookingsForPromotion } from '@/app/lib/camp-booking'
+import { listCampBookingsForPromotion, getCampDayAvailability } from '@/app/lib/camp-booking'
 
 export async function GET(
   request: NextRequest,
@@ -25,5 +25,6 @@ export async function GET(
   }
 
   const bookings = await listCampBookingsForPromotion(params.id)
-  return NextResponse.json({ bookings, camp_days: promotion.camp_days || [] })
+  const availability = await getCampDayAvailability(params.id)
+  return NextResponse.json({ bookings, camp_days: promotion.camp_days || [], availability })
 }

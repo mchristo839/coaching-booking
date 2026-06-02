@@ -132,6 +132,20 @@ the group), from the promotion detail page (`/dashboard/promotions/[id]`).
 - Sends are paced (~600ms apart) to reduce WhatsApp ban risk on the Baileys stack
 - Compliance: only signed-up members are messaged (PECR soft opt-in), never harvested group rosters
 
+## Holiday camp 1:1 booking conversation
+
+A WhatsApp 1:1 state machine that books a child onto a holiday-camp promotion.
+Engine: `app/lib/camp-booking.ts` (`tryHandleCampBookingReply`, wired into the
+webhook's 1:1 branch); message copy + pure parsers in `app/lib/ai-messages.ts`.
+
+- **Flow** (`conversation_step` on `camp_bookings`): `awaiting_parent_name → awaiting_child_name → awaiting_child_age → awaiting_day_selection → awaiting_checkout_confirm → awaiting_payment → awaiting_coach_confirm → confirmed` (+ `awaiting_waitlist_confirm`, `cancelled`). The coarse `state` column is kept in sync for the dashboard/confirm queries.
+- **Capacity is DERIVED, never stored**: `remaining = day.capacity − count(confirmed bookings incl. that day)`. Full days are excluded at selection and re-checked at checkout; capacity only drops on **coach confirm** (`getCampDayAvailability`).
+- **Multiple children, one payment**: sibling rows share a `booking_group_id`; checkout/payment/confirm operate on the whole group. One row per child so each consumes day capacity.
+- **Coach confirm** (`/api/promotions/[id]/bookings/[bookingId]/confirm`) → confirms the group, sets linked `members.status = 'active'`, sends the parent the "All booked ✓" message (Message 8). **Reject** (`…/reject`) keeps the booking pending and DMs the parent.
+- **Dashboard** (`/dashboard/promotions/[id]`): day-by-day availability panel (colour-coded), pending confirmations with one-click Confirm/Reject, CSV export of confirmed bookings.
+- New `camp_bookings` columns: `conversation_step`, `child_age`, `booking_group_id`, `payment_link`, `payment_status`.
+- **Trigger note**: the conversation is initiated by the cohort blast (`send-camp-cohort`). The spec's "poll YES → start conversation" is NOT wired — `polls` have no link to camp `promotions`; wiring it needs that linkage decided first.
+
 ## PLANNED (not yet implemented)
 
 - @mention-only mode (bot only responds when @mentioned)
