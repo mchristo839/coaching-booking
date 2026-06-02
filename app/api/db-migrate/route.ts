@@ -761,6 +761,33 @@ export async function POST() {
         ON camp_bookings(promotion_id, created_at DESC)
     `
 
+    // Camp 1:1 booking conversation (revised spec) — richer state machine.
+    //   conversation_step — fine-grained position in the 1:1 flow (app-enforced,
+    //                        intentionally no CHECK so steps can evolve). `state`
+    //                        is kept in sync as the coarse status the dashboard reads.
+    //   child_age         — collected during the conversation
+    //   booking_group_id  — groups sibling rows that share ONE combined payment
+    //   payment_link      — snapshot of the link sent to the parent
+    //   payment_status    — finance status, parallel to booking state
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS conversation_step VARCHAR(40)`
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS child_age INTEGER`
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS booking_group_id UUID`
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS payment_link TEXT`
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'not_sent'`
+    // Backfill conversation_step for any rows created by the older cohort-send path.
+    await sql`UPDATE camp_bookings SET conversation_step = 'awaiting_day_selection' WHERE conversation_step IS NULL AND state = 'awaiting_day_selection'`
+    await sql`UPDATE camp_bookings SET booking_group_id = id WHERE booking_group_id IS NULL`
+    await sql`CREATE INDEX IF NOT EXISTS idx_camp_bookings_group ON camp_bookings(booking_group_id)`
+
+    // Optional link from a poll to a holiday-camp promotion. When set, a YES vote
+    // on the poll starts the camp 1:1 booking conversation for that voter (so a
+    // camp can be launched from a poll OR from the promotion's cohort blast).
+    await sql`ALTER TABLE polls ADD COLUMN IF NOT EXISTS promotion_id UUID`
+
+    // Optional camp image (data URL / base64 or external URL) shown with the
+    // camp poll when it's posted to the group.
+    await sql`ALTER TABLE promotions ADD COLUMN IF NOT EXISTS camp_image_url TEXT`
+
     // ═══════════════════════════════════════════════════════════
     // Native bookable calendar (Paul's spec Flow 2 + Flow 12)
     // ═══════════════════════════════════════════════════════════

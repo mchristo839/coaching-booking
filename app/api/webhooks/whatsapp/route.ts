@@ -12,7 +12,7 @@ import {
 import { notifyCoachHandoff } from '@/app/lib/notify'
 import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId, optOutMemberByJid } from '@/app/lib/control-centre-db'
 import { tryHandleFeedbackReply } from '@/app/lib/feedback'
-import { tryHandleCampBookingReply } from '@/app/lib/camp-booking'
+import { tryHandleCampBookingReply, startCampBookingFromPoll } from '@/app/lib/camp-booking'
 import { tryHandlePtBookingReply } from '@/app/lib/calendar'
 import { tryHandleCancellationReply } from '@/app/lib/cancellation'
 import { tryHandleEnquiryMessage } from '@/app/lib/enquiry-chase'
@@ -230,11 +230,21 @@ export async function POST(request: NextRequest) {
               console.warn('[POLL-VOTE] unmatched vote payload:', JSON.stringify(selectedOptions).slice(0, 500))
             }
 
-            // Send the same 1:1 follow-up the text-vote path sends, so a parent
-            // who taps "yes" on a NATIVE WhatsApp poll also gets their booking
-            // link / waitlist / closed message. Previously native votes were
-            // recorded but the parent never received a way to confirm their spot.
-            const nativeFollowUp = voteResult ? pollFollowUpMessage(voteResult) : null
+            // If this poll is linked to a holiday camp, a YES starts the 1:1
+            // camp booking conversation instead of the generic follow-up.
+            let campStarted = false
+            if (voteResult?.was_yes && pollRow.promotion_id && voterJid) {
+              try {
+                campStarted = await startCampBookingFromPoll(pollRow.promotion_id, voterJid, voterName)
+              } catch (e) {
+                console.error('[POLL-VOTE] camp trigger failed:', e)
+              }
+            }
+
+            // Otherwise send the same 1:1 follow-up the text-vote path sends, so
+            // a parent who taps "yes" on a NATIVE WhatsApp poll also gets their
+            // booking link / waitlist / closed message.
+            const nativeFollowUp = campStarted ? null : voteResult ? pollFollowUpMessage(voteResult) : null
             if (nativeFollowUp && voterJid) {
               try {
                 await sendWhatsAppMessage(voterJid, nativeFollowUp)
@@ -550,8 +560,19 @@ export async function POST(request: NextRequest) {
           chosen
         )
 
-        // 1:1 follow-up based on outcome (shared with the native-poll path)
-        const followUp = pollFollowUpMessage(result)
+        // If this poll is linked to a holiday camp, a YES starts the 1:1 camp
+        // booking conversation instead of the generic follow-up.
+        let campStarted = false
+        if (result.was_yes && activePoll.promotion_id) {
+          try {
+            campStarted = await startCampBookingFromPoll(activePoll.promotion_id, senderJid, senderName)
+          } catch (e) {
+            console.error('[poll camp-trigger] failed:', e)
+          }
+        }
+
+        // Otherwise the standard 1:1 follow-up (shared with the native-poll path)
+        const followUp = campStarted ? null : pollFollowUpMessage(result)
 
         if (followUp) {
           // Fire-and-forget 1:1 DM so we don't block the webhook response

@@ -137,6 +137,23 @@ the group), from the promotion detail page (`/dashboard/promotions/[id]`).
 - Sends are paced (~600ms apart) to reduce WhatsApp ban risk on the Baileys stack
 - Compliance: only signed-up members are messaged (PECR soft opt-in), never harvested group rosters
 
+## Holiday camp 1:1 booking conversation
+
+A WhatsApp 1:1 state machine that books a child onto a holiday-camp promotion.
+Engine: `app/lib/camp-booking.ts` (`tryHandleCampBookingReply`, wired into the
+webhook's 1:1 branch); message copy + pure parsers in `app/lib/ai-messages.ts`.
+
+- **Flow** (`conversation_step` on `camp_bookings`): `awaiting_parent_name → awaiting_child_name → awaiting_child_age → awaiting_day_selection → awaiting_checkout_confirm → awaiting_payment → awaiting_coach_confirm → confirmed` (+ `awaiting_waitlist_confirm`, `cancelled`). The coarse `state` column is kept in sync for the dashboard/confirm queries.
+- **Capacity is DERIVED, never stored**: `remaining = day.capacity − count(confirmed bookings incl. that day)`. Full days are excluded at selection and re-checked at checkout; capacity only drops on **coach confirm** (`getCampDayAvailability`).
+- **Multiple children, one payment**: sibling rows share a `booking_group_id`; checkout/payment/confirm operate on the whole group. One row per child so each consumes day capacity.
+- **Coach confirm** (`/api/promotions/[id]/bookings/[bookingId]/confirm`) → confirms the group, sets linked `members.status = 'active'`, sends the parent the "All booked ✓" message (Message 8). **Reject** (`…/reject`) keeps the booking pending and DMs the parent.
+- **Dashboard** (`/dashboard/promotions/[id]`): day-by-day availability panel (colour-coded), pending confirmations with one-click Confirm/Reject, CSV export of confirmed bookings.
+- New `camp_bookings` columns: `conversation_step`, `child_age`, `booking_group_id`, `payment_link`, `payment_status`.
+- **Unified builder** (`/dashboard/camps/new` → `POST /api/camps`): one screen — description + optional image (base64, sent via `sendWhatsAppMedia`) + bookable days (price/capacity) + poll options. On save it creates the holiday_camp promotion AND creates + posts the linked poll to the chosen groups in one go. The old `/dashboard/promotions/new` holiday_camp path still works and links across to this builder.
+- **Two ways to start it (both supported)**:
+  1. **Cohort blast** — `send-camp-cohort` DMs every parent on the targeted programmes' member roll (details known → starts at day selection).
+  2. **Poll YES** — a poll can be linked to a camp via `polls.promotion_id` (set from the poll builder's "Link to a holiday camp" dropdown). A YES vote calls `startCampBookingFromPoll` (idempotent), which opens a booking and sends Message 1 (asks for parent name first if unknown, else child name). Wired into both the native-poll and text-vote paths in the webhook.
+
 ## PLANNED (not yet implemented)
 
 - @mention-only mode (bot only responds when @mentioned)
