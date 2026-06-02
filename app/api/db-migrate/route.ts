@@ -594,6 +594,16 @@ export async function POST() {
     // are populated from the first row for backward compatibility.
     await sql`ALTER TABLE programmes ADD COLUMN IF NOT EXISTS session_schedule JSONB`
 
+    // Closed-intent bot — three answerable fields the bot previously had no
+    // backing column for. Free-text so coaches phrase them naturally; the bot
+    // reads them verbatim and never invents a value when they're blank.
+    //   payment_method — how parents pay (e.g. "Bank transfer or cash on the day")
+    //   session_type   — what a session actually is (e.g. "45-min small-group strength class")
+    //   camp_schedule  — holiday-camp dates/times (e.g. "Feb half-term: Mon–Fri 17–21, 10am–2pm")
+    await sql`ALTER TABLE programmes ADD COLUMN IF NOT EXISTS payment_method TEXT`
+    await sql`ALTER TABLE programmes ADD COLUMN IF NOT EXISTS session_type TEXT`
+    await sql`ALTER TABLE programmes ADD COLUMN IF NOT EXISTS camp_schedule TEXT`
+
     // ═══════════════════════════════════════════════════════════
     // Phase 8: Fitness studio vertical (Paul's brief)
     // All additive. Existing 'sport' coaches are not affected.

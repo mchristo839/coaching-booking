@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
-import { findProgramByWhatsAppGroup, safeLogConversation, isMessageProcessed, trackBotReply, type Knowledgebase } from '@/app/lib/db'
+import { findProgramByWhatsAppGroup, getProgrammeAvailability, safeLogConversation, isMessageProcessed, trackBotReply, type Knowledgebase } from '@/app/lib/db'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
+import {
+  classifyBotIntent,
+  planBotResponse,
+  phraseAnswer,
+  buildHandoffMessage,
+  buildMissingDataMessage,
+} from '@/app/lib/bot-intent'
+import { notifyCoachHandoff } from '@/app/lib/notify'
 import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId, optOutMemberByJid } from '@/app/lib/control-centre-db'
 import { tryHandleFeedbackReply } from '@/app/lib/feedback'
 import { tryHandleCampBookingReply } from '@/app/lib/camp-booking'
@@ -11,7 +19,6 @@ import { tryHandleEnquiryMessage } from '@/app/lib/enquiry-chase'
 import { tryHandleOnboardingReply } from '@/app/lib/onboarding'
 import { resolveSender, classifyIntent, logInboxInteraction } from '@/app/lib/inbox-agent'
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 const BOT_JID = process.env.BOT_JID || ''
 
 // Resolve a single selected-option value from a native WhatsApp poll vote
@@ -115,59 +122,6 @@ function isBotMentioned(messageText: string, mentionedJids: string[]): boolean {
   }
 
   return false
-}
-
-function buildSystemPrompt(program: { program_name: string; coach_name: string; knowledgebase: Knowledgebase }): string {
-  const kb = program.knowledgebase
-
-  const faqSection = kb.customFaqs && kb.customFaqs.length > 0
-    ? `\nAdditional Q&A:\n${kb.customFaqs.map((f) => `Q: ${f.q}\nA: ${f.a}`).join('\n\n')}`
-    : ''
-
-  return `You are a helpful assistant for ${program.program_name}, a coaching programme run by ${program.coach_name}.
-
-Your job is to answer questions from parents and participants in this WhatsApp group. Only answer questions about this specific programme. If asked about anything unrelated, politely say you can only help with questions about ${program.program_name}.
-
-Keep answers concise and friendly — this is a WhatsApp group, not an email. 2-3 sentences max unless a list is genuinely helpful.
-
-Programme details:
-- Sport: ${kb.sport}
-- Venue: ${kb.venue}${kb.venueAddress ? ` (${kb.venueAddress})` : ''}
-- Age group: ${kb.ageGroup}
-- Skill level: ${kb.skillLevel}
-- Schedule: ${kb.schedule}
-- Price: £${(kb.priceCents / 100).toFixed(2)} per session
-- What to bring: ${kb.whatToBring}
-- Cancellation policy: ${kb.cancellationPolicy}
-- Medical/injury info: ${kb.medicalInfo}
-- About the coach: ${kb.coachBio}
-${faqSection}
-
-If you don't know the answer, say "I'm not sure about that — please contact the coach directly."`
-}
-
-async function askClaude(systemPrompt: string, userMessage: string): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-    }),
-  })
-
-  if (!res.ok) {
-    throw new Error(`Claude API error ${res.status}`)
-  }
-
-  const data = await res.json()
-  return data.content?.[0]?.text || "I'm not sure about that — please contact the coach directly."
 }
 
 /** Simple category classification based on message content */
@@ -503,7 +457,10 @@ export async function POST(request: NextRequest) {
     console.log(`[LOG] Incoming message from ${senderName} in ${groupJid}: ${messageText.slice(0, 100)}`)
 
     // Classify the message
-    const { category, escalated } = classifyMessage(messageText)
+    // We still run the keyword classifier purely to set the `escalated` flag on
+    // the conversation log (injury / complaint / safeguarding). The closed-intent
+    // gate below decides what the bot actually says.
+    const { escalated } = classifyMessage(messageText)
 
     // Look up which program this group belongs to
     const program = await findProgramByWhatsAppGroup(groupJid)
@@ -633,24 +590,77 @@ export async function POST(request: NextRequest) {
     void isBotMentioned // kept for future re-enable; silences unused-var lint
     void BOT_JID
 
-    // Strip @number tags from message text before sending to Claude
+    // Strip @number mention tags before classifying.
     const cleanedText = messageText.replace(/@\d+/g, '').trim()
-    const messageWithContext = `${senderName} asks: ${cleanedText}`
+    const kb = program.knowledgebase as Knowledgebase
+    const coachName = (program.coach_name as string) || ''
 
-    const systemPrompt = buildSystemPrompt({
-      program_name: program.program_name,
-      coach_name: program.coach_name,
-      knowledgebase: program.knowledgebase as Knowledgebase,
-    })
+    // ─── Closed-intent gate ───
+    // Recognise the intent widely, then answer ONLY from this programme's data
+    // for the allowed intents. Everything else — and any in-scope question whose
+    // backing data is missing — routes to the coach rather than being answered
+    // or guessed.
+    const { intent } = await classifyBotIntent(cleanedText)
 
-    const reply = await askClaude(systemPrompt, messageWithContext)
+    // Social chatter (greeting / thanks / emoji): stay quiet rather than reply to
+    // every message in the group. Log it and move on.
+    if (intent === 'social') {
+      await safeLogConversation({
+        programmeId: program.id,
+        groupJid,
+        senderJid,
+        senderName,
+        messageText,
+        botResponse: null,
+        category: 'social',
+        escalated,
+      })
+      return NextResponse.json({ ok: true })
+    }
 
-    const { isDuplicate } = await trackBotReply(groupJid, category, messageId)
+    const availability =
+      intent === 'capacity_booking' ? await getProgrammeAvailability(program) : null
+    const plan = planBotResponse(intent, kb, availability)
+
+    // Social is already handled and returned above; this guard narrows the type.
+    if (plan.action === 'social') {
+      return NextResponse.json({ ok: true })
+    }
+
+    let reply: string
+    let logCategory: string
+
+    if (plan.action === 'answer') {
+      reply = await phraseAnswer(cleanedText, plan.facts, program.program_name)
+      logCategory = `answer_${plan.intent}`
+    } else {
+      // Refuse-and-route. Out-of-scope gets the scope line; missing-data gets the
+      // "let me check with the coach" line. Either way DM the coach (best-effort)
+      // so the handoff is real, never a dead end. A notify failure must not stop
+      // the parent getting their group reply.
+      reply =
+        plan.reason === 'missing_data'
+          ? buildMissingDataMessage(coachName)
+          : buildHandoffMessage(coachName)
+      logCategory = `handoff_${plan.reason}`
+      try {
+        await notifyCoachHandoff({
+          programmeId: program.id,
+          parentName: senderName,
+          question: cleanedText,
+          reason: plan.reason,
+        })
+      } catch (e) {
+        console.error('[HANDOFF notify] error (group reply still sent):', e)
+      }
+    }
+
+    const { isDuplicate } = await trackBotReply(groupJid, logCategory, messageId)
     if (isDuplicate) return NextResponse.json({ ok: true })
 
     await sendWhatsAppMessage(groupJid, reply)
 
-    console.log(`[LOG] Bot replied in ${groupJid}, category: ${category}, escalated: ${escalated}`)
+    console.log(`[LOG] Bot replied in ${groupJid}, intent: ${intent}, action: ${plan.action}, escalated: ${escalated}`)
 
     await safeLogConversation({
       programmeId: program.id,
@@ -659,7 +669,7 @@ export async function POST(request: NextRequest) {
       senderName,
       messageText,
       botResponse: reply,
-      category,
+      category: logCategory,
       escalated,
     })
 
