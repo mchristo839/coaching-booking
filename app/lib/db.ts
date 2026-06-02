@@ -6,8 +6,18 @@ import { sql } from '@/app/lib/sql'
 
 // ─── Providers ───
 
+// Normalise emails for storage and lookup: trim surrounding whitespace and
+// lowercase. iPads/iOS keyboards often auto-capitalise the first letter or
+// leave a trailing space, which previously caused "Invalid email or password"
+// on an otherwise-correct login.
+export function normalizeEmail(email: string): string {
+  return (email || '').trim().toLowerCase()
+}
+
 export async function findProviderByEmail(email: string) {
-  const { rows } = await sql`SELECT * FROM providers WHERE email = ${email} LIMIT 1`
+  const normalized = normalizeEmail(email)
+  // Case-insensitive match so existing mixed-case rows still resolve.
+  const { rows } = await sql`SELECT * FROM providers WHERE LOWER(email) = ${normalized} LIMIT 1`
   return rows[0] || null
 }
 
@@ -24,7 +34,7 @@ export async function createProvider(data: {
 }) {
   const { rows } = await sql`
     INSERT INTO providers (first_name, last_name, email, password_hash, mobile_whatsapp, trading_name, town_city, postcode, referral_source)
-    VALUES (${data.firstName}, ${data.lastName}, ${data.email}, ${data.passwordHash}, ${data.mobileWhatsapp || ''}, ${data.tradingName || null}, ${data.townCity || null}, ${data.postcode || null}, ${data.referralSource || null})
+    VALUES (${data.firstName}, ${data.lastName}, ${normalizeEmail(data.email)}, ${data.passwordHash}, ${data.mobileWhatsapp || ''}, ${data.tradingName || null}, ${data.townCity || null}, ${data.postcode || null}, ${data.referralSource || null})
     RETURNING *
   `
   return rows[0]
