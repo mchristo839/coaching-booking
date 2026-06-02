@@ -45,6 +45,36 @@ export async function updateProvider(providerId: string, fields: Record<string, 
   return rows[0]
 }
 
+// ─── Password resets ───
+
+export async function updateProviderPassword(providerId: string, passwordHash: string) {
+  await sql`UPDATE providers SET password_hash = ${passwordHash}, updated_at = NOW() WHERE id = ${providerId}`
+}
+
+export async function createPasswordReset(providerId: string, tokenHash: string, expiresAt: Date) {
+  // Invalidate any earlier outstanding resets for this provider so only the
+  // most recent link is ever live.
+  await sql`UPDATE password_resets SET used_at = NOW() WHERE provider_id = ${providerId} AND used_at IS NULL`
+  await sql`
+    INSERT INTO password_resets (provider_id, token_hash, expires_at)
+    VALUES (${providerId}, ${tokenHash}, ${expiresAt.toISOString()})
+  `
+}
+
+// Returns the reset row if the token is unused and unexpired, else null.
+export async function findValidPasswordReset(tokenHash: string) {
+  const { rows } = await sql`
+    SELECT * FROM password_resets
+    WHERE token_hash = ${tokenHash} AND used_at IS NULL AND expires_at > NOW()
+    LIMIT 1
+  `
+  return rows[0] || null
+}
+
+export async function markPasswordResetUsed(id: string) {
+  await sql`UPDATE password_resets SET used_at = NOW() WHERE id = ${id}`
+}
+
 // ─── Coaches ───
 
 export async function createCoach(data: {

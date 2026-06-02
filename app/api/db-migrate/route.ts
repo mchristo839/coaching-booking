@@ -29,6 +29,22 @@ export async function POST() {
       )
     `
 
+    // ── 1b. Password resets (forgot-password flow) ──
+    // We store only a SHA-256 hash of the token, never the token itself, so a
+    // DB leak can't be used to hijack a reset. Tokens are single-use (used_at)
+    // and short-lived (expires_at, set by the issuing route).
+    await sql`
+      CREATE TABLE IF NOT EXISTS password_resets (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        provider_id UUID NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+        token_hash VARCHAR(64) NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_password_resets_token_hash ON password_resets (token_hash)`
+
     // ── 2. Coaches (separate from provider for club scaling) ──
     await sql`
       CREATE TABLE IF NOT EXISTS coaches_v2 (
