@@ -28,6 +28,7 @@ import {
   parseCampAge,
   parseCheckoutReply,
   parseAffirmative,
+  buildCampOpening,
   buildCampAskChildName,
   buildCampAskAge,
   buildCampAgeRetry,
@@ -238,10 +239,12 @@ export async function createCampBooking(input: {
   parentName?: string | null
   childName?: string | null
   bookingGroupId?: string | null
+  startStep?: CampStep
 }): Promise<string> {
-  // If the child's name is already known (cohort-send path), skip straight to
-  // day selection; otherwise begin the conversational collection.
-  const step: CampStep = input.childName ? 'awaiting_day_selection' : 'awaiting_child_name'
+  // Default: if the child's name is already known (cohort-send path), skip
+  // straight to day selection; otherwise begin the conversational collection.
+  // A caller can override (e.g. the poll trigger starts at parent/child name).
+  const step: CampStep = input.startStep || (input.childName ? 'awaiting_day_selection' : 'awaiting_child_name')
   const { rows } = await sql`
     INSERT INTO camp_bookings (
       promotion_id, member_id, parent_jid, parent_name, child_name,
@@ -258,6 +261,57 @@ export async function createCampBooking(input: {
   const groupId = input.bookingGroupId || id
   await sql`UPDATE camp_bookings SET booking_group_id = ${groupId} WHERE id = ${id}`
   return id
+}
+
+// Resolve a parent from their WhatsApp JID across the camp's target programmes,
+// so a poll-triggered booking can pre-fill the name + link the member row.
+async function findMemberByJid(jid: string): Promise<{ id: string; parent_name: string | null } | null> {
+  const { rows } = await sql`
+    SELECT id, parent_name FROM members
+    WHERE parent_whatsapp_id = ${jid} AND status <> 'cancelled'
+    ORDER BY created_at DESC LIMIT 1
+  `
+  return (rows[0] as { id: string; parent_name: string | null } | undefined) || null
+}
+
+// Start the 1:1 booking conversation from a poll YES. Idempotent: if the voter
+// already has an open booking for this camp, we don't start a second one.
+// Returns true when the camp opening was sent (so the caller skips its generic
+// poll follow-up), false when the camp is misconfigured / already in progress.
+export async function startCampBookingFromPoll(
+  promotionId: string,
+  voterJid: string,
+  voterName?: string | null
+): Promise<boolean> {
+  const promo = await getCampPromotion(promotionId)
+  if (!promo || !Array.isArray(promo.camp_days) || promo.camp_days.length === 0 || !promo.payment_link) {
+    console.warn('[CAMP poll-trigger] promotion misconfigured, skipping:', promotionId)
+    return false
+  }
+
+  // Idempotency — don't open a duplicate booking on a re-vote.
+  const { rows: existing } = await sql`
+    SELECT id FROM camp_bookings
+    WHERE parent_jid = ${voterJid} AND promotion_id = ${promotionId}
+      AND state NOT IN ('cancelled','expired')
+    LIMIT 1
+  `
+  if (existing[0]) return true
+
+  const member = await findMemberByJid(voterJid)
+  const parentName = member?.parent_name || (voterName && voterName !== 'there' ? voterName : null)
+  const parentFirst = parentName ? parentName.split(/\s+/)[0] : null
+  const startStep: CampStep = parentName ? 'awaiting_child_name' : 'awaiting_parent_name'
+
+  await createCampBooking({
+    promotionId,
+    parentJid: voterJid,
+    parentName,
+    memberId: member?.id || null,
+    startStep,
+  })
+  await sendWhatsAppMessage(voterJid, buildCampOpening(promo.title || 'the camp', parentFirst))
+  return true
 }
 
 async function setStep(id: string, step: CampStep) {

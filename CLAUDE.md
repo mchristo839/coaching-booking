@@ -144,7 +144,9 @@ webhook's 1:1 branch); message copy + pure parsers in `app/lib/ai-messages.ts`.
 - **Coach confirm** (`/api/promotions/[id]/bookings/[bookingId]/confirm`) → confirms the group, sets linked `members.status = 'active'`, sends the parent the "All booked ✓" message (Message 8). **Reject** (`…/reject`) keeps the booking pending and DMs the parent.
 - **Dashboard** (`/dashboard/promotions/[id]`): day-by-day availability panel (colour-coded), pending confirmations with one-click Confirm/Reject, CSV export of confirmed bookings.
 - New `camp_bookings` columns: `conversation_step`, `child_age`, `booking_group_id`, `payment_link`, `payment_status`.
-- **Trigger note**: the conversation is initiated by the cohort blast (`send-camp-cohort`). The spec's "poll YES → start conversation" is NOT wired — `polls` have no link to camp `promotions`; wiring it needs that linkage decided first.
+- **Two ways to start it (both supported)**:
+  1. **Cohort blast** — `send-camp-cohort` DMs every parent on the targeted programmes' member roll (details known → starts at day selection).
+  2. **Poll YES** — a poll can be linked to a camp via `polls.promotion_id` (set from the poll builder's "Link to a holiday camp" dropdown). A YES vote calls `startCampBookingFromPoll` (idempotent), which opens a booking and sends Message 1 (asks for parent name first if unknown, else child name). Wired into both the native-poll and text-vote paths in the webhook.
 
 ## PLANNED (not yet implemented)
 

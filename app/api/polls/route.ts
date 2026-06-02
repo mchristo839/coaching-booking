@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       sessionAt,
       yesOptionIndex,
       paymentLink,
+      promotionId,
     } = body
 
     if (!question || !Array.isArray(options) || options.length < 2 || options.length > 6) {
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
       sessionAt: sessionAt || null,
       yesOptionIndex: parsedYesIdx,
       paymentLink: paymentLink || null,
+      promotionId: promotionId || null,
     })
 
     const targets = await getPollTargets(poll.id)

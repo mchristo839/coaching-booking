@@ -129,19 +129,20 @@ export interface PollCreateInput {
   sessionAt?: string | null
   yesOptionIndex?: number | null
   paymentLink?: string | null
+  promotionId?: string | null
 }
 
 export async function createPoll(input: PollCreateInput) {
   const { rows } = await sql`
     INSERT INTO polls (
       created_by, question, options, response_type, closes_at, anonymous,
-      capacity, session_at, yes_option_index, payment_link
+      capacity, session_at, yes_option_index, payment_link, promotion_id
     )
     VALUES (
       ${input.createdBy}, ${input.question}, ${JSON.stringify(input.options)}::jsonb,
       ${input.responseType}, ${input.closesAt ?? null}, ${input.anonymous},
       ${input.capacity ?? null}, ${input.sessionAt ?? null},
-      ${input.yesOptionIndex ?? 0}, ${input.paymentLink ?? null}
+      ${input.yesOptionIndex ?? 0}, ${input.paymentLink ?? null}, ${input.promotionId ?? null}
     )
     RETURNING *
   `
@@ -384,7 +385,7 @@ export async function setPollTargetMessageId(
  */
 export async function getPollByWaMessageId(waMessageId: string) {
   const { rows } = await sql`
-    SELECT p.id as poll_id, p.options, p.response_type, p.status, pt.programme_id
+    SELECT p.id as poll_id, p.options, p.response_type, p.status, p.promotion_id, pt.programme_id
     FROM poll_targets pt
     JOIN polls p ON p.id = pt.poll_id
     WHERE pt.wa_message_id = ${waMessageId}
