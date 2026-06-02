@@ -31,6 +31,7 @@ export interface PromotionCreateInput {
   slug?: string | null
   programmeIds: string[]
   campDays?: CampDayInput[] | null
+  campImageUrl?: string | null
 }
 
 export async function createPromotion(input: PromotionCreateInput) {
@@ -40,14 +41,14 @@ export async function createPromotion(input: PromotionCreateInput) {
   const { rows } = await sql`
     INSERT INTO promotions (
       created_by, promotion_type, title, detail, start_at, end_at,
-      venue, cost_gbp, is_free, payment_link, send_mode, generated_message, slug, camp_days
+      venue, cost_gbp, is_free, payment_link, send_mode, generated_message, slug, camp_days, camp_image_url
     )
     VALUES (
       ${input.createdBy}, ${input.promotionType}, ${input.title ?? null}, ${input.detail},
       ${input.startAt ?? null}, ${input.endAt ?? null},
       ${input.venue ?? null}, ${input.costGbp ?? null}, ${input.isFree ?? false},
       ${input.paymentLink ?? null}, ${input.sendMode}, ${input.generatedMessage ?? null},
-      ${input.slug ?? null}, ${campDaysJson}::jsonb
+      ${input.slug ?? null}, ${campDaysJson}::jsonb, ${input.campImageUrl ?? null}
     )
     RETURNING *
   `

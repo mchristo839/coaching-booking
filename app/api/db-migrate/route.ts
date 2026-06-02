@@ -758,6 +758,10 @@ export async function POST() {
     // camp can be launched from a poll OR from the promotion's cohort blast).
     await sql`ALTER TABLE polls ADD COLUMN IF NOT EXISTS promotion_id UUID`
 
+    // Optional camp image (data URL / base64 or external URL) shown with the
+    // camp poll when it's posted to the group.
+    await sql`ALTER TABLE promotions ADD COLUMN IF NOT EXISTS camp_image_url TEXT`
+
     // ═══════════════════════════════════════════════════════════
     // Native bookable calendar (Paul's spec Flow 2 + Flow 12)
     // ═══════════════════════════════════════════════════════════

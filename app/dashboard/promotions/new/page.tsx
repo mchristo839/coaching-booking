@@ -302,6 +302,16 @@ export default function NewPromotionPage() {
         </div>
 
         {promotionType === 'holiday_camp' && (
+          <div className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-ink">
+            ✨ There&apos;s now a dedicated <strong>Summer Camp builder</strong> that posts the camp as a poll
+            and turns YES votes into bookings automatically.{' '}
+            <Link href="/dashboard/camps/new" className="font-semibold text-brand-700 hover:underline">
+              Use the Summer Camp builder →
+            </Link>
+          </div>
+        )}
+
+        {promotionType === 'holiday_camp' && (
           <div className="card shadow-card space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-lg font-semibold text-ink">Camp days</h2>
