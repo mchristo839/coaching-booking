@@ -170,6 +170,10 @@ export interface ProgrammeData {
   paymentMethods?: string[]
   paymentReminderSchedule?: string
   botNotes?: string
+  // Closed-intent bot answerable fields (free-text)
+  paymentMethod?: string
+  sessionType?: string
+  campSchedule?: string
   whatsappGroupId?: string
   // Phase 7 additions
   seasonType?: string                  // autumn_winter | spring_summer | full_year | custom
@@ -225,7 +229,7 @@ export async function createProgramme(data: ProgrammeData) {
       trial_available, trial_instructions, what_to_bring, equipment_provided, kit_required,
       kit_details, paid_or_free, payment_model, price_gbp, price_includes,
       sibling_discount, refund_policy, refund_details, payment_methods, payment_reminder_schedule,
-      bot_notes, whatsapp_group_id
+      bot_notes, payment_method, session_type, camp_schedule, whatsapp_group_id
     )
     VALUES (
       ${data.coachId}, ${data.programmeName}, ${data.shortDescription || null}, ${data.targetAudience || null}, ${data.specificAgeGroup || null},
@@ -237,7 +241,7 @@ export async function createProgramme(data: ProgrammeData) {
       ${data.trialAvailable || null}, ${data.trialInstructions || null}, ${data.whatToBring || null}, ${data.equipmentProvided || null}, ${data.kitRequired || null},
       ${data.kitDetails || null}, ${data.paidOrFree || 'paid'}, ${data.paymentModel || null}, ${data.priceGbp || null}, ${data.priceIncludes || null},
       ${data.siblingDiscount || null}, ${data.refundPolicy || null}, ${data.refundDetails || null}, ${methods}, ${data.paymentReminderSchedule || null},
-      ${data.botNotes || null}, ${normaliseWhatsappGroupId(data.whatsappGroupId)}
+      ${data.botNotes || null}, ${data.paymentMethod || null}, ${data.sessionType || null}, ${data.campSchedule || null}, ${normaliseWhatsappGroupId(data.whatsappGroupId)}
     )
     RETURNING *
   `
@@ -297,6 +301,9 @@ export async function updateProgramme(programmeId: string, fields: Partial<Progr
   }
   if (fields.paymentReminderSchedule !== undefined) updates.push(sql`UPDATE programmes SET payment_reminder_schedule = ${v(fields.paymentReminderSchedule)}, updated_at = NOW() WHERE id = ${programmeId}`)
   if (fields.botNotes !== undefined) updates.push(sql`UPDATE programmes SET bot_notes = ${v(fields.botNotes)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.paymentMethod !== undefined) updates.push(sql`UPDATE programmes SET payment_method = ${v(fields.paymentMethod)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.sessionType !== undefined) updates.push(sql`UPDATE programmes SET session_type = ${v(fields.sessionType)}, updated_at = NOW() WHERE id = ${programmeId}`)
+  if (fields.campSchedule !== undefined) updates.push(sql`UPDATE programmes SET camp_schedule = ${v(fields.campSchedule)}, updated_at = NOW() WHERE id = ${programmeId}`)
   if (fields.whatsappGroupId !== undefined) {
     const normalised = normaliseWhatsappGroupId(fields.whatsappGroupId)
     if (normalised) {
@@ -583,7 +590,11 @@ export interface Knowledgebase {
   ageGroup: string
   skillLevel: string
   schedule: string
+  duration: string
   priceCents: number
+  paymentMethod: string
+  sessionType: string
+  campSchedule: string
   whatToBring: string
   cancellationPolicy: string
   medicalInfo: string
@@ -610,7 +621,11 @@ export async function findProgramByWhatsAppGroup(whatsappGroupId: string) {
     schedule: result.session_days
       ? `${(result.session_days || []).join(', ')} ${result.session_start_time || ''} (${result.session_duration || ''})`
       : '',
+    duration: result.session_duration || '',
     priceCents: result.price_gbp ? Math.round(Number(result.price_gbp) * 100) : 0,
+    paymentMethod: result.payment_method || '',
+    sessionType: result.session_type || '',
+    campSchedule: result.camp_schedule || '',
     whatToBring: result.what_to_bring || '',
     cancellationPolicy: result.cancellation_notice || '',
     medicalInfo: result.bot_notes || '',
@@ -625,6 +640,78 @@ export async function findProgramByWhatsAppGroup(whatsappGroupId: string) {
   mapped.coach_email = result.coach_email
   mapped.knowledgebase = knowledgebase
   return mapped
+}
+
+// ─── Programme availability (live capacity check for the bot) ───
+// Used by the closed-intent bot to answer "is there space / can my child join"
+// from real data: the coach-set programme_status is authoritative when it says
+// full/closed/waitlist; otherwise we compare max_capacity against the live
+// count of active members. Returns 'unknown' only when there's genuinely no
+// signal, so the caller can route to the coach instead of guessing.
+
+export interface ProgrammeAvailability {
+  status: 'open' | 'full' | 'waitlist' | 'closed' | 'unknown'
+  maxCapacity: number | null
+  activeCount: number
+  spotsLeft: number | null
+  waitlistEnabled: boolean
+}
+
+export async function getProgrammeAvailability(program: {
+  id: string
+  max_capacity?: number | null
+  programme_status?: string | null
+  waitlist_enabled?: boolean | null
+}): Promise<ProgrammeAvailability> {
+  const waitlistEnabled = program.waitlist_enabled ?? true
+  const maxCapacity =
+    program.max_capacity != null && Number(program.max_capacity) > 0
+      ? Number(program.max_capacity)
+      : null
+  const rawStatus = (program.programme_status || '').toLowerCase()
+
+  let activeCount = 0
+  try {
+    const { rows } = await sql`
+      SELECT COUNT(*)::int as n FROM members
+      WHERE programme_id = ${program.id} AND status = 'active'
+    `
+    activeCount = Number(rows[0]?.n ?? 0)
+  } catch {
+    activeCount = 0
+  }
+
+  // Coach-set status wins when it explicitly signals not-open.
+  if (rawStatus === 'closed') {
+    return { status: 'closed', maxCapacity, activeCount, spotsLeft: null, waitlistEnabled }
+  }
+  if (rawStatus === 'full' || rawStatus === 'waitlist' || rawStatus === 'waitlist_only') {
+    return { status: 'waitlist', maxCapacity, activeCount, spotsLeft: 0, waitlistEnabled }
+  }
+
+  // Otherwise compare capacity against live active members.
+  if (maxCapacity != null) {
+    const spotsLeft = Math.max(0, maxCapacity - activeCount)
+    if (spotsLeft <= 0) {
+      return {
+        status: waitlistEnabled ? 'waitlist' : 'full',
+        maxCapacity,
+        activeCount,
+        spotsLeft: 0,
+        waitlistEnabled,
+      }
+    }
+    return { status: 'open', maxCapacity, activeCount, spotsLeft, waitlistEnabled }
+  }
+
+  // Open status but no capacity number: we can confirm it's taking bookings,
+  // we just can't quote remaining spots.
+  if (rawStatus === 'open') {
+    return { status: 'open', maxCapacity: null, activeCount, spotsLeft: null, waitlistEnabled }
+  }
+
+  // No status and no capacity → no signal. Caller routes to the coach.
+  return { status: 'unknown', maxCapacity: null, activeCount, spotsLeft: null, waitlistEnabled }
 }
 
 // ─── Conversation logging ───

@@ -14,7 +14,10 @@ export interface Knowledgebase {
   ageGroup: string
   skillLevel: string
   schedule: string
+  sessionType: string
+  campSchedule: string
   priceCents: number
+  paymentMethod: string
   whatToBring: string
   cancellationPolicy: string
   medicalInfo: string
@@ -29,7 +32,10 @@ export const emptyKb = (): Knowledgebase => ({
   ageGroup: '',
   skillLevel: 'Beginner',
   schedule: '',
+  sessionType: '',
+  campSchedule: '',
   priceCents: 0,
+  paymentMethod: '',
   whatToBring: '',
   cancellationPolicy: '',
   medicalInfo: '',
@@ -48,7 +54,10 @@ export interface ProgrammeRow {
   sessionFrequency?: string | null
   venueName?: string | null
   venueAddress?: string | null
+  sessionType?: string | null
+  campSchedule?: string | null
   priceGbp?: number | string | null
+  paymentMethod?: string | null
   whatToBring?: string | null
   cancellationNotice?: string | null
   botNotes?: string | null
@@ -95,7 +104,10 @@ export function programmePayloadFromForm(
     sessionFrequency: kb.schedule || undefined,
     venueName: kb.venue || undefined,
     venueAddress: kb.venueAddress || undefined,
+    sessionType: kb.sessionType || undefined,
+    campSchedule: kb.campSchedule || undefined,
     priceGbp: kb.priceCents > 0 ? kb.priceCents / 100 : undefined,
+    paymentMethod: kb.paymentMethod || undefined,
     whatToBring: kb.whatToBring || undefined,
     cancellationNotice: kb.cancellationPolicy || undefined,
     botNotes: buildBotNotes(kb.medicalInfo, kb.coachBio),
@@ -115,7 +127,10 @@ export function kbFromProgrammeRow(row: ProgrammeRow): Knowledgebase {
     ageGroup: row.specificAgeGroup || '',
     skillLevel: row.skillLevel || 'Beginner',
     schedule: row.sessionFrequency || '',
+    sessionType: row.sessionType || '',
+    campSchedule: row.campSchedule || '',
     priceCents: row.priceGbp ? Math.round(Number(row.priceGbp) * 100) : 0,
+    paymentMethod: row.paymentMethod || '',
     whatToBring: row.whatToBring || '',
     cancellationPolicy: row.cancellationNotice || '',
     medicalInfo: medical,
@@ -287,6 +302,41 @@ export default function ProgrammeForm({
             onChange={(e) => updateKb('schedule', e.target.value)}
             required
             placeholder="e.g. Every Monday 4:00pm-5:00pm"
+            className="input-field"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-ink mb-1.5">What is a session?</label>
+          <textarea
+            value={kb.sessionType}
+            onChange={(e) => updateKb('sessionType', e.target.value)}
+            rows={2}
+            placeholder="e.g. A 45-minute small-group session: warm-up, skills drills, then a small-sided game."
+            className="input-field"
+          />
+          <p className="text-xs text-ink-muted mt-1.5">The bot uses this to answer &ldquo;what kind of class is it?&rdquo;</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-ink mb-1.5">Holiday camps</label>
+          <textarea
+            value={kb.campSchedule}
+            onChange={(e) => updateKb('campSchedule', e.target.value)}
+            rows={2}
+            placeholder="e.g. Feb half-term camp: Mon–Fri 17–21 Feb, 10am–2pm. Summer camps run weekly through August."
+            className="input-field"
+          />
+          <p className="text-xs text-ink-muted mt-1.5">Leave blank if you don&rsquo;t run camps — the bot will check with you instead of guessing.</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-ink mb-1.5">How do parents pay?</label>
+          <input
+            type="text"
+            value={kb.paymentMethod}
+            onChange={(e) => updateKb('paymentMethod', e.target.value)}
+            placeholder="e.g. Bank transfer on booking, or cash on the day"
             className="input-field"
           />
         </div>
