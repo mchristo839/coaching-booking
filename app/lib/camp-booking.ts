@@ -160,15 +160,30 @@ function firstWord(s: string | null | undefined): string {
   return (s || '').trim().split(/\s+/)[0].toLowerCase()
 }
 
-// Find the active booking for a 1:1 reply, bridging the WhatsApp LID↔phone gap.
+// Digits of a JID's user part (before @, before any :device suffix). For a
+// phone JID this is the phone number; for a @lid it's the (unrelated) lid number.
+function jidDigits(jid: string): string {
+  return (jid || '').split('@')[0].split(':')[0].replace(/\D/g, '')
+}
+
+async function adoptBooking(row: CampBookingRow, senderJid: string, why: string): Promise<CampBookingRow> {
+  await sql`UPDATE camp_bookings SET parent_jid = ${senderJid}, updated_at = NOW() WHERE id = ${row.id}`
+  console.log(`[CAMP] adopted booking ${row.id}: ${row.parent_jid} → ${senderJid} (${why})`)
+  row.parent_jid = senderJid
+  return row
+}
+
+// Find the active booking for a 1:1 reply, bridging WhatsApp's identity quirks.
 //
-// A parent who votes YES on a GROUP poll is only known by their group `@lid`,
-// so the booking is created keyed to that lid. But their 1:1 replies arrive
-// from their PHONE jid — a different string — so an exact lookup misses and the
-// message wrongly falls through to other handlers. On the first such reply we
-// "adopt" a recent open lid-keyed booking whose WhatsApp name matches the
-// sender, re-keying it to the phone jid. After that every reply matches exactly.
-// The name match disambiguates concurrent voters and stops strangers hijacking.
+// Two problems this handles:
+//  (B) Phone-JID format drift — the stored jid and the reply jid are the same
+//      number but differ in form (@c.us vs @s.whatsapp.net, a :device suffix).
+//      Matched on phone digits and re-keyed.
+//  (A) LID↔phone — a parent who votes on a GROUP poll is only known by their
+//      group @lid, but their 1:1 replies come from their phone jid. On the first
+//      reply we adopt a recent open lid-keyed booking and re-key it. We prefer a
+//      unique WhatsApp-name match; failing that, if there's exactly one open
+//      lid booking we adopt it. Ambiguous (multiple, no name match) → skip.
 export async function findOrAdoptOpenCampBooking(
   senderJid: string,
   senderName?: string | null
@@ -176,29 +191,49 @@ export async function findOrAdoptOpenCampBooking(
   const exact = await findOpenCampBooking(senderJid)
   if (exact) return exact
 
-  // Only bridge phone→lid (don't re-key when the reply itself is a lid).
-  if (senderJid.endsWith('@lid')) return null
-  const name = firstWord(senderName)
-  if (!name || name === 'there') return null
+  const senderIsLid = senderJid.endsWith('@lid')
+  const digits = jidDigits(senderJid)
 
-  const { rows } = await sql.query(
+  // (B) Same phone number, different JID format.
+  if (!senderIsLid && digits.length >= 6) {
+    const { rows } = await sql.query(
+      `SELECT ${CAMP_SELECT} FROM camp_bookings
+       WHERE parent_jid NOT LIKE '%@lid'
+         AND regexp_replace(split_part(split_part(parent_jid, '@', 1), ':', 1), '\\D', '', 'g') = $1
+         AND (conversation_step IS NULL OR conversation_step NOT IN ('confirmed','cancelled'))
+         AND state NOT IN ('confirmed','cancelled','expired')
+         AND expires_at > NOW()
+       ORDER BY created_at DESC LIMIT 1`,
+      [digits]
+    )
+    if (rows[0]) return adoptBooking(rows[0] as CampBookingRow, senderJid, 'phone-digit match')
+  }
+
+  // (A) LID bridge — only for phone-JID replies.
+  if (senderIsLid) return null
+  const { rows: lidRows } = await sql.query(
     `SELECT ${CAMP_SELECT} FROM camp_bookings
      WHERE parent_jid LIKE '%@lid'
        AND conversation_step IN ('awaiting_parent_name','awaiting_child_name')
        AND state NOT IN ('confirmed','cancelled','expired')
        AND expires_at > NOW()
-       AND created_at > NOW() - INTERVAL '2 hours'
+       AND created_at > NOW() - INTERVAL '6 hours'
      ORDER BY created_at DESC`,
     []
   )
-  const candidates = (rows as CampBookingRow[]).filter((r) => firstWord(r.parent_name) === name)
-  if (candidates.length !== 1) return null
+  const open = lidRows as CampBookingRow[]
+  if (open.length === 0) return null
 
-  const adopted = candidates[0]
-  await sql`UPDATE camp_bookings SET parent_jid = ${senderJid}, updated_at = NOW() WHERE id = ${adopted.id}`
-  console.log(`[CAMP] adopted booking ${adopted.id}: ${adopted.parent_jid} → ${senderJid} (name "${name}")`)
-  adopted.parent_jid = senderJid
-  return adopted
+  const name = firstWord(senderName)
+  if (name && name !== 'there') {
+    const named = open.filter((r) => firstWord(r.parent_name) === name)
+    if (named.length === 1) return adoptBooking(named[0], senderJid, `name "${name}"`)
+  }
+  // No usable name match — adopt only when there's a single open lid booking.
+  if (open.length === 1) return adoptBooking(open[0], senderJid, 'sole open lid booking')
+
+  console.log(`[CAMP] adoption ambiguous: ${open.length} open lid bookings, sender "${name || '(no name)'}" — not adopting`)
+  return null
 }
 
 export async function getCampPromotion(promotionId: string): Promise<CampPromotionRow | null> {
