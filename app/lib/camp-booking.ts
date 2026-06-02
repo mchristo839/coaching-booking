@@ -228,6 +228,15 @@ export async function findOrAdoptOpenCampBooking(
   if (name && name !== 'there') {
     const named = open.filter((r) => firstWord(r.parent_name) === name)
     if (named.length === 1) return adoptBooking(named[0], senderJid, `name "${name}"`)
+    // Same person (one lid) with duplicate bookings that all match the name.
+    if (named.length > 1 && new Set(named.map((r) => r.parent_jid)).size === 1) {
+      return adoptBooking(named[0], senderJid, `name "${name}", dedup one lid`)
+    }
+  }
+  // All open lid bookings belong to a single lid → same person → adopt the latest.
+  // (Handles a parent who voted on more than one camp poll.)
+  if (new Set(open.map((r) => r.parent_jid)).size === 1) {
+    return adoptBooking(open[0], senderJid, 'single lid (same person)')
   }
   // No usable name match — adopt only when there's a single open lid booking.
   if (open.length === 1) return adoptBooking(open[0], senderJid, 'sole open lid booking')
