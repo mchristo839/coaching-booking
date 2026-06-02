@@ -29,6 +29,22 @@ export async function POST() {
       )
     `
 
+    // ── 1b. Password resets (forgot-password flow) ──
+    // We store only a SHA-256 hash of the token, never the token itself, so a
+    // DB leak can't be used to hijack a reset. Tokens are single-use (used_at)
+    // and short-lived (expires_at, set by the issuing route).
+    await sql`
+      CREATE TABLE IF NOT EXISTS password_resets (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        provider_id UUID NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+        token_hash VARCHAR(64) NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_password_resets_token_hash ON password_resets (token_hash)`
+
     // ── 2. Coaches (separate from provider for club scaling) ──
     await sql`
       CREATE TABLE IF NOT EXISTS coaches_v2 (
@@ -594,6 +610,16 @@ export async function POST() {
     // are populated from the first row for backward compatibility.
     await sql`ALTER TABLE programmes ADD COLUMN IF NOT EXISTS session_schedule JSONB`
 
+    // Closed-intent bot — three answerable fields the bot previously had no
+    // backing column for. Free-text so coaches phrase them naturally; the bot
+    // reads them verbatim and never invents a value when they're blank.
+    //   payment_method — how parents pay (e.g. "Bank transfer or cash on the day")
+    //   session_type   — what a session actually is (e.g. "45-min small-group strength class")
+    //   camp_schedule  — holiday-camp dates/times (e.g. "Feb half-term: Mon–Fri 17–21, 10am–2pm")
+    await sql`ALTER TABLE programmes ADD COLUMN IF NOT EXISTS payment_method TEXT`
+    await sql`ALTER TABLE programmes ADD COLUMN IF NOT EXISTS session_type TEXT`
+    await sql`ALTER TABLE programmes ADD COLUMN IF NOT EXISTS camp_schedule TEXT`
+
     // ═══════════════════════════════════════════════════════════
     // Phase 8: Fitness studio vertical (Paul's brief)
     // All additive. Existing 'sport' coaches are not affected.
@@ -734,6 +760,33 @@ export async function POST() {
       CREATE INDEX IF NOT EXISTS idx_camp_bookings_promotion
         ON camp_bookings(promotion_id, created_at DESC)
     `
+
+    // Camp 1:1 booking conversation (revised spec) — richer state machine.
+    //   conversation_step — fine-grained position in the 1:1 flow (app-enforced,
+    //                        intentionally no CHECK so steps can evolve). `state`
+    //                        is kept in sync as the coarse status the dashboard reads.
+    //   child_age         — collected during the conversation
+    //   booking_group_id  — groups sibling rows that share ONE combined payment
+    //   payment_link      — snapshot of the link sent to the parent
+    //   payment_status    — finance status, parallel to booking state
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS conversation_step VARCHAR(40)`
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS child_age INTEGER`
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS booking_group_id UUID`
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS payment_link TEXT`
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'not_sent'`
+    // Backfill conversation_step for any rows created by the older cohort-send path.
+    await sql`UPDATE camp_bookings SET conversation_step = 'awaiting_day_selection' WHERE conversation_step IS NULL AND state = 'awaiting_day_selection'`
+    await sql`UPDATE camp_bookings SET booking_group_id = id WHERE booking_group_id IS NULL`
+    await sql`CREATE INDEX IF NOT EXISTS idx_camp_bookings_group ON camp_bookings(booking_group_id)`
+
+    // Optional link from a poll to a holiday-camp promotion. When set, a YES vote
+    // on the poll starts the camp 1:1 booking conversation for that voter (so a
+    // camp can be launched from a poll OR from the promotion's cohort blast).
+    await sql`ALTER TABLE polls ADD COLUMN IF NOT EXISTS promotion_id UUID`
+
+    // Optional camp image (data URL / base64 or external URL) shown with the
+    // camp poll when it's posted to the group.
+    await sql`ALTER TABLE promotions ADD COLUMN IF NOT EXISTS camp_image_url TEXT`
 
     // ═══════════════════════════════════════════════════════════
     // Native bookable calendar (Paul's spec Flow 2 + Flow 12)

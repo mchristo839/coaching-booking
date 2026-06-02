@@ -9,6 +9,11 @@ interface AuthorisedProgramme {
   programme_name: string
 }
 
+interface CampPromotion {
+  id: string
+  title: string | null
+}
+
 export default function NewPollPage() {
   const router = useRouter()
   const [authorisedProgrammes, setAuthorisedProgrammes] = useState<AuthorisedProgramme[]>([])
@@ -28,6 +33,9 @@ export default function NewPollPage() {
   const [sessionAt, setSessionAt] = useState('')
   const [yesOptionIndex, setYesOptionIndex] = useState(0)
   const [paymentLink, setPaymentLink] = useState('')
+  // Optional: link this poll to a holiday camp so YES starts the booking chat.
+  const [camps, setCamps] = useState<CampPromotion[]>([])
+  const [promotionId, setPromotionId] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -35,6 +43,18 @@ export default function NewPollPage() {
       if (res.status === 401) { router.push('/auth/login'); return }
       const data = await res.json()
       setAuthorisedProgrammes(data.programmes || [])
+      // Holiday-camp promotions this coach can link a poll to.
+      try {
+        const pr = await fetch('/api/promotions', { credentials: 'include' })
+        if (pr.ok) {
+          const pd = await pr.json()
+          setCamps(
+            (pd.promotions || [])
+              .filter((p: { promotion_type?: string }) => p.promotion_type === 'holiday_camp')
+              .map((p: { id: string; title: string | null }) => ({ id: p.id, title: p.title }))
+          )
+        }
+      } catch { /* non-fatal */ }
       setLoading(false)
     }
     load()
@@ -92,6 +112,7 @@ export default function NewPollPage() {
           sessionAt: sessionAt || null,
           yesOptionIndex,
           paymentLink: paymentLink.trim() || null,
+          promotionId: promotionId || null,
         }),
       })
       const data = await res.json()
@@ -240,6 +261,26 @@ export default function NewPollPage() {
               </p>
             </div>
           </div>
+
+          {camps.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-ink mb-1.5">Link to a holiday camp (optional)</label>
+              <select
+                value={promotionId}
+                onChange={(e) => setPromotionId(e.target.value)}
+                className="input-field"
+              >
+                <option value="">Not a camp poll</option>
+                {camps.map((c) => (
+                  <option key={c.id} value={c.id}>{c.title || 'Untitled camp'}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-ink-muted">
+                If you link a camp, voting <strong>YES</strong> starts the 1:1 booking chat
+                (collect child + age → pick days → pay → confirm) using that camp&apos;s days and payment link.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="card shadow-card space-y-3">

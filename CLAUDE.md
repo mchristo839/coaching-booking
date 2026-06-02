@@ -23,7 +23,7 @@ First live coach: Paul (coach ID `481181c9`, programme ID `89557f36`, group `120
 | Layer | Technology |
 |-------|-----------|
 | Framework | Next.js 14 (App Router, TypeScript) |
-| Database | Neon Postgres via Vercel Postgres (`@vercel/postgres`, tagged template literals) |
+| Database | Self-hosted **Postgres on Contabo VPS** via the standard `pg` driver (`app/lib/sql.ts` shim; tagged template literals). Migrated off Neon. |
 | Auth | localStorage-based (bcryptjs password hashing) |
 | AI | Claude Haiku 4.5 via Anthropic API (raw fetch) |
 | WhatsApp | Evolution API v2 (Baileys-based) |
@@ -37,7 +37,7 @@ First live coach: Paul (coach ID `481181c9`, programme ID `89557f36`, group `120
 | Next.js app | https://coaching-booking-v3.vercel.app |
 | Evolution API | http://161.97.176.176:8080 |
 | Evolution Manager UI | http://161.97.176.176:8080/manager |
-| Neon Postgres | Vercel-managed connection |
+| Postgres | Self-hosted on Contabo VPS (standard TCP, self-signed SSL) |
 | GitHub repo | mchristo839/coaching-booking |
 | Ops cron | Contabo VPS via `/ops/contabo/` scripts |
 
@@ -49,7 +49,7 @@ First live coach: Paul (coach ID `481181c9`, programme ID `89557f36`, group `120
 | `EVOLUTION_API_URL` | `http://161.97.176.176:8080` | evolution.ts, health check |
 | `EVOLUTION_API_KEY` | Evolution API auth key | evolution.ts, health check |
 | `EVOLUTION_INSTANCE` | `paul-bot` | evolution.ts, health check |
-| `POSTGRES_URL` | Neon connection string | auto-injected by Vercel |
+| `POSTGRES_URL` | Contabo Postgres connection string (`pg` shim reads this / `DATABASE_URL`) | sql.ts |
 | `NEXT_PUBLIC_APP_URL` | Public app URL | admin invites page |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot for ops alerts | alerts.ts |
 | `TELEGRAM_CHAT_ID` | `1412433866` (Mario's personal chat) | alerts.ts |
@@ -112,9 +112,14 @@ docs/                           # Audit reports and task specs
 
 ## Bot behaviour
 
-- Responds to **all group messages** (no @mention filtering yet)
-- Classifies messages into: `question`, `social`, `escalation`, `general`
-- Escalation keywords trigger `escalated=true` flag (injury, complaint, safeguard, etc.)
+- **Closed intent set** — the group bot answers ONLY a defined list of intents, all from programme data: location, price, payment, duration, session type, holiday camps, age range, what to bring, capacity/booking. Everything else is refused-and-routed. See `app/lib/bot-intent.ts`.
+- **Wide recognition, narrow answers** — an LLM classifier (`classifyBotIntent`) maps loose/casual phrasings onto the closed set; a deterministic gate (`planBotResponse`) decides answer-vs-route in code, so the two guarantees hold regardless of the LLM:
+  1. **Never answers out-of-scope** (incl. general-knowledge/fitness advice) — routes to the coach.
+  2. **Never guesses inside scope** — if the backing field is empty, routes to the coach instead of inventing.
+- **Capacity/booking** uses a live check (`getProgrammeAvailability`): coach-set `programme_status` overrides, else `max_capacity` vs active `members` count.
+- **Real handoff** — out-of-scope/missing-data DMs the coach via `notifyCoachHandoff` (`notify.ts`) AND posts a routing line in the group. Social chatter (greetings/thanks) gets no reply.
+- Answers are phrased by a second LLM call (`phraseAnswer`) scoped to ONLY the resolved field — defence-in-depth so it can't add outside knowledge.
+- Responds to all group messages (no @mention filtering yet); the keyword classifier still sets the `escalated` flag (injury, complaint, safeguard) for logging.
 - Every message + bot response logged to `conversations` table
 - Duplicate webhook calls deduped via `processed_messages` table
 - Duplicate bot replies prevented via `bot_replies` 10-second window check
@@ -131,6 +136,23 @@ the group), from the promotion detail page (`/dashboard/promotions/[id]`).
 - Opt-out (`members.marketing_opt_out` / `marketing_opt_out_at`) is checked before sending and honoured on STOP
 - Sends are paced (~600ms apart) to reduce WhatsApp ban risk on the Baileys stack
 - Compliance: only signed-up members are messaged (PECR soft opt-in), never harvested group rosters
+
+## Holiday camp 1:1 booking conversation
+
+A WhatsApp 1:1 state machine that books a child onto a holiday-camp promotion.
+Engine: `app/lib/camp-booking.ts` (`tryHandleCampBookingReply`, wired into the
+webhook's 1:1 branch); message copy + pure parsers in `app/lib/ai-messages.ts`.
+
+- **Flow** (`conversation_step` on `camp_bookings`): `awaiting_parent_name → awaiting_child_name → awaiting_child_age → awaiting_day_selection → awaiting_checkout_confirm → awaiting_payment → awaiting_coach_confirm → confirmed` (+ `awaiting_waitlist_confirm`, `cancelled`). The coarse `state` column is kept in sync for the dashboard/confirm queries.
+- **Capacity is DERIVED, never stored**: `remaining = day.capacity − count(confirmed bookings incl. that day)`. Full days are excluded at selection and re-checked at checkout; capacity only drops on **coach confirm** (`getCampDayAvailability`).
+- **Multiple children, one payment**: sibling rows share a `booking_group_id`; checkout/payment/confirm operate on the whole group. One row per child so each consumes day capacity.
+- **Coach confirm** (`/api/promotions/[id]/bookings/[bookingId]/confirm`) → confirms the group, sets linked `members.status = 'active'`, sends the parent the "All booked ✓" message (Message 8). **Reject** (`…/reject`) keeps the booking pending and DMs the parent.
+- **Dashboard** (`/dashboard/promotions/[id]`): day-by-day availability panel (colour-coded), pending confirmations with one-click Confirm/Reject, CSV export of confirmed bookings.
+- New `camp_bookings` columns: `conversation_step`, `child_age`, `booking_group_id`, `payment_link`, `payment_status`.
+- **Unified builder** (`/dashboard/camps/new` → `POST /api/camps`): one screen — description + optional image (base64, sent via `sendWhatsAppMedia`) + bookable days (price/capacity) + poll options. On save it creates the holiday_camp promotion AND creates + posts the linked poll to the chosen groups in one go. The old `/dashboard/promotions/new` holiday_camp path still works and links across to this builder.
+- **Two ways to start it (both supported)**:
+  1. **Cohort blast** — `send-camp-cohort` DMs every parent on the targeted programmes' member roll (details known → starts at day selection).
+  2. **Poll YES** — a poll can be linked to a camp via `polls.promotion_id` (set from the poll builder's "Link to a holiday camp" dropdown). A YES vote calls `startCampBookingFromPoll` (idempotent), which opens a booking and sends Message 1 (asks for parent name first if unknown, else child name). Wired into both the native-poll and text-vote paths in the webhook.
 
 ## PLANNED (not yet implemented)
 

@@ -63,3 +63,36 @@ export async function sendWhatsAppPoll(
   const data = await res.json()
   return { messageId: data?.key?.id ?? null }
 }
+
+// Send an image to a group/JID. `media` is either a public URL or a base64
+// string (with or without a data: prefix — we strip it for Evolution).
+export async function sendWhatsAppMedia(
+  groupJid: string,
+  media: string,
+  caption?: string
+): Promise<{ messageId: string | null }> {
+  const url = `${EVOLUTION_BASE_URL}/message/sendMedia/${EVOLUTION_INSTANCE}`
+  const cleaned = media.startsWith('data:') ? media.replace(/^data:[^;]+;base64,/, '') : media
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: EVOLUTION_API_KEY,
+    },
+    body: JSON.stringify({
+      number: groupJid,
+      mediatype: 'image',
+      media: cleaned,
+      caption: caption || undefined,
+    }),
+  })
+
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Evolution API sendMedia error ${res.status}: ${body}`)
+  }
+
+  const data = await res.json()
+  return { messageId: data?.key?.id ?? null }
+}

@@ -47,6 +47,7 @@ interface CampBooking {
   parent_jid: string
   parent_name: string | null
   child_name: string | null
+  child_age: number | null
   days_selected: number[] | null
   total_gbp: string | null
   state:
@@ -56,10 +57,19 @@ interface CampBooking {
     | 'confirmed'
     | 'cancelled'
     | 'expired'
+  payment_status: string | null
   payment_self_reported_at: string | null
   payment_confirmed_at: string | null
   parent_phone: string | null
   created_at: string
+}
+
+interface DayAvailability {
+  index: number
+  day: { label: string; price_gbp: number; capacity?: number | null }
+  confirmed: number
+  remaining: number | null
+  full: boolean
 }
 
 export default function PromotionDetailPage() {
@@ -79,9 +89,11 @@ export default function PromotionDetailPage() {
 
   // Holiday camp state (only meaningful when promotion_type === 'holiday_camp')
   const [bookings, setBookings] = useState<CampBooking[]>([])
+  const [availability, setAvailability] = useState<DayAvailability[]>([])
   const [bookingsLoading, setBookingsLoading] = useState(false)
   const [sendingCohort, setSendingCohort] = useState(false)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
 
   // Refer-a-friend: DM the link to individual members
   const [members, setMembers] = useState<MessageableMember[]>([])
@@ -122,6 +134,7 @@ export default function PromotionDetailPage() {
       if (!res.ok) return
       const data = await res.json()
       setBookings(data.bookings || [])
+      setAvailability(data.availability || [])
     } finally {
       setBookingsLoading(false)
     }
@@ -234,6 +247,52 @@ export default function PromotionDetailPage() {
     } finally {
       setConfirmingId(null)
     }
+  }
+
+  async function handleRejectBooking(bookingId: string) {
+    if (!confirm('Reject this payment? The parent will be told the coach will be in touch.')) return
+    setRejectingId(bookingId)
+    setError('')
+    try {
+      const res = await fetch(`/api/promotions/${id}/bookings/${bookingId}/reject`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || 'Failed to reject booking')
+        return
+      }
+      await loadBookings()
+    } finally {
+      setRejectingId(null)
+    }
+  }
+
+  function exportConfirmedCsv() {
+    const confirmed = bookings.filter((b) => b.state === 'confirmed')
+    const labelFor = (i: number) => promotion?.camp_days?.[i]?.label || String.fromCharCode(97 + i)
+    const header = ['Parent', 'Phone', 'Child', 'Age', 'Days', 'Total', 'Confirmed at']
+    const esc = (v: string) => `"${String(v).replace(/"/g, '""')}"`
+    const rows = confirmed.map((b) =>
+      [
+        b.parent_name || '',
+        b.parent_phone || '',
+        b.child_name || '',
+        b.child_age != null ? String(b.child_age) : '',
+        (b.days_selected || []).map(labelFor).join(' + '),
+        b.total_gbp ? `£${Number(b.total_gbp).toFixed(2)}` : '',
+        b.payment_confirmed_at ? new Date(b.payment_confirmed_at).toLocaleString('en-GB') : '',
+      ].map(esc).join(',')
+    )
+    const csv = [header.map(esc).join(','), ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `camp-bookings-${id}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   async function handleRegenerate() {
@@ -496,14 +555,67 @@ export default function PromotionDetailPage() {
         <div className="card shadow-card mt-6">
           <div className="flex justify-between items-center mb-3">
             <h2 className="font-display font-semibold text-ink">Camp bookings</h2>
-            <button
-              onClick={handleSendCohort}
-              disabled={sendingCohort}
-              className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors"
-            >
-              {sendingCohort ? 'Sending invites…' : 'Send invites to cohort'}
-            </button>
+            <div className="flex gap-2">
+              {bookings.some((b) => b.state === 'confirmed') && (
+                <button
+                  onClick={exportConfirmedCsv}
+                  className="btn-secondary text-sm"
+                >
+                  Export confirmed (CSV)
+                </button>
+              )}
+              <button
+                onClick={handleSendCohort}
+                disabled={sendingCohort}
+                className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors"
+              >
+                {sendingCohort ? 'Sending invites…' : 'Send invites to cohort'}
+              </button>
+            </div>
           </div>
+
+          {availability.length > 0 && (
+            <div className="mb-5 rounded-lg border border-line overflow-hidden">
+              <div className="px-4 py-2 text-xs font-medium text-ink-muted bg-surface-muted border-b border-line">
+                Day-by-day availability (capacity drops only when you confirm a payment)
+              </div>
+              <table className="w-full text-sm">
+                <thead className="text-xs text-ink-muted border-b border-line">
+                  <tr>
+                    <th className="text-left px-4 py-2 font-medium">Day</th>
+                    <th className="text-right px-2 py-2 font-medium">Price</th>
+                    <th className="text-right px-2 py-2 font-medium">Confirmed</th>
+                    <th className="text-right px-2 py-2 font-medium">Capacity</th>
+                    <th className="text-right px-4 py-2 font-medium">Remaining</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {availability.map((a) => {
+                    const cap = a.day.capacity ?? null
+                    const pct = cap && cap > 0 && a.remaining != null ? a.remaining / cap : 1
+                    const cls = a.full
+                      ? 'text-red-700'
+                      : pct <= 0.25
+                        ? 'text-red-700'
+                        : pct <= 0.5
+                          ? 'text-amber-700'
+                          : 'text-green-700'
+                    return (
+                      <tr key={a.index} className="border-b border-line last:border-0">
+                        <td className="px-4 py-2 text-ink">{a.day.label}</td>
+                        <td className="px-2 py-2 text-right text-ink">£{Number(a.day.price_gbp).toFixed(2)}</td>
+                        <td className="px-2 py-2 text-right text-ink">{a.confirmed}</td>
+                        <td className="px-2 py-2 text-right text-ink">{cap ?? '—'}</td>
+                        <td className={`px-4 py-2 text-right font-medium ${cls}`}>
+                          {a.remaining == null ? 'Uncapped' : a.full ? 'Full' : a.remaining}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {promotion.camp_days && promotion.camp_days.length > 0 && (
             <div className="text-xs text-ink-muted mb-4">
@@ -545,7 +657,10 @@ export default function PromotionDetailPage() {
                     const total = b.total_gbp ? `£${Number(b.total_gbp).toFixed(2)}` : '—'
                     return (
                       <tr key={b.id} className="border-b border-line">
-                        <td className="px-6 py-2 text-ink">{b.child_name || '—'}</td>
+                        <td className="px-6 py-2 text-ink">
+                          {b.child_name || '—'}
+                          {b.child_age != null && <span className="text-ink-muted"> (age {b.child_age})</span>}
+                        </td>
                         <td className="px-2 py-2 text-ink">
                           <div>{b.parent_name || '—'}</div>
                           {b.parent_phone && (
@@ -559,13 +674,22 @@ export default function PromotionDetailPage() {
                         </td>
                         <td className="px-6 py-2 text-right">
                           {b.state === 'paid_self_reported' ? (
-                            <button
-                              onClick={() => handleConfirmBooking(b.id)}
-                              disabled={confirmingId === b.id}
-                              className="bg-green-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
-                            >
-                              {confirmingId === b.id ? 'Confirming…' : 'Confirm payment'}
-                            </button>
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleConfirmBooking(b.id)}
+                                disabled={confirmingId === b.id || rejectingId === b.id}
+                                className="bg-green-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
+                              >
+                                {confirmingId === b.id ? 'Confirming…' : 'Confirm payment'}
+                              </button>
+                              <button
+                                onClick={() => handleRejectBooking(b.id)}
+                                disabled={confirmingId === b.id || rejectingId === b.id}
+                                className="text-xs text-red-600 hover:underline disabled:opacity-50"
+                              >
+                                {rejectingId === b.id ? 'Rejecting…' : 'Reject'}
+                              </button>
+                            </div>
                           ) : b.state === 'confirmed' ? (
                             <span className="text-xs text-green-700">✓ Confirmed</span>
                           ) : (
