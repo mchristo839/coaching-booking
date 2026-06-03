@@ -66,6 +66,7 @@ Add these lines:
 0 4 * * * /opt/mca/mca-cleanup.sh
 0 * * * * /opt/mca/mca-referral-nudges.sh
 0 16 * * * /opt/mca/mca-session-reminders.sh
+0 9 * * * /opt/mca/mca-payment-chase.sh
 ```
 
 Health check every 5 minutes. Cleanup daily at 04:00 UTC. Referral nudges
@@ -74,13 +75,21 @@ day-before message to each coach with attendance from the latest poll. The
 session-reminders endpoint is idempotent within a 23h window, so a
 duplicate run won't double-send.
 
+Payment chase daily at 09:00 UTC — chases unpaid PT sessions AND runs the
+holiday-camp ladders (nudges parents who haven't paid the camp link at
++24h/+48h; reminds coaches about reported-but-unconfirmed payments at
++24h/+48h, reassuring the parent once). Idempotent via per-booking chase-step
+columns, so a duplicate run won't double-send.
+
 Don't forget to copy the new scripts into place before adding the cron lines:
 
 ```bash
 cp mca-referral-nudges.sh /opt/mca/
 cp mca-session-reminders.sh /opt/mca/
+cp mca-payment-chase.sh /opt/mca/
 chmod +x /opt/mca/mca-referral-nudges.sh
 chmod +x /opt/mca/mca-session-reminders.sh
+chmod +x /opt/mca/mca-payment-chase.sh
 ```
 
 ## 5. Verify cron is running

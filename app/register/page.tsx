@@ -690,7 +690,7 @@ export default function RegisterPage() {
 
         <div>
           <Label htmlFor="email" required>Email Address</Label>
-          <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Input id="email" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} required value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
 
         <div>
@@ -800,7 +800,7 @@ export default function RegisterPage() {
 
         <div>
           <Label htmlFor="coachEmail" required>Email</Label>
-          <Input id="coachEmail" type="email" required value={coachEmail} onChange={(e) => setCoachEmail(e.target.value)} />
+          <Input id="coachEmail" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} required value={coachEmail} onChange={(e) => setCoachEmail(e.target.value)} />
         </div>
 
         <div>

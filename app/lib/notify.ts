@@ -6,6 +6,7 @@
 import { sql } from '@/app/lib/sql'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 import { logNotification } from '@/app/lib/control-centre-db'
+import { normalizeUkPhoneToJid } from '@/app/lib/feedback'
 
 interface InternalRecipient {
   coachId: string
@@ -54,8 +55,12 @@ export async function getInternalRecipients(
     if (seen.has(r.coach_id)) continue
     if (excludeCoachId && r.coach_id === excludeCoachId) continue
     seen.add(r.coach_id)
-    // Build a whatsapp JID from the mobile number if present
-    const jid = r.mobile ? `${r.mobile.replace(/\D/g, '')}@s.whatsapp.net` : null
+    // Build a whatsapp JID from the mobile number if present. Must be the
+    // INTERNATIONAL form — UK coaches store local "07…" numbers, and
+    // "07…@s.whatsapp.net" doesn't exist on WhatsApp (Evolution 400s). The
+    // normaliser converts 07…→447…, 0044…→44…, etc.
+    const digits = r.mobile ? r.mobile.replace(/\D/g, '') : ''
+    const jid = digits ? normalizeUkPhoneToJid(r.mobile) : null
     recipients.push({
       coachId: r.coach_id,
       whatsappJid: jid,
@@ -63,6 +68,67 @@ export async function getInternalRecipients(
     })
   }
   return recipients
+}
+
+// Real handoff for the closed-intent bot. When the bot refuses-and-routes
+// (out-of-scope, or in-scope but missing data) it must not be a dead end: the
+// owning coach/GM/admin get a WhatsApp DM with the parent's question so they
+// can follow up. Best-effort — every send is logged; the caller wraps this so
+// a notification failure can never break the bot's group reply.
+export async function notifyCoachHandoff(input: {
+  programmeId: string
+  parentName: string
+  question: string
+  reason: 'out_of_scope' | 'missing_data'
+}): Promise<{ notified: number; failed: number }> {
+  const recipients = await getInternalRecipients(input.programmeId)
+  const why =
+    input.reason === 'missing_data'
+      ? "needs information the bot doesn't have on file"
+      : "asked something outside what the bot can answer"
+  const message =
+    `🔔 A parent in your WhatsApp group ${why}, so I've passed it to you.\n\n` +
+    `From: ${input.parentName || 'a parent'}\n` +
+    `They asked: "${input.question}"\n\n` +
+    `I've told them you'll come back to them directly.`
+
+  let notified = 0
+  let failed = 0
+  for (const r of recipients) {
+    if (!r.whatsappJid) {
+      await logNotification({
+        eventType: 'bot_handoff_internal',
+        programmeId: input.programmeId,
+        recipientType: r.role,
+        status: 'failed',
+        error: 'No phone number on record',
+      })
+      failed++
+      continue
+    }
+    try {
+      await sendWhatsAppMessage(r.whatsappJid, message)
+      await logNotification({
+        eventType: 'bot_handoff_internal',
+        programmeId: input.programmeId,
+        recipientType: r.role,
+        recipientJid: r.whatsappJid,
+        status: 'sent',
+      })
+      notified++
+    } catch (err) {
+      await logNotification({
+        eventType: 'bot_handoff_internal',
+        programmeId: input.programmeId,
+        recipientType: r.role,
+        recipientJid: r.whatsappJid,
+        status: 'failed',
+        error: err instanceof Error ? err.message : String(err),
+      })
+      failed++
+    }
+  }
+  return { notified, failed }
 }
 
 interface CascadeInput {

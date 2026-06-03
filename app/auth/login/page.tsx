@@ -75,6 +75,10 @@ export default function LoginPage() {
             <input
               id="email"
               type="email"
+              inputMode="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -96,6 +100,11 @@ export default function LoginPage() {
               className="input-field"
               placeholder="Your password"
             />
+            <div className="mt-1.5 text-right">
+              <Link href="/auth/forgot-password" className="text-sm font-medium text-brand-700 hover:underline">
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
           <button

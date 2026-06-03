@@ -573,12 +573,251 @@ export function buildCampPaidAck(input: {
   return `Thanks${name} — I've flagged £${input.total.toFixed(2)} for ${input.childName} as paid. The coach will confirm receipt against the bank shortly.`
 }
 
+// Richer WhatsApp "thank-you / payment received" follow-up sent the moment the
+// parent reports payment — itemised so it reads like a receipt. Replaces the email.
+export function buildCampPaymentReceived(input: {
+  parentFirstName: string | null
+  children: CampChildSummary[]
+  campName: string
+}): string {
+  const total = input.children.reduce((s, c) => s + c.total, 0)
+  const name = input.parentFirstName ? ` ${input.parentFirstName}` : ''
+  const lines = input.children.map(
+    (c) => `• ${c.childName}${c.age != null ? ` (age ${c.age})` : ''} — ${c.dayLabels.join(', ')} — £${c.total.toFixed(2)}`
+  )
+  return (
+    `Thank you${name}! 🙌 I've got your payment details for ${input.campName}:\n\n` +
+    `${lines.join('\n')}\n\nTotal: £${total.toFixed(2)}\n\n` +
+    `The coach will confirm against the bank shortly and I'll send your final confirmation here. Any questions, just reply 👍`
+  )
+}
+
 // Sent when we can't parse the parent's day-selection reply.
 export function buildCampDayUnparseableNudge(childName: string, dayList: CampDayLite[]): string {
   const lettered = dayList
     .map((d, i) => `${String.fromCharCode(97 + i)}) ${d.label}`)
     .join('\n')
   return `Sorry, didn't catch which days you'd like for ${childName}. Please reply with the letters (e.g. "a, b") or day names from the list below — or "all" for every day.\n\n${lettered}`
+}
+
+// ─── Camp 1:1 conversation (revised spec) — pure message builders ───
+// All deterministic templates (no LLM) so they're cheap and unit-testable.
+
+export interface CampDayAvailLite {
+  index: number
+  label: string
+  price_gbp: number
+  remaining: number | null   // null = uncapped
+}
+
+export interface CampChildSummary {
+  childName: string
+  age: number | null
+  dayLabels: string[]
+  total: number
+}
+
+// Message 1 — opening. If the parent's name is unknown, ask for it first.
+export function buildCampOpening(campName: string, parentFirstName: string | null): string {
+  if (!parentFirstName) {
+    return `Hi! 👋 Great that you're interested in ${campName}.\n\nLet me get your child booked in — takes about a minute. First, what's your name?`
+  }
+  return `Hey ${parentFirstName}! 👋 Great that you're interested in ${campName}.\n\nLet me get your child booked in — takes about a minute.\n\nWhat's your child's first name?`
+}
+
+export function buildCampAskChildName(parentFirstName: string | null): string {
+  const name = parentFirstName ? ` ${parentFirstName}` : ''
+  return `Lovely to meet you${name}! And what's your child's first name?`
+}
+
+export function buildCampAskAge(childName: string): string {
+  return `Nice! How old is ${childName}?`
+}
+
+export function buildCampAgeRetry(childName: string): string {
+  return `Just to check — how old is ${childName} in years? (a number between 4 and 17)`
+}
+
+// Message 3 — day selection. Only days with capacity are passed in.
+export function buildCampDaySelection(childName: string, campName: string, availableDays: CampDayAvailLite[]): string {
+  const lines = availableDays.map((d) => {
+    const letter = String.fromCharCode(97 + d.index)
+    const spots = d.remaining != null ? ` (${d.remaining} spot${d.remaining === 1 ? '' : 's'} left)` : ''
+    return `${letter}) ${d.label} — £${Number(d.price_gbp).toFixed(2)}${spots}`
+  })
+  return `Great! Here are the available days for ${campName}:\n\n${lines.join('\n')}\n\nWhich days would you like ${childName} to attend? Reply with the letters, e.g. "a c" for the first and third.`
+}
+
+export function buildCampAllFull(campName: string): string {
+  return `Sorry — ${campName} is fully booked right now. Want me to add you to the waitlist? Reply "yes" and I'll let you know the moment a spot opens up.`
+}
+
+export function buildCampDayJustFilled(filledLabel: string, stillAvailable: CampDayAvailLite[]): string {
+  if (stillAvailable.length === 0) {
+    return `Sorry — ${filledLabel} just filled up, and the rest of the camp is now full too. I can add you to the waitlist if you'd like — reply "yes".`
+  }
+  const lines = stillAvailable.map((d) => `${String.fromCharCode(97 + d.index)}) ${d.label}`).join('\n')
+  return `Sorry — ${filledLabel} just filled up since you started! These are still available:\n\n${lines}\n\nWhich would you like? Reply with the letters.`
+}
+
+// Message 4 — checkout recap. Handles single and multiple children.
+export function buildCampCheckoutRecap(children: CampChildSummary[]): string {
+  const grandTotal = children.reduce((s, c) => s + c.total, 0)
+  if (children.length === 1) {
+    const c = children[0]
+    const ageBit = c.age != null ? ` (age ${c.age})` : ''
+    const daysLine = c.dayLabels.join(' + ')
+    const n = c.dayLabels.length
+    return `Here's what I've got:\n\n👦 ${c.childName}${ageBit}\n📅 ${daysLine}\n💰 ${n} day${n === 1 ? '' : 's'} = £${c.total.toFixed(2)}\n\nDoes that look right? Reply "yes" to get the payment link, "add" to book another child, or "change" to update anything.`
+  }
+  const lines = children.map((c) => {
+    const ageBit = c.age != null ? ` (age ${c.age})` : ''
+    return `• ${c.childName}${ageBit} — ${c.dayLabels.join(' + ')} — £${c.total.toFixed(2)}`
+  })
+  return `Here's your booking:\n\n${lines.join('\n')}\n\nTotal: £${grandTotal.toFixed(2)}\n\nReply "yes" for the payment link, "add" to book another child, or "change" to update anything.`
+}
+
+// Message 5 — combined payment link (single or multiple children).
+export function buildCampPaymentMessage(input: {
+  children: CampChildSummary[]
+  paymentLink: string | null
+  paymentReference: string
+  campName: string
+}): string {
+  const total = input.children.reduce((s, c) => s + c.total, 0)
+  const names = input.children.map((c) => c.childName).join(' & ')
+  const lines: string[] = []
+  lines.push(`Here's your payment link:`)
+  lines.push('')
+  lines.push(`£${total.toFixed(2)} for ${names} — ${input.campName}`)
+  if (input.paymentLink) {
+    lines.push('')
+    lines.push(input.paymentLink)
+  }
+  lines.push('')
+  lines.push(`Please use "${input.paymentReference}" as the payment reference.`)
+  lines.push('')
+  lines.push(`Once you've paid, reply "done" and I'll confirm your spot${input.children.length === 1 ? '' : 's'}.`)
+  return lines.join('\n')
+}
+
+// Sent when the parent messages while we're waiting on the coach to confirm.
+export function buildCampWaitingOnCoach(coachName: string | null): string {
+  const who = coachName && coachName.trim() ? coachName.trim() : 'the coach'
+  return `You're all set on my end — I'm just waiting for ${who} to confirm your payment. You'll get a confirmation here as soon as that's done 👍`
+}
+
+// Message 8 — booking confirmed (sent after coach confirms). One per group.
+export function buildCampConfirmed(input: {
+  children: CampChildSummary[]
+  venue: string | null
+}): string {
+  const total = input.children.reduce((s, c) => s + c.total, 0)
+  const lines: string[] = []
+  lines.push(`All booked! ✓`)
+  lines.push('')
+  for (const c of input.children) {
+    lines.push(`${c.childName} is confirmed for:`)
+    for (const d of c.dayLabels) lines.push(`📅 ${d}`)
+  }
+  if (input.venue && input.venue.trim()) {
+    lines.push('')
+    lines.push(`📍 ${input.venue.trim()}`)
+  }
+  lines.push(`💰 £${total.toFixed(2)} — payment received`)
+  lines.push('')
+  lines.push(`What to bring: comfy kit, trainers, a water bottle and a packed lunch.`)
+  lines.push('')
+  lines.push(`See you there! 💪`)
+  return lines.join('\n')
+}
+
+// Reject — coach flags a payment issue.
+export function buildCampRejected(coachName: string | null): string {
+  const who = coachName && coachName.trim() ? coachName.trim() : 'the coach'
+  return `There's a small issue with the payment — ${who} will be in touch shortly to sort it out. 🙏`
+}
+
+// ─── Pure parsers for the camp conversation ───
+
+// Extract a plausible child age (4–17) from a free-text reply.
+export function parseCampAge(text: string): number | null {
+  const m = text.match(/\b(\d{1,2})\b/)
+  if (!m) return null
+  const n = parseInt(m[1], 10)
+  return n >= 4 && n <= 17 ? n : null
+}
+
+export type CheckoutReply = 'confirm' | 'change' | 'add' | 'unknown'
+
+// Classify the reply to the checkout recap.
+export function parseCheckoutReply(text: string): CheckoutReply {
+  const t = text.trim().toLowerCase()
+  if (!t) return 'unknown'
+  if (/\b(add|another|more|second child|sibling|also)\b/.test(t)) return 'add'
+  if (/\b(change|wrong|edit|update|amend|no\b|incorrect|not right)\b/.test(t)) return 'change'
+  if (/\b(yes|yep|yeah|yes please|correct|looks good|that's right|thats right|perfect|👍|confirm|go ahead|send)\b/.test(t) || t === 'y' || t === '✅') return 'confirm'
+  return 'unknown'
+}
+
+// Affirmative yes (used for waitlist offers etc).
+export function parseAffirmative(text: string): boolean {
+  const t = text.trim().toLowerCase()
+  return /^(y|yes|yep|yeah|yes please|ok|okay|sure|go on|please|👍|✅)\b/.test(t) || t === '👍' || t === '✅'
+}
+
+// ─── Sign-up details collected before payment ───
+
+export function buildCampAskRegName(childName: string): string {
+  return `Almost there! Before I send the payment link I just need a few details to register ${childName}.\n\nWhat's the parent/guardian's full name?`
+}
+export function buildCampAskRegEmail(): string {
+  return `Thanks! What's the best email for your booking confirmation?`
+}
+export function buildCampAskRegPhone(): string {
+  return `And a contact phone number?`
+}
+export function buildCampRegEmailRetry(): string {
+  return `Hmm, that doesn't look like an email address — could you send it again? (e.g. you@example.com)`
+}
+export function buildCampRegPhoneRetry(): string {
+  return `Could you send a contact number for the booking? (just the digits is fine)`
+}
+
+// Accept a reasonable email. Deliberately lenient.
+export function isValidEmail(text: string): string | null {
+  const m = text.trim().match(/[^\s@]+@[^\s@]+\.[^\s@]+/)
+  return m ? m[0] : null
+}
+// Pull a usable phone number (>=7 digits) from free text.
+export function parsePhoneNumber(text: string): string | null {
+  const digits = text.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '')
+  const justDigits = digits.replace(/\D/g, '')
+  return justDigits.length >= 7 ? digits : null
+}
+
+// Thank-you email sent as soon as the parent reports payment.
+export function buildCampThankYouEmail(input: {
+  parentFirstName: string | null
+  children: CampChildSummary[]
+  campName: string
+  venue: string | null
+}): { subject: string; text: string; html: string } {
+  const total = input.children.reduce((s, c) => s + c.total, 0)
+  const hi = input.parentFirstName ? `Hi ${input.parentFirstName},` : 'Hi there,'
+  const lines = input.children.map((c) => `• ${c.childName}${c.age != null ? ` (age ${c.age})` : ''} — ${c.dayLabels.join(', ')} — £${c.total.toFixed(2)}`)
+  const venueLine = input.venue && input.venue.trim() ? `\nVenue: ${input.venue.trim()}` : ''
+  const subject = `Thanks — your ${input.campName} booking`
+  const text =
+    `${hi}\n\nThanks for booking onto ${input.campName}! We've received your payment details and the coach will confirm your place shortly.\n\n` +
+    `${lines.join('\n')}\n\nTotal: £${total.toFixed(2)}${venueLine}\n\n` +
+    `You'll get a final confirmation once payment is verified. Any questions, just reply on WhatsApp.\n\nSee you there!`
+  const html =
+    `<p>${hi}</p><p>Thanks for booking onto <strong>${input.campName}</strong>! We've received your payment details and the coach will confirm your place shortly.</p>` +
+    `<ul>${input.children.map((c) => `<li>${c.childName}${c.age != null ? ` (age ${c.age})` : ''} — ${c.dayLabels.join(', ')} — £${c.total.toFixed(2)}</li>`).join('')}</ul>` +
+    `<p><strong>Total: £${total.toFixed(2)}</strong>${venueLine ? `<br>Venue: ${input.venue!.trim()}` : ''}</p>` +
+    `<p>You'll get a final confirmation once payment is verified. Any questions, just reply on WhatsApp.</p><p>See you there!</p>`
+  return { subject, text, html }
 }
 
 // ─── PT booking flow (Paul's spec Flow 2 — Private Lesson Booking) ───

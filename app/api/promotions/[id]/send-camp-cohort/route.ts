@@ -154,6 +154,7 @@ export async function POST(
         // back from the parent can always find the open row.
         const bookingId = await createCampBooking({
           promotionId: params.id,
+          programmeId,
           memberId: member.id,
           parentJid,
           parentName,
