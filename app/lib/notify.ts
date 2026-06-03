@@ -6,6 +6,7 @@
 import { sql } from '@/app/lib/sql'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 import { logNotification } from '@/app/lib/control-centre-db'
+import { normalizeUkPhoneToJid } from '@/app/lib/feedback'
 
 interface InternalRecipient {
   coachId: string
@@ -54,8 +55,12 @@ export async function getInternalRecipients(
     if (seen.has(r.coach_id)) continue
     if (excludeCoachId && r.coach_id === excludeCoachId) continue
     seen.add(r.coach_id)
-    // Build a whatsapp JID from the mobile number if present
-    const jid = r.mobile ? `${r.mobile.replace(/\D/g, '')}@s.whatsapp.net` : null
+    // Build a whatsapp JID from the mobile number if present. Must be the
+    // INTERNATIONAL form — UK coaches store local "07…" numbers, and
+    // "07…@s.whatsapp.net" doesn't exist on WhatsApp (Evolution 400s). The
+    // normaliser converts 07…→447…, 0044…→44…, etc.
+    const digits = r.mobile ? r.mobile.replace(/\D/g, '') : ''
+    const jid = digits ? normalizeUkPhoneToJid(r.mobile) : null
     recipients.push({
       coachId: r.coach_id,
       whatsappJid: jid,
