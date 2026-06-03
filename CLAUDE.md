@@ -148,7 +148,10 @@ webhook's 1:1 branch); message copy + pure parsers in `app/lib/ai-messages.ts`.
 - **Multiple children, one payment**: sibling rows share a `booking_group_id`; checkout/payment/confirm operate on the whole group. One row per child so each consumes day capacity.
 - **Coach confirm** (`/api/promotions/[id]/bookings/[bookingId]/confirm`) → confirms the group, sets linked `members.status = 'active'`, sends the parent the "All booked ✓" message (Message 8). **Reject** (`…/reject`) keeps the booking pending and DMs the parent.
 - **Dashboard** (`/dashboard/promotions/[id]`): day-by-day availability panel (colour-coded), pending confirmations with one-click Confirm/Reject, CSV export of confirmed bookings.
-- New `camp_bookings` columns: `conversation_step`, `child_age`, `booking_group_id`, `payment_link`, `payment_status`.
+- New `camp_bookings` columns: `conversation_step`, `child_age`, `booking_group_id`, `payment_link`, `payment_status`, `programme_id`, `parent_email`, `parent_phone`, `payment_link_sent_at`, `thankyou_sent_at`, `parent_chase_step`, `coach_chase_step`.
+- **Sign-up before payment**: after checkout-confirm, the flow collects parent full name → email → phone (`awaiting_reg_name/email/phone`), then **registers a `members` row per child** (status `trial`, linked to the programme) so the family shows on the Members page, then sends the payment link.
+- **Thank-you email** (`buildCampThankYouEmail` via Resend) fires the moment the parent replies "done"/paid.
+- **24h chase ladders** (`runCampChase`, wired into the `payment-chase` cron): nudges the **parent** if the link is unpaid (+24h/+48h), and reminds the **coach** (via `getInternalRecipients`) + reassures the parent if a reported payment sits unconfirmed (+24h/+48h).
 - **Unified builder** (`/dashboard/camps/new` → `POST /api/camps`): one screen — description + optional image (base64, sent via `sendWhatsAppMedia`) + bookable days (price/capacity) + poll options. On save it creates the holiday_camp promotion AND creates + posts the linked poll to the chosen groups in one go. The old `/dashboard/promotions/new` holiday_camp path still works and links across to this builder.
 - **Two ways to start it (both supported)**:
   1. **Cohort blast** — `send-camp-cohort` DMs every parent on the targeted programmes' member roll (details known → starts at day selection).

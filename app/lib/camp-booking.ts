@@ -23,11 +23,16 @@
 
 import { sql } from '@/app/lib/sql'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
+import { createMember } from '@/app/lib/db'
+import { sendEmail } from '@/app/lib/email'
+import { getInternalRecipients } from '@/app/lib/notify'
 import {
   parseCampDaySelection,
   parseCampAge,
   parseCheckoutReply,
   parseAffirmative,
+  isValidEmail,
+  parsePhoneNumber,
   buildCampOpening,
   buildCampAskChildName,
   buildCampAskAge,
@@ -36,6 +41,12 @@ import {
   buildCampAllFull,
   buildCampDayJustFilled,
   buildCampCheckoutRecap,
+  buildCampAskRegName,
+  buildCampAskRegEmail,
+  buildCampAskRegPhone,
+  buildCampRegEmailRetry,
+  buildCampRegPhoneRetry,
+  buildCampThankYouEmail,
   buildCampPaymentMessage,
   buildCampPaidAck,
   buildCampWaitingOnCoach,
@@ -70,6 +81,9 @@ export type CampStep =
   | 'awaiting_day_selection'
   | 'awaiting_waitlist_confirm'
   | 'awaiting_checkout_confirm'
+  | 'awaiting_reg_name'
+  | 'awaiting_reg_email'
+  | 'awaiting_reg_phone'
   | 'awaiting_payment'
   | 'awaiting_coach_confirm'
   | 'confirmed'
@@ -80,8 +94,11 @@ export interface CampBookingRow {
   promotion_id: string
   booking_group_id: string | null
   member_id: string | null
+  programme_id: string | null
   parent_jid: string
   parent_name: string | null
+  parent_email: string | null
+  parent_phone: string | null
   child_name: string | null
   child_age: number | null
   days_selected: number[] | null
@@ -132,10 +149,10 @@ function stepToState(step: CampStep): CampBookingState {
 }
 
 const CAMP_SELECT = `
-  id, promotion_id, booking_group_id, member_id, parent_jid, parent_name,
-  child_name, child_age, days_selected, total_gbp::text as total_gbp, state,
-  conversation_step, payment_status, payment_link, prompt_message_id,
-  expires_at, created_at, updated_at
+  id, promotion_id, booking_group_id, member_id, programme_id, parent_jid, parent_name,
+  parent_email, parent_phone, child_name, child_age, days_selected,
+  total_gbp::text as total_gbp, state, conversation_step, payment_status, payment_link,
+  prompt_message_id, expires_at, created_at, updated_at
 `
 
 // ─── Lookups ───
@@ -323,6 +340,7 @@ function groupChildSummaries(group: CampBookingRow[], dayList: CampDay[]): CampC
 
 export async function createCampBooking(input: {
   promotionId: string
+  programmeId?: string | null
   memberId?: string | null
   parentJid: string
   parentName?: string | null
@@ -336,10 +354,10 @@ export async function createCampBooking(input: {
   const step: CampStep = input.startStep || (input.childName ? 'awaiting_day_selection' : 'awaiting_child_name')
   const { rows } = await sql`
     INSERT INTO camp_bookings (
-      promotion_id, member_id, parent_jid, parent_name, child_name,
+      promotion_id, programme_id, member_id, parent_jid, parent_name, child_name,
       state, conversation_step
     ) VALUES (
-      ${input.promotionId}, ${input.memberId || null}, ${input.parentJid},
+      ${input.promotionId}, ${input.programmeId || null}, ${input.memberId || null}, ${input.parentJid},
       ${input.parentName || null}, ${input.childName || null},
       ${stepToState(step)}, ${step}
     )
@@ -370,7 +388,8 @@ async function findMemberByJid(jid: string): Promise<{ id: string; parent_name: 
 export async function startCampBookingFromPoll(
   promotionId: string,
   voterJid: string,
-  voterName?: string | null
+  voterName?: string | null,
+  programmeId?: string | null
 ): Promise<boolean> {
   const promo = await getCampPromotion(promotionId)
   if (!promo || !Array.isArray(promo.camp_days) || promo.camp_days.length === 0 || !promo.payment_link) {
@@ -394,6 +413,7 @@ export async function startCampBookingFromPoll(
 
   await createCampBooking({
     promotionId,
+    programmeId: programmeId || null,
     parentJid: voterJid,
     parentName,
     memberId: member?.id || null,
@@ -401,6 +421,42 @@ export async function startCampBookingFromPoll(
   })
   await sendWhatsAppMessage(voterJid, buildCampOpening(promo.title || 'the camp', parentFirst))
   return true
+}
+
+// Resolve the programme to register a member under: the booking's own
+// programme_id if known, else the camp promotion's first target programme.
+async function resolveProgrammeId(promotionId: string, bookingProgrammeId: string | null): Promise<string | null> {
+  if (bookingProgrammeId) return bookingProgrammeId
+  const { rows } = await sql`SELECT programme_id FROM promotion_targets WHERE promotion_id = ${promotionId} LIMIT 1`
+  return (rows[0]?.programme_id as string | undefined) || null
+}
+
+// Create/link a member row per child in the group (status 'trial'), so the
+// family shows up on the Members page. Idempotent-ish: only creates for rows
+// that don't already have a member_id.
+async function registerGroupMembers(group: CampBookingRow[], promotionId: string): Promise<void> {
+  for (const row of group) {
+    if (row.member_id) continue
+    const programmeId = await resolveProgrammeId(promotionId, row.programme_id)
+    if (!programmeId) {
+      console.warn('[CAMP] cannot register member — no programme for booking', row.id)
+      continue
+    }
+    try {
+      const member = await createMember({
+        programmeId,
+        parentName: row.parent_name || undefined,
+        parentEmail: row.parent_email || undefined,
+        parentWhatsappId: row.parent_jid,
+        parentPhone: row.parent_phone || undefined,
+        childName: row.child_name || undefined,
+        status: 'trial',
+      })
+      await sql`UPDATE camp_bookings SET member_id = ${member.id} WHERE id = ${row.id}`
+    } catch (e) {
+      console.error('[CAMP] registerGroupMembers failed for', row.id, e)
+    }
+  }
 }
 
 async function setStep(id: string, step: CampStep) {
@@ -431,6 +487,14 @@ async function setStepForGroup(
 
 async function setParentNameForGroup(bookingGroupId: string, parentName: string) {
   await sql`UPDATE camp_bookings SET parent_name = ${parentName}, updated_at = NOW() WHERE booking_group_id = ${bookingGroupId}`
+}
+
+async function setParentEmailForGroup(bookingGroupId: string, email: string) {
+  await sql`UPDATE camp_bookings SET parent_email = ${email}, updated_at = NOW() WHERE booking_group_id = ${bookingGroupId}`
+}
+
+async function setParentPhoneForGroup(bookingGroupId: string, phone: string) {
+  await sql`UPDATE camp_bookings SET parent_phone = ${phone}, updated_at = NOW() WHERE booking_group_id = ${bookingGroupId}`
 }
 
 async function setChildName(id: string, childName: string) {
@@ -684,20 +748,52 @@ export async function tryHandleCampBookingReply(
               return true
             }
           }
-          await setStepForGroup(groupId, 'awaiting_payment', { paymentLink: promo.payment_link, paymentStatus: 'sent' })
-          const children = groupChildSummaries(group, dayList)
-          await sendWhatsAppMessage(
-            senderJid,
-            buildCampPaymentMessage({
-              children,
-              paymentLink: promo.payment_link,
-              paymentReference: children.map((c) => c.childName).join(' & '),
-              campName,
-            })
-          )
+          // Days are locked in — collect the sign-up details before payment.
+          await setStep(booking.id, 'awaiting_reg_name')
+          await sendWhatsAppMessage(senderJid, buildCampAskRegName(childName))
           return true
         }
         await sendWhatsAppMessage(senderJid, `Reply "yes" to get the payment link, "add" to book another child, or "change" to update the days.`)
+        return true
+      }
+
+      case 'awaiting_reg_name': {
+        const name = messageText.trim()
+        if (name.length < 2) { await sendWhatsAppMessage(senderJid, `Sorry, what's the parent/guardian's full name?`); return true }
+        await setParentNameForGroup(groupId, name)
+        await setStep(booking.id, 'awaiting_reg_email')
+        await sendWhatsAppMessage(senderJid, buildCampAskRegEmail())
+        return true
+      }
+
+      case 'awaiting_reg_email': {
+        const email = isValidEmail(messageText)
+        if (!email) { await sendWhatsAppMessage(senderJid, buildCampRegEmailRetry()); return true }
+        await setParentEmailForGroup(groupId, email)
+        await setStep(booking.id, 'awaiting_reg_phone')
+        await sendWhatsAppMessage(senderJid, buildCampAskRegPhone())
+        return true
+      }
+
+      case 'awaiting_reg_phone': {
+        const phone = parsePhoneNumber(messageText)
+        if (!phone) { await sendWhatsAppMessage(senderJid, buildCampRegPhoneRetry()); return true }
+        await setParentPhoneForGroup(groupId, phone)
+        // Register the family on the Members page, then send the payment link.
+        const group = await getGroupRows(groupId)
+        await registerGroupMembers(group, booking.promotion_id)
+        await setStepForGroup(groupId, 'awaiting_payment', { paymentLink: promo.payment_link, paymentStatus: 'sent' })
+        await sql`UPDATE camp_bookings SET payment_link_sent_at = NOW() WHERE booking_group_id = ${groupId} AND conversation_step = 'awaiting_payment'`
+        const children = groupChildSummaries(group, dayList)
+        await sendWhatsAppMessage(
+          senderJid,
+          buildCampPaymentMessage({
+            children,
+            paymentLink: promo.payment_link,
+            paymentReference: children.map((c) => c.childName).join(' & '),
+            campName,
+          })
+        )
         return true
       }
 
@@ -713,6 +809,22 @@ export async function tryHandleCampBookingReply(
         const group = await getGroupRows(groupId)
         const total = group.reduce((s, r) => s + Number(r.total_gbp || 0), 0)
         await sendWhatsAppMessage(senderJid, buildCampPaidAck({ parentFirstName: parentFirst, childName, total }))
+        // Thank-you email the moment they report payment (best-effort).
+        const parentEmail = group.find((r) => r.parent_email)?.parent_email || null
+        if (parentEmail) {
+          try {
+            const mail = buildCampThankYouEmail({
+              parentFirstName: parentFirst || null,
+              children: groupChildSummaries(group, dayList),
+              campName,
+              venue: promo.venue,
+            })
+            await sendEmail({ to: parentEmail, subject: mail.subject, text: mail.text, html: mail.html })
+            await sql`UPDATE camp_bookings SET thankyou_sent_at = NOW() WHERE booking_group_id = ${groupId}`
+          } catch (e) {
+            console.error('[CAMP] thank-you email failed for group', groupId, e)
+          }
+        }
         return true
       }
 
@@ -776,4 +888,91 @@ export async function getCampBookingForCoach(bookingId: string, coachId: string)
     LIMIT 1
   `
   return rows[0] || null
+}
+
+// ─── 24h chase ladders (run by the daily payment-chase cron) ───
+// Two ladders, tracked on camp_bookings (parent_chase_step / coach_chase_step):
+//  • Parent hasn't paid the link → nudge the parent at +24h, +48h.
+//  • Parent reported payment but the coach hasn't confirmed → remind the coach
+//    at +24h, +48h, and reassure the parent once.
+
+export interface CampChaseResult { parentNudged: number; coachReminded: number; errors: string[] }
+
+export async function runCampChase(): Promise<CampChaseResult> {
+  const result: CampChaseResult = { parentNudged: 0, coachReminded: 0, errors: [] }
+
+  // ── Parent unpaid ──
+  try {
+    const { rows } = await sql`
+      SELECT DISTINCT ON (booking_group_id)
+             booking_group_id, parent_jid, parent_name, payment_link,
+             payment_link_sent_at, parent_chase_step
+      FROM camp_bookings
+      WHERE conversation_step = 'awaiting_payment'
+        AND payment_link_sent_at IS NOT NULL
+        AND payment_link_sent_at < NOW() - INTERVAL '24 hours'
+      ORDER BY booking_group_id, created_at ASC`
+    for (const r of rows) {
+      const first = (r.parent_name || '').split(/\s+/)[0] || ''
+      const link = r.payment_link ? `\n${r.payment_link}` : ''
+      const sentMs = r.payment_link_sent_at ? Date.now() - new Date(r.payment_link_sent_at).getTime() : 0
+      const hours = sentMs / 36e5
+      let step: string | null = null
+      let msg = ''
+      if (!r.parent_chase_step) {
+        step = 'nudge_24h'
+        msg = `Hi ${first || 'there'} — just a nudge that your camp spot isn't secured until payment's in. Here's the link again:${link}\n\nOnce done, reply "done" and I'll confirm your place.`
+      } else if (r.parent_chase_step === 'nudge_24h' && hours >= 48) {
+        step = 'nudge_48h'
+        msg = `Hi ${first || 'there'} — last reminder on your camp booking. Spaces are limited, so to keep your place please pay here:${link}\n\nReply "done" once sorted. 🙏`
+      }
+      if (!step) continue
+      try {
+        await sendWhatsAppMessage(r.parent_jid, msg)
+        await sql`UPDATE camp_bookings SET parent_chase_step = ${step}, updated_at = NOW() WHERE booking_group_id = ${r.booking_group_id}`
+        result.parentNudged++
+      } catch (e) { result.errors.push(`parent ${r.booking_group_id}: ${e instanceof Error ? e.message : String(e)}`) }
+    }
+  } catch (e) { result.errors.push(`parent query: ${e instanceof Error ? e.message : String(e)}`) }
+
+  // ── Coach hasn't confirmed a reported payment ──
+  try {
+    const { rows } = await sql`
+      SELECT DISTINCT ON (booking_group_id)
+             booking_group_id, parent_jid, parent_name, child_name, promotion_id,
+             programme_id, total_gbp::text AS total_gbp, payment_self_reported_at, coach_chase_step
+      FROM camp_bookings
+      WHERE conversation_step = 'awaiting_coach_confirm'
+        AND payment_self_reported_at < NOW() - INTERVAL '24 hours'
+      ORDER BY booking_group_id, created_at ASC`
+    for (const r of rows) {
+      const repMs = r.payment_self_reported_at ? Date.now() - new Date(r.payment_self_reported_at).getTime() : 0
+      const hours = repMs / 36e5
+      let step: string | null = null
+      if (!r.coach_chase_step) step = 'remind_24h'
+      else if (r.coach_chase_step === 'remind_24h' && hours >= 48) step = 'remind_48h'
+      if (!step) continue
+
+      const programmeId = await resolveProgrammeId(r.promotion_id, r.programme_id)
+      let dmd = false
+      if (programmeId) {
+        try {
+          const recipients = await getInternalRecipients(programmeId)
+          const coachMsg = `⏳ Reminder: a camp payment from ${r.parent_name || 'a parent'} (${r.child_name || 'child'}) has been waiting for your confirmation for over 24h. Confirm it on the dashboard so they get their booking confirmation.`
+          for (const rec of recipients) {
+            if (rec.whatsappJid) { try { await sendWhatsAppMessage(rec.whatsappJid, coachMsg); dmd = true } catch { /* logged below via errors */ } }
+          }
+        } catch (e) { result.errors.push(`coach recipients ${r.booking_group_id}: ${e instanceof Error ? e.message : String(e)}`) }
+      }
+      // Reassure the parent once (on the first reminder only).
+      if (step === 'remind_24h') {
+        const first = (r.parent_name || '').split(/\s+/)[0] || 'there'
+        try { await sendWhatsAppMessage(r.parent_jid, `Hi ${first} — just letting you know we're still confirming your payment. You'll get your booking confirmation here shortly. Thanks for your patience! 🙏`) } catch { /* non-fatal */ }
+      }
+      await sql`UPDATE camp_bookings SET coach_chase_step = ${step}, updated_at = NOW() WHERE booking_group_id = ${r.booking_group_id}`
+      if (dmd) result.coachReminded++
+    }
+  } catch (e) { result.errors.push(`coach query: ${e instanceof Error ? e.message : String(e)}`) }
+
+  return result
 }

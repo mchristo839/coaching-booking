@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
             let campStarted = false
             if (voteResult?.was_yes && pollRow.promotion_id && voterJid) {
               try {
-                campStarted = await startCampBookingFromPoll(pollRow.promotion_id, voterJid, voterName)
+                campStarted = await startCampBookingFromPoll(pollRow.promotion_id, voterJid, voterName, pollRow.programme_id)
               } catch (e) {
                 console.error('[POLL-VOTE] camp trigger failed:', e)
               }
@@ -565,7 +565,7 @@ export async function POST(request: NextRequest) {
         let campStarted = false
         if (result.was_yes && activePoll.promotion_id) {
           try {
-            campStarted = await startCampBookingFromPoll(activePoll.promotion_id, senderJid, senderName)
+            campStarted = await startCampBookingFromPoll(activePoll.promotion_id, senderJid, senderName, activePoll.programme_id)
           } catch (e) {
             console.error('[poll camp-trigger] failed:', e)
           }
