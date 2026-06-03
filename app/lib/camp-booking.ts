@@ -432,29 +432,41 @@ async function resolveProgrammeId(promotionId: string, bookingProgrammeId: strin
 // Create/link a member row per child in the group (status 'trial'), so the
 // family shows up on the Members page. Idempotent-ish: only creates for rows
 // that don't already have a member_id.
-async function registerGroupMembers(group: CampBookingRow[], promotionId: string): Promise<void> {
-  for (const row of group) {
-    if (row.member_id) continue
-    const programmeId = await resolveProgrammeId(promotionId, row.programme_id)
-    if (!programmeId) {
-      console.warn('[CAMP] cannot register member — no programme for booking', row.id)
-      continue
+async function ensureMemberForBooking(row: CampBookingRow, promotionId: string): Promise<void> {
+  const programmeId = await resolveProgrammeId(promotionId, row.programme_id)
+  if (!programmeId) { console.warn('[CAMP] cannot register member — no programme for booking', row.id); return }
+  try {
+    if (row.member_id) {
+      // Enrich the existing member as more details come in (email/phone/full name).
+      await sql`
+        UPDATE members SET
+          parent_name = COALESCE(${row.parent_name}, parent_name),
+          parent_email = COALESCE(${row.parent_email}, parent_email),
+          parent_phone = COALESCE(${row.parent_phone}, parent_phone),
+          child_name = COALESCE(${row.child_name}, child_name)
+        WHERE id = ${row.member_id}`
+      return
     }
-    try {
-      const member = await createMember({
-        programmeId,
-        parentName: row.parent_name || undefined,
-        parentEmail: row.parent_email || undefined,
-        parentWhatsappId: row.parent_jid,
-        parentPhone: row.parent_phone || undefined,
-        childName: row.child_name || undefined,
-        status: 'trial',
-      })
-      await sql`UPDATE camp_bookings SET member_id = ${member.id} WHERE id = ${row.id}`
-    } catch (e) {
-      console.error('[CAMP] registerGroupMembers failed for', row.id, e)
-    }
+    const member = await createMember({
+      programmeId,
+      parentName: row.parent_name || undefined,
+      parentEmail: row.parent_email || undefined,
+      parentWhatsappId: row.parent_jid,
+      parentPhone: row.parent_phone || undefined,
+      childName: row.child_name || undefined,
+      status: 'trial',
+    })
+    await sql`UPDATE camp_bookings SET member_id = ${member.id} WHERE id = ${row.id}`
+    row.member_id = member.id
+  } catch (e) {
+    console.error('[CAMP] ensureMemberForBooking failed for', row.id, e)
   }
+}
+
+// Create/enrich a member row per child in the group (status 'trial') so the
+// family shows on the Members page. Idempotent — updates existing members.
+async function registerGroupMembers(group: CampBookingRow[], promotionId: string): Promise<void> {
+  for (const row of group) await ensureMemberForBooking(row, promotionId)
 }
 
 async function setStep(id: string, step: CampStep) {
@@ -643,6 +655,9 @@ export async function tryHandleCampBookingReply(
         const name = messageText.trim()
         if (!name) { await sendWhatsAppMessage(senderJid, `What's your child's first name?`); return true }
         await setChildName(booking.id, name)
+        // Store the client the moment we have a child name (enriched later).
+        booking.child_name = name
+        await ensureMemberForBooking(booking, booking.promotion_id)
         await setStep(booking.id, 'awaiting_child_age')
         await sendWhatsAppMessage(senderJid, buildCampAskAge(name))
         return true
