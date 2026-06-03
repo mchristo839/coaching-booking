@@ -24,7 +24,6 @@
 import { sql } from '@/app/lib/sql'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 import { createMember } from '@/app/lib/db'
-import { sendEmail } from '@/app/lib/email'
 import { getInternalRecipients } from '@/app/lib/notify'
 import {
   parseCampDaySelection,
@@ -46,9 +45,8 @@ import {
   buildCampAskRegPhone,
   buildCampRegEmailRetry,
   buildCampRegPhoneRetry,
-  buildCampThankYouEmail,
   buildCampPaymentMessage,
-  buildCampPaidAck,
+  buildCampPaymentReceived,
   buildCampWaitingOnCoach,
   buildCampConfirmed,
   buildCampRejected,
@@ -807,24 +805,16 @@ export async function tryHandleCampBookingReply(
         }
         await setStepForGroup(groupId, 'awaiting_coach_confirm', { paymentStatus: 'awaiting_confirmation' })
         const group = await getGroupRows(groupId)
-        const total = group.reduce((s, r) => s + Number(r.total_gbp || 0), 0)
-        await sendWhatsAppMessage(senderJid, buildCampPaidAck({ parentFirstName: parentFirst, childName, total }))
-        // Thank-you email the moment they report payment (best-effort).
-        const parentEmail = group.find((r) => r.parent_email)?.parent_email || null
-        if (parentEmail) {
-          try {
-            const mail = buildCampThankYouEmail({
-              parentFirstName: parentFirst || null,
-              children: groupChildSummaries(group, dayList),
-              campName,
-              venue: promo.venue,
-            })
-            await sendEmail({ to: parentEmail, subject: mail.subject, text: mail.text, html: mail.html })
-            await sql`UPDATE camp_bookings SET thankyou_sent_at = NOW() WHERE booking_group_id = ${groupId}`
-          } catch (e) {
-            console.error('[CAMP] thank-you email failed for group', groupId, e)
-          }
-        }
+        // Richer WhatsApp thank-you/receipt the moment they report payment.
+        await sendWhatsAppMessage(
+          senderJid,
+          buildCampPaymentReceived({
+            parentFirstName: parentFirst || null,
+            children: groupChildSummaries(group, dayList),
+            campName,
+          })
+        )
+        await sql`UPDATE camp_bookings SET thankyou_sent_at = NOW() WHERE booking_group_id = ${groupId}`
         return true
       }
 
