@@ -747,6 +747,60 @@ export function parseAffirmative(text: string): boolean {
   return /^(y|yes|yep|yeah|yes please|ok|okay|sure|go on|please|👍|✅)\b/.test(t) || t === '👍' || t === '✅'
 }
 
+// ─── Sign-up details collected before payment ───
+
+export function buildCampAskRegName(childName: string): string {
+  return `Almost there! Before I send the payment link I just need a few details to register ${childName}.\n\nWhat's the parent/guardian's full name?`
+}
+export function buildCampAskRegEmail(): string {
+  return `Thanks! What's the best email for your booking confirmation?`
+}
+export function buildCampAskRegPhone(): string {
+  return `And a contact phone number?`
+}
+export function buildCampRegEmailRetry(): string {
+  return `Hmm, that doesn't look like an email address — could you send it again? (e.g. you@example.com)`
+}
+export function buildCampRegPhoneRetry(): string {
+  return `Could you send a contact number for the booking? (just the digits is fine)`
+}
+
+// Accept a reasonable email. Deliberately lenient.
+export function isValidEmail(text: string): string | null {
+  const m = text.trim().match(/[^\s@]+@[^\s@]+\.[^\s@]+/)
+  return m ? m[0] : null
+}
+// Pull a usable phone number (>=7 digits) from free text.
+export function parsePhoneNumber(text: string): string | null {
+  const digits = text.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '')
+  const justDigits = digits.replace(/\D/g, '')
+  return justDigits.length >= 7 ? digits : null
+}
+
+// Thank-you email sent as soon as the parent reports payment.
+export function buildCampThankYouEmail(input: {
+  parentFirstName: string | null
+  children: CampChildSummary[]
+  campName: string
+  venue: string | null
+}): { subject: string; text: string; html: string } {
+  const total = input.children.reduce((s, c) => s + c.total, 0)
+  const hi = input.parentFirstName ? `Hi ${input.parentFirstName},` : 'Hi there,'
+  const lines = input.children.map((c) => `• ${c.childName}${c.age != null ? ` (age ${c.age})` : ''} — ${c.dayLabels.join(', ')} — £${c.total.toFixed(2)}`)
+  const venueLine = input.venue && input.venue.trim() ? `\nVenue: ${input.venue.trim()}` : ''
+  const subject = `Thanks — your ${input.campName} booking`
+  const text =
+    `${hi}\n\nThanks for booking onto ${input.campName}! We've received your payment details and the coach will confirm your place shortly.\n\n` +
+    `${lines.join('\n')}\n\nTotal: £${total.toFixed(2)}${venueLine}\n\n` +
+    `You'll get a final confirmation once payment is verified. Any questions, just reply on WhatsApp.\n\nSee you there!`
+  const html =
+    `<p>${hi}</p><p>Thanks for booking onto <strong>${input.campName}</strong>! We've received your payment details and the coach will confirm your place shortly.</p>` +
+    `<ul>${input.children.map((c) => `<li>${c.childName}${c.age != null ? ` (age ${c.age})` : ''} — ${c.dayLabels.join(', ')} — £${c.total.toFixed(2)}</li>`).join('')}</ul>` +
+    `<p><strong>Total: £${total.toFixed(2)}</strong>${venueLine ? `<br>Venue: ${input.venue!.trim()}` : ''}</p>` +
+    `<p>You'll get a final confirmation once payment is verified. Any questions, just reply on WhatsApp.</p><p>See you there!</p>`
+  return { subject, text, html }
+}
+
 // ─── PT booking flow (Paul's spec Flow 2 — Private Lesson Booking) ───
 
 interface PtSlotLite {

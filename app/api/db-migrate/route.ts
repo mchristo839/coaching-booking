@@ -774,6 +774,15 @@ export async function POST() {
     await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS booking_group_id UUID`
     await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS payment_link TEXT`
     await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'not_sent'`
+    // Sign-up details collected before payment + lifecycle timestamps for the
+    // thank-you email and the 24h chase ladders.
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS programme_id UUID`
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS parent_email TEXT`
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS parent_phone TEXT`
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS payment_link_sent_at TIMESTAMPTZ`
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS thankyou_sent_at TIMESTAMPTZ`
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS parent_chase_step VARCHAR(20)`
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS coach_chase_step VARCHAR(20)`
     // Backfill conversation_step for any rows created by the older cohort-send path.
     await sql`UPDATE camp_bookings SET conversation_step = 'awaiting_day_selection' WHERE conversation_step IS NULL AND state = 'awaiting_day_selection'`
     await sql`UPDATE camp_bookings SET booking_group_id = id WHERE booking_group_id IS NULL`

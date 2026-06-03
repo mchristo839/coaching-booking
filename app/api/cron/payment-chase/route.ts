@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runPaymentChase } from '@/app/lib/payment-chase'
+import { runCampChase } from '@/app/lib/camp-booking'
 
 function isAuthorised(request: NextRequest): boolean {
   const secret = process.env.HEALTH_CHECK_SECRET
@@ -17,7 +18,8 @@ export async function POST(request: NextRequest) {
   }
   try {
     const result = await runPaymentChase()
-    return NextResponse.json({ ok: true, ...result, timestamp: new Date().toISOString() })
+    const camp = await runCampChase()
+    return NextResponse.json({ ok: true, ...result, camp, timestamp: new Date().toISOString() })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
