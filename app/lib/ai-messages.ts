@@ -573,6 +573,25 @@ export function buildCampPaidAck(input: {
   return `Thanks${name} — I've flagged £${input.total.toFixed(2)} for ${input.childName} as paid. The coach will confirm receipt against the bank shortly.`
 }
 
+// Richer WhatsApp "thank-you / payment received" follow-up sent the moment the
+// parent reports payment — itemised so it reads like a receipt. Replaces the email.
+export function buildCampPaymentReceived(input: {
+  parentFirstName: string | null
+  children: CampChildSummary[]
+  campName: string
+}): string {
+  const total = input.children.reduce((s, c) => s + c.total, 0)
+  const name = input.parentFirstName ? ` ${input.parentFirstName}` : ''
+  const lines = input.children.map(
+    (c) => `• ${c.childName}${c.age != null ? ` (age ${c.age})` : ''} — ${c.dayLabels.join(', ')} — £${c.total.toFixed(2)}`
+  )
+  return (
+    `Thank you${name}! 🙌 I've got your payment details for ${input.campName}:\n\n` +
+    `${lines.join('\n')}\n\nTotal: £${total.toFixed(2)}\n\n` +
+    `The coach will confirm against the bank shortly and I'll send your final confirmation here. Any questions, just reply 👍`
+  )
+}
+
 // Sent when we can't parse the parent's day-selection reply.
 export function buildCampDayUnparseableNudge(childName: string, dayList: CampDayLite[]): string {
   const lettered = dayList
