@@ -91,6 +91,8 @@ Critical rules:
 Return ONLY a single-line JSON object: {"intent":"<label>","confidence":<0..1>}`
 
   try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 9000)
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -104,7 +106,8 @@ Return ONLY a single-line JSON object: {"intent":"<label>","confidence":<0..1>}`
         system,
         messages: [{ role: 'user', content: `Message: """${text.slice(0, 500)}"""\n\nReturn JSON now.` }],
       }),
-    })
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout))
     if (!res.ok) return { intent: 'out_of_scope', confidence: 0 }
     const data = await res.json()
     const raw = (data.content?.[0]?.text || '').trim()
@@ -248,6 +251,8 @@ Rules:
 - If the facts do not actually answer the question, reply EXACTLY: "Let me check that with the coach and come back to you."`
 
   try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 9000)
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -264,7 +269,8 @@ Rules:
         system,
         messages: [{ role: 'user', content: question.slice(0, 500) }],
       }),
-    })
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout))
     if (!res.ok) return facts
     const data = await res.json()
     return (data.content?.[0]?.text || '').trim() || facts
