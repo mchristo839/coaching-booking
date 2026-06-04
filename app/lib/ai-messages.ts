@@ -12,20 +12,30 @@ interface ClaudeMessage {
 }
 
 async function callClaude(systemPrompt: string, messages: ClaudeMessage[], maxTokens = 200): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages,
-    }),
-  })
+  // Hard timeout so a slow/overloaded Anthropic can never hang the WhatsApp
+  // webhook into silence — the caller catches and falls back to a safe reply.
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 9000)
+  let res: Response
+  try {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages,
+      }),
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timeout)
+  }
 
   if (!res.ok) {
     const body = await res.text()
@@ -481,6 +491,51 @@ Rules:
   ]
 
   return callClaude(systemPrompt, [{ role: 'user', content: `Write the WhatsApp invite now.\n\n${parts.join('\n')}` }], 350)
+}
+
+// Deterministic fast-path for the documented happy path ("reply with the
+// letters, e.g. 'a c'"). Handles letters (a, A, "a c", "a, c", "a and c",
+// compact "ac"), "all"/"every day", and plain day numbers ("1", "1 3"). Returns
+// the 0-based indices, or null when it can't confidently parse — in which case
+// the caller falls back to the LLM parser for natural language / dates.
+// No network, so a single letter ALWAYS gets an instant, reliable response.
+export function parseCampDayLetters(reply: string, dayCount: number): number[] | null {
+  const t = (reply || '').trim().toLowerCase()
+  if (!t || dayCount <= 0) return null
+
+  if (/\b(all|every ?day|the lot|all of them|everything|each day|whole week)\b/.test(t)) {
+    return Array.from({ length: dayCount }, (_, i) => i)
+  }
+
+  const picked = new Set<number>()
+
+  // Letter tokens with boundaries: "a", "a c", "a, c", "a and c".
+  for (const m of t.matchAll(/\b([a-z])\b/g)) {
+    const idx = m[1].charCodeAt(0) - 97
+    if (idx >= 0 && idx < dayCount) picked.add(idx)
+  }
+
+  // Compact run of valid day letters with no separators, e.g. "ac", "abc".
+  if (picked.size === 0 && /^[a-z]+$/.test(t) && t.length <= dayCount) {
+    let ok = true
+    for (const ch of t) {
+      const idx = ch.charCodeAt(0) - 97
+      if (idx >= 0 && idx < dayCount) picked.add(idx)
+      else { ok = false; break }
+    }
+    if (!ok) picked.clear()
+  }
+
+  // Plain option numbers ("1", "1 3") — only small ones that map to a day, so we
+  // don't misread a date like "20 July". Skip if the text also has month words.
+  if (picked.size === 0 && !/[a-z]/.test(t.replace(/(st|nd|rd|th)\b/g, ''))) {
+    for (const m of t.matchAll(/\b(\d{1,2})\b/g)) {
+      const n = parseInt(m[1], 10)
+      if (n >= 1 && n <= dayCount) picked.add(n - 1)
+    }
+  }
+
+  return picked.size ? Array.from(picked).sort((a, b) => a - b) : null
 }
 
 // Free-text → array of day-list indices (0-based). Uses Claude in

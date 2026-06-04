@@ -29,6 +29,7 @@ import { matchActiveFaq } from '@/app/lib/faq-learning'
 import { getInternalRecipients } from '@/app/lib/notify'
 import {
   parseCampDaySelection,
+  parseCampDayLetters,
   parseCampAge,
   parseCheckoutReply,
   parseAffirmative,
@@ -878,12 +879,17 @@ export async function tryHandleCampBookingReply(
       }
 
       case 'awaiting_day_selection': {
-        let indices: number[] | null
-        try {
-          indices = await parseCampDaySelection(messageText, dayList)
-        } catch (e) {
-          console.error('[CAMP] day-parse error for booking', booking.id, e)
-          indices = null
+        // Fast, deterministic path for the documented reply style ("a", "a c",
+        // "all", "1 3") — no LLM, so a letter reply ALWAYS gets an instant,
+        // reliable response. Fall back to the LLM only for natural language.
+        let indices: number[] | null = parseCampDayLetters(messageText, dayList.length)
+        if (!indices) {
+          try {
+            indices = await parseCampDaySelection(messageText, dayList)
+          } catch (e) {
+            console.error('[CAMP] day-parse error for booking', booking.id, e)
+            indices = null
+          }
         }
         if (!indices || indices.length === 0) {
           if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
