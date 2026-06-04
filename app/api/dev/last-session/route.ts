@@ -1,8 +1,8 @@
 // app/api/dev/last-session/route.ts
-// TEMPORARY read-only diagnostic (token-guarded) for "can't create a session"
-// reports. Dumps the most recent rows across every creatable entity + the
-// notifications_log (which records WhatsApp send failures with the error), so we
-// can see what a coach last created and exactly why it appeared to fail.
+// TEMPORARY read-only diagnostic (token-guarded). Dumps recent promotions/polls
+// WITH coach names, every programme's configured WhatsApp group id (to spot a
+// bad/mistyped one), and the notifications_log (which records send failures with
+// the error). Read-only.
 //
 //   GET /api/dev/last-session?token=…
 
@@ -25,27 +25,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
 
-  const [series, fixtures, promotions, polls, notif, notifFailed] = await Promise.all([
-    dump(sql`SELECT id, programme_id, series_type, title, recurrence_rule, series_start, default_time, created_at
-             FROM schedule_series ORDER BY created_at DESC NULLS LAST LIMIT 5`),
-    dump(sql`SELECT id, created_by, fixture_type, opposition, kickoff_at, created_at
-             FROM fixtures ORDER BY created_at DESC NULLS LAST LIMIT 5`),
-    dump(sql`SELECT id, created_by, promotion_type, title, status, send_mode, created_at
-             FROM promotions ORDER BY created_at DESC NULLS LAST LIMIT 6`),
-    dump(sql`SELECT id, created_by, question, status, promotion_id, created_at
-             FROM polls ORDER BY created_at DESC NULLS LAST LIMIT 6`),
-    dump(sql`SELECT event_type, programme_id, recipient_type, status, error, sent_at
-             FROM notifications_log ORDER BY sent_at DESC NULLS LAST LIMIT 12`),
-    dump(sql`SELECT event_type, programme_id, recipient_jid, status, error, sent_at
-             FROM notifications_log WHERE status = 'failed' ORDER BY sent_at DESC NULLS LAST LIMIT 8`),
+  const [promotions, programmes, notif] = await Promise.all([
+    dump(sql`
+      SELECT pr.id, pr.promotion_type, pr.title, pr.status, pr.send_mode, pr.created_at,
+             trim(coalesce(c.first_name,'')||' '||coalesce(c.last_name,'')) AS coach
+      FROM promotions pr
+      LEFT JOIN coaches_v2 c ON c.id = pr.created_by
+      ORDER BY pr.created_at DESC NULLS LAST LIMIT 8`),
+    dump(sql`
+      SELECT p.id, p.programme_name, p.whatsapp_group_id, p.is_active,
+             trim(coalesce(c.first_name,'')||' '||coalesce(c.last_name,'')) AS coach
+      FROM programmes p
+      LEFT JOIN coaches_v2 c ON c.id = p.coach_id
+      ORDER BY p.programme_name`),
+    dump(sql`
+      SELECT n.event_type, n.status, n.error, n.recipient_jid, n.sent_at, p.programme_name
+      FROM notifications_log n
+      LEFT JOIN programmes p ON p.id = n.programme_id
+      ORDER BY n.sent_at DESC NULLS LAST LIMIT 14`),
   ])
 
-  return NextResponse.json({
-    schedule_series: series,
-    fixtures,
-    promotions,
-    polls,
-    notifications_recent: notif,
-    notifications_failed: notifFailed,
-  })
+  return NextResponse.json({ promotions, programmes, notifications_recent: notif })
 }
