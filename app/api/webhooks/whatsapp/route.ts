@@ -716,19 +716,15 @@ export async function POST(request: NextRequest) {
     if (plan.action === 'answer') {
       reply = await phraseAnswer(cleanedText, plan.facts, program.program_name)
       logCategory = `answer_${plan.intent}`
-      // Route 2: after answering, offer a booking link if there's a live camp.
-      if (activeCamp) {
-        reply += `\n\nWould you like me to get you booked in for ${activeCamp.title || 'the camp'}? Just reply *yes* 👍`
-        try { await recordCampOffer(groupJid, senderJid, activeCamp.id) } catch (e) { console.error('[ROUTE2 offer] record failed:', e) }
-      }
+      // NB: we deliberately do NOT tack a booking offer onto every answer — it
+      // read as repetitive/salesy (e.g. after "what do I wear" / "nearest
+      // station"). The booking link is only ever offered when a parent directly
+      // asks to book (the `capacity_booking` path above). This is customer
+      // service first.
     } else if (faqMatch) {
       // Answer from the coach's approved FAQ (phrased scoped to ONLY that answer).
       reply = await phraseAnswer(cleanedText, `Coach's approved answer: ${faqMatch.a}`, program.program_name)
       logCategory = 'answer_faq'
-      if (activeCamp) {
-        reply += `\n\nWould you like me to get you booked in for ${activeCamp.title || 'the camp'}? Just reply *yes* 👍`
-        try { await recordCampOffer(groupJid, senderJid, activeCamp.id) } catch (e) { console.error('[ROUTE2 offer] record failed:', e) }
-      }
     } else if (plan.reason === 'missing_data') {
       // In-scope question we don't have data for → genuine routing to the coach.
       reply = buildMissingDataMessage(coachName)
