@@ -199,17 +199,60 @@ async function adoptBooking(row: CampBookingRow, senderJid: string, why: string)
 //      reply we adopt a recent open lid-keyed booking and re-key it. We prefer a
 //      unique WhatsApp-name match; failing that, if there's exactly one open
 //      lid booking we adopt it. Ambiguous (multiple, no name match) → skip.
+// Lower rank = preferred. A fresh booking mid-conversation (collecting details)
+// should always win over one stuck at payment/coach-confirm, so a stale booking
+// can never shadow a new one the parent is actively answering.
+function stepRank(s: CampStep | null): number {
+  switch (s) {
+    case 'awaiting_payment': return 2
+    case 'awaiting_coach_confirm': return 3
+    case 'confirmed':
+    case 'cancelled': return 9
+    default: return 1 // active collection / checkout / reg / waitlist
+  }
+}
+
+// Choose which open @lid booking to adopt for a phone reply (name match, or a
+// single lid = same person, or a sole open lid booking). Returns null when
+// genuinely ambiguous.
+async function pickAdoptableLidBooking(senderName?: string | null): Promise<CampBookingRow | null> {
+  const { rows } = await sql.query(
+    `SELECT ${CAMP_SELECT} FROM camp_bookings
+     WHERE parent_jid LIKE '%@lid'
+       AND conversation_step IN ('awaiting_parent_name','awaiting_child_name')
+       AND state NOT IN ('confirmed','cancelled','expired')
+       AND expires_at > NOW()
+       AND created_at > NOW() - INTERVAL '6 hours'
+     ORDER BY created_at DESC`,
+    []
+  )
+  const open = rows as CampBookingRow[]
+  if (open.length === 0) return null
+  const name = firstWord(senderName)
+  if (name && name !== 'there') {
+    const named = open.filter((r) => firstWord(r.parent_name) === name)
+    if (named.length === 1) return named[0]
+    if (named.length > 1 && new Set(named.map((r) => r.parent_jid)).size === 1) return named[0]
+  }
+  if (new Set(open.map((r) => r.parent_jid)).size === 1) return open[0]
+  if (open.length === 1) return open[0]
+  console.log(`[CAMP] adoption ambiguous: ${open.length} open lid bookings, sender "${name || '(no name)'}"`)
+  return null
+}
+
 export async function findOrAdoptOpenCampBooking(
   senderJid: string,
   senderName?: string | null
 ): Promise<CampBookingRow | null> {
-  const exact = await findOpenCampBooking(senderJid)
-  if (exact) return exact
-
   const senderIsLid = senderJid.endsWith('@lid')
   const digits = jidDigits(senderJid)
+  const candidates: { row: CampBookingRow; needsAdopt: boolean }[] = []
 
-  // (B) Same phone number, different JID format.
+  // Exact JID match.
+  const exact = await findOpenCampBooking(senderJid)
+  if (exact) candidates.push({ row: exact, needsAdopt: false })
+
+  // (B) Same phone number, different JID format (@c.us vs @s.whatsapp.net, :device).
   if (!senderIsLid && digits.length >= 6) {
     const { rows } = await sql.query(
       `SELECT ${CAMP_SELECT} FROM camp_bookings
@@ -221,43 +264,32 @@ export async function findOrAdoptOpenCampBooking(
        ORDER BY created_at DESC LIMIT 1`,
       [digits]
     )
-    if (rows[0]) return adoptBooking(rows[0] as CampBookingRow, senderJid, 'phone-digit match')
-  }
-
-  // (A) LID bridge — only for phone-JID replies.
-  if (senderIsLid) return null
-  const { rows: lidRows } = await sql.query(
-    `SELECT ${CAMP_SELECT} FROM camp_bookings
-     WHERE parent_jid LIKE '%@lid'
-       AND conversation_step IN ('awaiting_parent_name','awaiting_child_name')
-       AND state NOT IN ('confirmed','cancelled','expired')
-       AND expires_at > NOW()
-       AND created_at > NOW() - INTERVAL '6 hours'
-     ORDER BY created_at DESC`,
-    []
-  )
-  const open = lidRows as CampBookingRow[]
-  if (open.length === 0) return null
-
-  const name = firstWord(senderName)
-  if (name && name !== 'there') {
-    const named = open.filter((r) => firstWord(r.parent_name) === name)
-    if (named.length === 1) return adoptBooking(named[0], senderJid, `name "${name}"`)
-    // Same person (one lid) with duplicate bookings that all match the name.
-    if (named.length > 1 && new Set(named.map((r) => r.parent_jid)).size === 1) {
-      return adoptBooking(named[0], senderJid, `name "${name}", dedup one lid`)
+    const r = rows[0] as CampBookingRow | undefined
+    if (r && !candidates.some((c) => c.row.id === r.id)) {
+      candidates.push({ row: r, needsAdopt: r.parent_jid !== senderJid })
     }
   }
-  // All open lid bookings belong to a single lid → same person → adopt the latest.
-  // (Handles a parent who voted on more than one camp poll.)
-  if (new Set(open.map((r) => r.parent_jid)).size === 1) {
-    return adoptBooking(open[0], senderJid, 'single lid (same person)')
-  }
-  // No usable name match — adopt only when there's a single open lid booking.
-  if (open.length === 1) return adoptBooking(open[0], senderJid, 'sole open lid booking')
 
-  console.log(`[CAMP] adoption ambiguous: ${open.length} open lid bookings, sender "${name || '(no name)'}" — not adopting`)
-  return null
+  // (A) LID bridge — a recent open @lid booking that's likely this person.
+  if (!senderIsLid) {
+    const lidPick = await pickAdoptableLidBooking(senderName)
+    if (lidPick && !candidates.some((c) => c.row.id === lidPick.id)) {
+      candidates.push({ row: lidPick, needsAdopt: true })
+    }
+  }
+
+  if (candidates.length === 0) return null
+
+  // Prefer the actively-progressing booking (collection stage) over a stale one,
+  // then the most recent. Stops a stuck awaiting_payment booking intercepting a
+  // fresh conversation the parent is mid-way through.
+  candidates.sort(
+    (a, b) =>
+      stepRank(a.row.conversation_step) - stepRank(b.row.conversation_step) ||
+      new Date(b.row.created_at).getTime() - new Date(a.row.created_at).getTime()
+  )
+  const best = candidates[0]
+  return best.needsAdopt ? adoptBooking(best.row, senderJid, 'best active booking') : best.row
 }
 
 export async function getCampPromotion(promotionId: string): Promise<CampPromotionRow | null> {
@@ -1078,4 +1110,26 @@ export async function tryHandleCoachCampConfirm(senderJid: string, messageText: 
     console.error('[CAMP] coach confirm handling failed for', mine.id, e)
   }
   return true
+}
+
+// ─── Automatic cleanup of stuck bookings (run by the daily cron) ───
+// Abandoned mid-sign-up (pre-payment) → expire after 12h of inactivity.
+// Unpaid after the chase ladder → expire after 72h. Coach-pending bookings are
+// left alone (the coach chase reminds them), and confirmed are never touched.
+// This stops abandoned conversations piling up and interfering with new ones.
+export interface CampCleanupResult { expired: number }
+
+export async function runCampCleanup(): Promise<CampCleanupResult> {
+  const { rows } = await sql`
+    UPDATE camp_bookings
+    SET state = 'expired', conversation_step = 'cancelled', updated_at = NOW()
+    WHERE state NOT IN ('confirmed','cancelled','expired')
+      AND COALESCE(conversation_step, 'awaiting_day_selection') <> 'awaiting_coach_confirm'
+      AND (
+        (COALESCE(conversation_step, 'collecting') <> 'awaiting_payment' AND updated_at < NOW() - INTERVAL '12 hours')
+        OR (conversation_step = 'awaiting_payment' AND updated_at < NOW() - INTERVAL '72 hours')
+      )
+    RETURNING id`
+  if (rows.length) console.log(`[CAMP cleanup] expired ${rows.length} stuck booking(s)`)
+  return { expired: rows.length }
 }
