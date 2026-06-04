@@ -1111,3 +1111,25 @@ export async function tryHandleCoachCampConfirm(senderJid: string, messageText: 
   }
   return true
 }
+
+// ─── Automatic cleanup of stuck bookings (run by the daily cron) ───
+// Abandoned mid-sign-up (pre-payment) → expire after 12h of inactivity.
+// Unpaid after the chase ladder → expire after 72h. Coach-pending bookings are
+// left alone (the coach chase reminds them), and confirmed are never touched.
+// This stops abandoned conversations piling up and interfering with new ones.
+export interface CampCleanupResult { expired: number }
+
+export async function runCampCleanup(): Promise<CampCleanupResult> {
+  const { rows } = await sql`
+    UPDATE camp_bookings
+    SET state = 'expired', conversation_step = 'cancelled', updated_at = NOW()
+    WHERE state NOT IN ('confirmed','cancelled','expired')
+      AND COALESCE(conversation_step, 'awaiting_day_selection') <> 'awaiting_coach_confirm'
+      AND (
+        (COALESCE(conversation_step, 'collecting') <> 'awaiting_payment' AND updated_at < NOW() - INTERVAL '12 hours')
+        OR (conversation_step = 'awaiting_payment' AND updated_at < NOW() - INTERVAL '72 hours')
+      )
+    RETURNING id`
+  if (rows.length) console.log(`[CAMP cleanup] expired ${rows.length} stuck booking(s)`)
+  return { expired: rows.length }
+}
