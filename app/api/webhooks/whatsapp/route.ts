@@ -12,7 +12,7 @@ import {
 import { notifyCoachHandoff } from '@/app/lib/notify'
 import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId, optOutMemberByJid } from '@/app/lib/control-centre-db'
 import { tryHandleFeedbackReply } from '@/app/lib/feedback'
-import { tryHandleCampBookingReply, startCampBookingFromPoll } from '@/app/lib/camp-booking'
+import { tryHandleCampBookingReply, startCampBookingFromPoll, tryHandleCoachCampConfirm } from '@/app/lib/camp-booking'
 import { tryHandlePtBookingReply } from '@/app/lib/calendar'
 import { tryHandleCancellationReply } from '@/app/lib/cancellation'
 import { tryHandleEnquiryMessage } from '@/app/lib/enquiry-chase'
@@ -286,6 +286,13 @@ export async function POST(request: NextRequest) {
       const inboundText: string =
         data?.message?.conversation ||
         data?.message?.extendedTextMessage?.text ||
+        // Button/list taps carry no conversation text — capture the reply so a
+        // pure tap (e.g. a coach confirming payment) is still processed.
+        data?.message?.buttonsResponseMessage?.selectedDisplayText ||
+        data?.message?.buttonsResponseMessage?.selectedButtonId ||
+        data?.message?.templateButtonReplyMessage?.selectedDisplayText ||
+        data?.message?.templateButtonReplyMessage?.selectedId ||
+        data?.message?.listResponseMessage?.title ||
         ''
 
       if (inboundText.trim()) {
@@ -325,6 +332,18 @@ export async function POST(request: NextRequest) {
 
         let consumedBy: string | null = null
 
+        // ─── Coach payment confirmation (highest priority) ───
+        // A coach replying YES/NO (button or text) to a payment-confirm request
+        // confirms/rejects the pending camp booking. Self-gating: only fires for
+        // a coach with a pending confirmation and a clear yes/no.
+        try {
+          if (await tryHandleCoachCampConfirm(remoteJid, inboundText)) {
+            consumedBy = 'coach_camp_confirm'
+          }
+        } catch (e) {
+          console.error('[COACH CONFIRM BRANCH] error, falling through:', e)
+        }
+
         // Branch order matters when a member is mid-flow on multiple things:
         //   0. Onboarding (highest priority — once intake starts, all replies
         //      belong to it until completed/abandoned)
@@ -334,12 +353,14 @@ export async function POST(request: NextRequest) {
         // Each branch is self-gating (returns false fast when no open state) and
         // wrapped in its own try/catch so a failure can't take Paul's group bot down.
 
-        try {
-          if (await tryHandleOnboardingReply(remoteJid, inboundText)) {
-            consumedBy = 'onboarding'
+        if (!consumedBy) {
+          try {
+            if (await tryHandleOnboardingReply(remoteJid, inboundText)) {
+              consumedBy = 'onboarding'
+            }
+          } catch (e) {
+            console.error('[ONBOARDING BRANCH] error, falling through:', e)
           }
-        } catch (e) {
-          console.error('[ONBOARDING BRANCH] error, falling through:', e)
         }
 
         if (!consumedBy) {

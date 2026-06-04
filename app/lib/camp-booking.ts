@@ -22,7 +22,7 @@
 // SERVER-SIDE ONLY.
 
 import { sql } from '@/app/lib/sql'
-import { sendWhatsAppMessage } from '@/app/lib/evolution'
+import { sendWhatsAppMessage, sendWhatsAppButtons } from '@/app/lib/evolution'
 import { createMember } from '@/app/lib/db'
 import { getInternalRecipients } from '@/app/lib/notify'
 import {
@@ -830,6 +830,12 @@ export async function tryHandleCampBookingReply(
           })
         )
         await sql`UPDATE camp_bookings SET thankyou_sent_at = NOW() WHERE booking_group_id = ${groupId}`
+        // DM the coach a YES/NO confirm request (button + text fallback).
+        try {
+          await requestCoachPaymentConfirm(groupId, booking.promotion_id, booking.programme_id, promo, group, dayList)
+        } catch (e) {
+          console.error('[CAMP] coach confirm request failed for group', groupId, e)
+        }
         return true
       }
 
@@ -980,4 +986,96 @@ export async function runCampChase(): Promise<CampChaseResult> {
   } catch (e) { result.errors.push(`coach query: ${e instanceof Error ? e.message : String(e)}`) }
 
   return result
+}
+
+// ─── Coach payment confirmation over WhatsApp (button + text) ───
+
+// DM each internal recipient a YES/NO confirm request when a parent reports
+// payment. Buttons are attempted first (unreliable on Baileys) with a plain
+// text fallback that's equally actionable.
+async function requestCoachPaymentConfirm(
+  groupId: string,
+  promotionId: string,
+  bookingProgrammeId: string | null,
+  promo: CampPromotionRow,
+  group: CampBookingRow[],
+  dayList: CampDay[],
+): Promise<void> {
+  const programmeId = await resolveProgrammeId(promotionId, bookingProgrammeId)
+  if (!programmeId) return
+  const recipients = await getInternalRecipients(programmeId)
+  const children = groupChildSummaries(group, dayList)
+  const total = children.reduce((s, c) => s + c.total, 0)
+  const parentName = group.find((r) => r.parent_name)?.parent_name || 'a parent'
+  const items = children
+    .map((c) => `• ${c.childName}${c.age != null ? ` (age ${c.age})` : ''} — ${c.dayLabels.join(', ')} — £${c.total.toFixed(2)}`)
+    .join('\n')
+  const text =
+    `💷 Payment reported for ${promo.title || 'the camp'}\n\n` +
+    `From: ${parentName}\n${items}\nTotal: £${total.toFixed(2)}\n\n` +
+    `Has it landed in your account? Reply *YES* to confirm (the family gets booked in + notified) or *NO* if not.`
+  for (const r of recipients) {
+    if (!r.whatsappJid) continue
+    try {
+      await sendWhatsAppButtons(
+        r.whatsappJid,
+        text,
+        [
+          { id: 'camp_confirm_yes', text: 'YES — confirm' },
+          { id: 'camp_confirm_no', text: 'NO — not yet' },
+        ],
+        'MyCoachingAssistant',
+      )
+    } catch {
+      try { await sendWhatsAppMessage(r.whatsappJid, text) } catch (e) { console.error('[CAMP] coach confirm DM failed:', e) }
+    }
+  }
+}
+
+function parseCoachConfirmReply(text: string): 'yes' | 'no' | null {
+  const t = (text || '').trim().toLowerCase()
+  if (!t) return null
+  if (t.includes('camp_confirm_yes') || /^(yes|y|confirm|confirmed|received|got it|paid|yep|✅|👍)\b/.test(t)) return 'yes'
+  if (t.includes('camp_confirm_no') || /^(no|n|not yet|nope|reject|decline|❌)\b/.test(t)) return 'no'
+  return null
+}
+
+// Coach 1:1 handler: a coach replying YES/NO (button or text) confirms/rejects
+// the oldest pending camp payment for a camp they own. Self-gating — returns
+// false unless the sender is a coach with a pending confirmation and a clear
+// yes/no, so it can run high-priority in the webhook without hijacking.
+export async function tryHandleCoachCampConfirm(senderJid: string, messageText: string): Promise<boolean> {
+  const decision = parseCoachConfirmReply(messageText)
+  if (!decision) return false
+  const senderDigits = jidDigits(senderJid)
+  if (senderDigits.length < 9) return false
+
+  const { rows } = await sql`
+    SELECT cb.id, cb.parent_name, cb.child_name, p.created_by as coach_id, c.mobile
+    FROM camp_bookings cb
+    JOIN promotions p ON p.id = cb.promotion_id
+    JOIN coaches_v2 c ON c.id = p.created_by
+    WHERE cb.conversation_step = 'awaiting_coach_confirm'
+    ORDER BY cb.created_at ASC
+  `
+  // Match the owning coach by the last 9 phone digits (bridges 07… vs 447…).
+  const tail = senderDigits.slice(-9)
+  const mine = rows.find((r) => {
+    const cd = String(r.mobile || '').replace(/\D/g, '')
+    return cd.length >= 9 && cd.slice(-9) === tail
+  })
+  if (!mine) return false
+
+  try {
+    if (decision === 'yes') {
+      await confirmCampBookingPayment(mine.id as string, mine.coach_id as string)
+      await sendWhatsAppMessage(senderJid, `✅ Confirmed ${mine.parent_name || 'the parent'}'s payment — ${mine.child_name || 'the child'} is booked in and has been notified.`)
+    } else {
+      await rejectCampBooking(mine.id as string, mine.coach_id as string)
+      await sendWhatsAppMessage(senderJid, `👍 Noted — I've let ${mine.parent_name || 'the parent'} know there's an issue to sort.`)
+    }
+  } catch (e) {
+    console.error('[CAMP] coach confirm handling failed for', mine.id, e)
+  }
+  return true
 }

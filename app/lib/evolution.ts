@@ -96,3 +96,37 @@ export async function sendWhatsAppMedia(
   const data = await res.json()
   return { messageId: data?.key?.id ?? null }
 }
+
+// Send up to 3 reply buttons. Buttons are unreliable on the Baileys stack
+// (modern WhatsApp often won't render them), so callers should ALWAYS include
+// a text fallback ("reply YES/NO") in `bodyText` and fall back to sendText on
+// failure. Each button has an id (matched on the incoming buttonsResponseMessage)
+// and a display label.
+export async function sendWhatsAppButtons(
+  jid: string,
+  bodyText: string,
+  buttons: { id: string; text: string }[],
+  footer?: string
+): Promise<{ messageId: string | null }> {
+  const url = `${EVOLUTION_BASE_URL}/message/sendButtons/${EVOLUTION_INSTANCE}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: EVOLUTION_API_KEY,
+    },
+    body: JSON.stringify({
+      number: jid,
+      title: '',
+      description: bodyText,
+      footer: footer || '',
+      buttons: buttons.slice(0, 3).map((b) => ({ type: 'reply', displayText: b.text, id: b.id })),
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Evolution API sendButtons error ${res.status}: ${body}`)
+  }
+  const data = await res.json()
+  return { messageId: data?.key?.id ?? null }
+}
