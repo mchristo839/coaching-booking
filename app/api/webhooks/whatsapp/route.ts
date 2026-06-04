@@ -14,6 +14,7 @@ import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId, optOut
 import { tryHandleFeedbackReply } from '@/app/lib/feedback'
 import { tryHandleCampBookingReply, startCampBookingFromPoll, tryHandleCoachCampConfirm, getActiveCampForProgramme, recordCampOffer, consumeRecentCampOffer } from '@/app/lib/camp-booking'
 import { parseAffirmative } from '@/app/lib/ai-messages'
+import { matchActiveFaq } from '@/app/lib/faq-learning'
 import { tryHandlePtBookingReply } from '@/app/lib/calendar'
 import { tryHandleCancellationReply } from '@/app/lib/cancellation'
 import { tryHandleEnquiryMessage } from '@/app/lib/enquiry-chase'
@@ -703,10 +704,25 @@ export async function POST(request: NextRequest) {
     let reply: string
     let logCategory: string
 
+    // When the structured gate can't answer, see if a COACH-APPROVED FAQ does.
+    // FAQs are this programme's own approved Q&A (kb.customFaqs) — never shared.
+    const faqMatch =
+      plan.action !== 'answer' && Array.isArray(kb.customFaqs) && kb.customFaqs.length > 0
+        ? await matchActiveFaq(cleanedText, kb.customFaqs)
+        : null
+
     if (plan.action === 'answer') {
       reply = await phraseAnswer(cleanedText, plan.facts, program.program_name)
       logCategory = `answer_${plan.intent}`
       // Route 2: after answering, offer a booking link if there's a live camp.
+      if (activeCamp) {
+        reply += `\n\nWould you like me to get you booked in for ${activeCamp.title || 'the camp'}? Just reply *yes* 👍`
+        try { await recordCampOffer(groupJid, senderJid, activeCamp.id) } catch (e) { console.error('[ROUTE2 offer] record failed:', e) }
+      }
+    } else if (faqMatch) {
+      // Answer from the coach's approved FAQ (phrased scoped to ONLY that answer).
+      reply = await phraseAnswer(cleanedText, `Coach's approved answer: ${faqMatch.a}`, program.program_name)
+      logCategory = 'answer_faq'
       if (activeCamp) {
         reply += `\n\nWould you like me to get you booked in for ${activeCamp.title || 'the camp'}? Just reply *yes* 👍`
         try { await recordCampOffer(groupJid, senderJid, activeCamp.id) } catch (e) { console.error('[ROUTE2 offer] record failed:', e) }

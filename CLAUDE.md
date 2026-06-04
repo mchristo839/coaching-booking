@@ -159,11 +159,16 @@ webhook's 1:1 branch); message copy + pure parsers in `app/lib/ai-messages.ts`.
   2. **Poll YES** — a poll can be linked to a camp via `polls.promotion_id` (set from the poll builder's "Link to a holiday camp" dropdown). A YES vote calls `startCampBookingFromPoll` (idempotent), which opens a booking and sends Message 1 (asks for parent name first if unknown, else child name). Wired into both the native-poll and text-vote paths in the webhook.
   3. **Group enquiry** (Route 2) — when a live camp exists for the group (`getActiveCampForProgramme`), the closed-intent bot offers a booking after answering an in-scope question ("reply *yes*", tracked in `camp_offers`); a `capacity_booking` intent ("can I book") starts it directly. Both call `startCampBookingFromPoll` and DM the parent.
 
+## FAQ learning (coach-approved, per-programme)
+
+`app/lib/faq-learning.ts`. Two halves, both scoped to a single `programme_id` (FAQs are never shared across programmes/coaches):
+- **Bot answers from approved FAQs**: when the closed-intent gate can't answer, `matchActiveFaq` checks the programme's `kb.customFaqs` (active FAQs) — if one matches, the bot answers from it (phrased scoped to that answer only). FAQs fill the long tail the structured fields don't cover.
+- **Suggestions from chats**: `suggestFaqsForProgramme` reads that programme's `conversations` log and drafts durable Q&A as `faqs` rows with `status='pending_coach_approval'`, `source='learned'`. It **excludes one-off/time-bound answers** ("this week", dates, "normally X but…") so exceptions aren't learned as standing facts. Triggered by the **"Suggest from recent chats"** button on `/dashboard/learning` (`POST /api/faqs/suggest`). The coach approves/edits/rejects on that page (existing `/api/faqs` PATCH → `status='active'`), after which the bot uses them.
+
 ## PLANNED (not yet implemented)
 
 - @mention-only mode (bot only responds when @mentioned)
 - Member/parent signup system (`members` table)
-- FAQ learning from coach responses (`faqs` table)
 - Escalation acknowledgement (coach replies mark `escalation_acked_at`)
 - DM signup flow (`signup_sessions` table)
 - JWT/cookie auth (replacing localStorage)
