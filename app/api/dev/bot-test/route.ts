@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     } else if (plan.action === 'answer') {
       decision = `ANSWER (${plan.intent})`
       wouldReply = true
-      reply = await phraseAnswer(text, plan.facts, programmeName)
+      reply = await phraseAnswer(text, plan.facts, programmeName, { allowVenueGeo: plan.intent === 'location' })
     } else if (plan.reason === 'missing_data') {
       decision = `ROUTE TO COACH (in-scope, no data)`
       wouldReply = true

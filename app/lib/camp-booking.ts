@@ -762,8 +762,10 @@ async function answerCampQuestionMidFlow(
     const plan = planBotResponse(intent, kb, availability)
 
     let facts: string | null = null
+    let allowVenueGeo = false
     if (plan.action === 'answer') {
       facts = campFacts ? `${plan.facts}\n${campFacts}` : plan.facts
+      allowVenueGeo = plan.intent === 'location'
     } else {
       const faq =
         Array.isArray(kb.customFaqs) && kb.customFaqs.length ? await matchActiveFaq(question, kb.customFaqs) : null
@@ -781,7 +783,7 @@ async function answerCampQuestionMidFlow(
     }
     if (!facts) return false
 
-    const answer = await phraseAnswer(question, facts, promo.title || program.program_name || 'the camp')
+    const answer = await phraseAnswer(question, facts, promo.title || program.program_name || 'the camp', { allowVenueGeo })
     const reprompt = await buildStepReprompt(booking, promo, dayList, step)
     await sendWhatsAppMessage(senderJid, `${answer}\n\n${reprompt}`)
     return true

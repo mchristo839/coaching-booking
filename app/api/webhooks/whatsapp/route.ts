@@ -732,7 +732,7 @@ export async function POST(request: NextRequest) {
         : null
 
     if (plan.action === 'answer') {
-      reply = await phraseAnswer(cleanedText, plan.facts, program.program_name)
+      reply = await phraseAnswer(cleanedText, plan.facts, program.program_name, { allowVenueGeo: plan.intent === 'location' })
       logCategory = `answer_${plan.intent}`
       // Customer service first — we never pitch on every reply. At most a single
       // one-time nudge (then never again). Direct booking asks still go via the

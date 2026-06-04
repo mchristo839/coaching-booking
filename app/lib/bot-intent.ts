@@ -39,7 +39,7 @@ export type AllowedIntent = (typeof ALLOWED_INTENTS)[number]
 export type BotIntent = AllowedIntent | 'social' | 'out_of_scope'
 
 const INTENT_MENU: Record<BotIntent, string> = {
-  location: 'where sessions are held — venue, address, postcode, directions, "where is it"',
+  location: 'where sessions are held, or how to get there — venue, address, postcode, directions, "where is it", "nearest station", "is there parking", "how do I get there"',
   price: 'how much it costs — price, fee, cost per session, "how much"',
   payment: 'how to pay — payment method, "do I pay now", bank transfer, cash, card',
   duration: 'how long a session lasts — session length, how long does it run',
@@ -47,7 +47,7 @@ const INTENT_MENU: Record<BotIntent, string> = {
   holiday_camps: 'holiday provision — half term, Easter, summer, Christmas camps or holiday classes',
   age_range: 'what ages it suits — age range, "is it right for a 7 year old"',
   what_to_bring: 'what to bring or wear — kit, boots, trainers, water, equipment needed',
-  capacity_booking: 'joining or availability — "is there space", "can my child join", "can I book a place"',
+  capacity_booking: 'the parent wants to BOOK/JOIN, or asks about availability, for their OWN child — "is there space", "can my child join", "how do I book", "can I book a place". NOT bringing a friend/guest/sibling along, NOT referrals, NOT general policy questions',
   social: 'greetings, thanks, emoji, AND any general chit-chat, banter, or plain statements that are NOT asking the bot for anything (e.g. "see you Saturday", "looking forward to it", "great thanks", "he loved it") — the bot stays silent on these',
   out_of_scope:
     'an off-topic QUESTION or REQUEST the bot cannot answer (coaching/fitness/technique advice, opinions, general knowledge, the weather), OR anything sensitive that needs a human (complaint, injury, safeguarding, refund). Use this only when the parent is actually asking for something off-topic — not for ordinary chatter (that is social)',
@@ -84,6 +84,8 @@ Critical rules:
 - Output exactly one label from the list. Never invent a label.
 - If a message could be answered from general knowledge but is NOT one of the specific allowed topics, it is out_of_scope. e.g. "what's a good warm-up for kids?" → out_of_scope.
 - Complaints, injuries, safeguarding or anything sensitive → out_of_scope (a human must handle it).
+- "Can I bring a friend / a guest / their sibling along?", referral questions, or other policy decisions are out_of_scope (a human decides) — NOT capacity_booking.
+- "Nearest station", "is there parking", "how do I get there", "what's the postcode" → location.
 - Only a greeting / thanks / emoji with no question → social.
 
 Return ONLY a single-line JSON object: {"intent":"<label>","confidence":<0..1>}`
@@ -213,10 +215,28 @@ export async function phraseAnswer(
   question: string,
   facts: string,
   programmeName: string,
+  opts?: { allowVenueGeo?: boolean },
 ): Promise<string> {
   if (!ANTHROPIC_API_KEY) return facts
 
-  const system = `You are the assistant for "${programmeName}", replying to a parent in a WhatsApp group.
+  // Default: STRICT — answer only from the facts, no general knowledge. Used for
+  // every programme fact (price, age, payment, times…) so the bot can't invent.
+  // allowVenueGeo: a deliberate, scoped relaxation for VENUE/TRAVEL questions
+  // only — the bot may use well-known public geography about the given address
+  // (nearest station, directions, nearby parking), but still must NOT invent any
+  // programme detail (prices, times, ages, policies, capacity).
+  const system = opts?.allowVenueGeo
+    ? `You are the assistant for "${programmeName}", helping a parent in a WhatsApp group with the VENUE and how to get there.
+
+Venue facts:
+${facts}
+
+You may answer using the venue/address above PLUS well-known public geographic knowledge about that location — e.g. the nearest train/tube/bus station, rough directions, or nearby parking.
+You must NOT state anything about the programme itself that isn't in the facts — no prices, times, ages, policies, capacity, or anything not given.
+Rules:
+- 1–2 short, warm sentences. WhatsApp tone. No sign-off.
+- If you genuinely don't know the travel detail they asked about, reply EXACTLY: "Let me check that with the coach and come back to you."`
+    : `You are the assistant for "${programmeName}", replying to a parent in a WhatsApp group.
 
 Answer the parent's question using ONLY the facts below. Do NOT add anything that is not in the facts — no advice, no assumptions, no extra detail, no general knowledge.
 
