@@ -216,27 +216,45 @@ function stepRank(s: CampStep | null): number {
 // single lid = same person, or a sole open lid booking). Returns null when
 // genuinely ambiguous.
 async function pickAdoptableLidBooking(senderName?: string | null): Promise<CampBookingRow | null> {
+  // Only ever adopt on a confident WhatsApp-NAME match, and NEVER across coaches.
+  // A 1:1 DM carries no group/coach context, so without a name we can't safely
+  // tell whose booking it is — and crossing coaches would be a data-isolation
+  // breach. So: no name → no adoption; same-named bookings under >1 coach → refuse.
+  const name = firstWord(senderName)
+  if (!name || name === 'there') return null
+
   const { rows } = await sql.query(
-    `SELECT ${CAMP_SELECT} FROM camp_bookings
-     WHERE parent_jid LIKE '%@lid'
-       AND conversation_step IN ('awaiting_parent_name','awaiting_child_name')
-       AND state NOT IN ('confirmed','cancelled','expired')
-       AND expires_at > NOW()
-       AND created_at > NOW() - INTERVAL '6 hours'
-     ORDER BY created_at DESC`,
+    `SELECT cb.id, cb.promotion_id, cb.booking_group_id, cb.member_id, cb.programme_id,
+            cb.parent_jid, cb.parent_name, cb.parent_email, cb.parent_phone, cb.child_name,
+            cb.child_age, cb.days_selected, cb.total_gbp::text as total_gbp, cb.state,
+            cb.conversation_step, cb.payment_status, cb.payment_link, cb.prompt_message_id,
+            cb.expires_at, cb.created_at, cb.updated_at,
+            p.created_by AS coach_id
+     FROM camp_bookings cb
+     JOIN promotions p ON p.id = cb.promotion_id
+     WHERE cb.parent_jid LIKE '%@lid'
+       AND cb.conversation_step IN ('awaiting_parent_name','awaiting_child_name')
+       AND cb.state NOT IN ('confirmed','cancelled','expired')
+       AND cb.expires_at > NOW()
+       AND cb.created_at > NOW() - INTERVAL '6 hours'
+     ORDER BY cb.created_at DESC`,
     []
   )
-  const open = rows as CampBookingRow[]
-  if (open.length === 0) return null
-  const name = firstWord(senderName)
-  if (name && name !== 'there') {
-    const named = open.filter((r) => firstWord(r.parent_name) === name)
-    if (named.length === 1) return named[0]
-    if (named.length > 1 && new Set(named.map((r) => r.parent_jid)).size === 1) return named[0]
+  const open = rows as (CampBookingRow & { coach_id: string })[]
+  const named = open.filter((r) => firstWord(r.parent_name) === name)
+  if (named.length === 0) return null
+
+  // SAFETY: if the name matches bookings under more than one coach, we cannot
+  // tell which coach this DM belongs to — refuse rather than risk a cross-coach mix.
+  if (new Set(named.map((r) => r.coach_id)).size > 1) {
+    console.warn(`[CAMP] adoption refused — name "${name}" matches bookings under multiple coaches`)
+    return null
   }
-  if (new Set(open.map((r) => r.parent_jid)).size === 1) return open[0]
-  if (open.length === 1) return open[0]
-  console.log(`[CAMP] adoption ambiguous: ${open.length} open lid bookings, sender "${name || '(no name)'}"`)
+  if (named.length === 1) return named[0]
+  // Several same-named bookings under ONE coach: only safe if they're the same
+  // person (one lid). Otherwise ambiguous → refuse.
+  if (new Set(named.map((r) => r.parent_jid)).size === 1) return named[0]
+  console.log(`[CAMP] adoption ambiguous: ${named.length} "${name}" bookings, one coach, different people — not adopting`)
   return null
 }
 
