@@ -17,11 +17,14 @@ interface Member {
   parent_phone: string | null
   child_name: string | null
   child_dob: string | null
+  child_age: number | null
   medical_flag: boolean
   status: string
   waitlist_position: number | null
   joined_at: string
   programme_name: string | null
+  sessions_booked: number | null
+  sessions_paid: number | null
 }
 
 interface Programme {
@@ -68,6 +71,32 @@ function formatDate(iso: string): string {
   } catch {
     return iso
   }
+}
+
+// Child age — prefer the age captured during a camp booking, else derive from DOB.
+function childAge(m: Member): number | null {
+  if (m.child_age != null) return m.child_age
+  if (!m.child_dob) return null
+  try {
+    const dob = new Date(m.child_dob)
+    if (isNaN(dob.getTime())) return null
+    const now = new Date()
+    let age = now.getFullYear() - dob.getFullYear()
+    const mDiff = now.getMonth() - dob.getMonth()
+    if (mDiff < 0 || (mDiff === 0 && now.getDate() < dob.getDate())) age--
+    return age >= 0 && age < 120 ? age : null
+  } catch {
+    return null
+  }
+}
+
+// "Sessions booked / paid" cell text. Shows paid-of-booked when there's any
+// camp activity, otherwise an em-dash.
+function sessionsLabel(m: Member): string {
+  const booked = m.sessions_booked ?? 0
+  const paid = m.sessions_paid ?? 0
+  if (booked === 0 && paid === 0) return '—'
+  return `${paid}/${booked} paid`
 }
 
 /* ------------------------------------------------------------------ */
@@ -246,6 +275,8 @@ export default function MembersPage() {
                     <tr className="border-b border-line bg-surface-muted">
                       <th className="text-left px-4 py-3 font-medium text-ink-muted text-xs uppercase tracking-wide">Parent</th>
                       <th className="text-left px-4 py-3 font-medium text-ink-muted text-xs uppercase tracking-wide">Child</th>
+                      <th className="text-left px-4 py-3 font-medium text-ink-muted text-xs uppercase tracking-wide">Age</th>
+                      <th className="text-left px-4 py-3 font-medium text-ink-muted text-xs uppercase tracking-wide">Sessions</th>
                       <th className="text-left px-4 py-3 font-medium text-ink-muted text-xs uppercase tracking-wide">Programme</th>
                       <th className="text-left px-4 py-3 font-medium text-ink-muted text-xs uppercase tracking-wide">Status</th>
                       <th className="text-left px-4 py-3 font-medium text-ink-muted text-xs uppercase tracking-wide">Joined</th>
@@ -267,6 +298,8 @@ export default function MembersPage() {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-ink-muted">{m.child_name || '\u2014'}</td>
+                          <td className="px-4 py-3 text-ink-muted">{childAge(m) ?? '\u2014'}</td>
+                          <td className="px-4 py-3 text-ink-muted">{sessionsLabel(m)}</td>
                           <td className="px-4 py-3 text-ink-muted">{m.programme_name || '\u2014'}</td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex items-center text-xs font-medium px-2 py-1 rounded ${badge.cls}`}>
@@ -323,8 +356,14 @@ export default function MembersPage() {
                     </div>
 
                     {m.child_name && (
-                      <p className="text-sm text-ink-muted mb-1">Child: {m.child_name}</p>
+                      <p className="text-sm text-ink-muted mb-1">
+                        Child: {m.child_name}{childAge(m) != null ? ` (age ${childAge(m)})` : ''}
+                      </p>
                     )}
+
+                    {(m.sessions_booked || m.sessions_paid) ? (
+                      <p className="text-xs text-ink-muted mb-1">Sessions: {sessionsLabel(m)}</p>
+                    ) : null}
 
                     {m.programme_name && (
                       <p className="text-xs text-ink-muted mb-2">{m.programme_name}</p>
