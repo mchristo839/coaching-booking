@@ -48,10 +48,9 @@ const INTENT_MENU: Record<BotIntent, string> = {
   age_range: 'what ages it suits — age range, "is it right for a 7 year old"',
   what_to_bring: 'what to bring or wear — kit, boots, trainers, water, equipment needed',
   capacity_booking: 'joining or availability — "is there space", "can my child join", "can I book a place"',
-  social: 'greeting, thanks, emoji or small talk with no actual question',
+  social: 'greetings, thanks, emoji, AND any general chit-chat, banter, or plain statements that are NOT asking the bot for anything (e.g. "see you Saturday", "looking forward to it", "great thanks", "he loved it") — the bot stays silent on these',
   out_of_scope:
-    'ANYTHING ELSE — coaching/fitness/technique advice, opinions, general knowledge, the weather, ' +
-    'off-topic chat, complaints, injuries, safeguarding, or any question not covered by the labels above',
+    'an off-topic QUESTION or REQUEST the bot cannot answer (coaching/fitness/technique advice, opinions, general knowledge, the weather), OR anything sensitive that needs a human (complaint, injury, safeguarding, refund). Use this only when the parent is actually asking for something off-topic — not for ordinary chatter (that is social)',
 }
 
 export interface BotClassification {
