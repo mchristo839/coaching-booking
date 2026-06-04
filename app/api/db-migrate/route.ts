@@ -788,6 +788,18 @@ export async function POST() {
     await sql`UPDATE camp_bookings SET booking_group_id = id WHERE booking_group_id IS NULL`
     await sql`CREATE INDEX IF NOT EXISTS idx_camp_bookings_group ON camp_bookings(booking_group_id)`
 
+    // Route 2: when the group bot offers a parent a booking link after answering
+    // a question, we remember the offer so their "yes" can start the booking.
+    await sql`
+      CREATE TABLE IF NOT EXISTS camp_offers (
+        group_jid TEXT NOT NULL,
+        sender_jid TEXT NOT NULL,
+        promotion_id UUID NOT NULL,
+        offered_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (group_jid, sender_jid)
+      )
+    `
+
     // Optional link from a poll to a holiday-camp promotion. When set, a YES vote
     // on the poll starts the camp 1:1 booking conversation for that voter (so a
     // camp can be launched from a poll OR from the promotion's cohort blast).
