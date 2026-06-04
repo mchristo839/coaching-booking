@@ -675,26 +675,34 @@ export async function POST(request: NextRequest) {
     if (plan.action === 'answer') {
       reply = await phraseAnswer(cleanedText, plan.facts, program.program_name)
       logCategory = `answer_${plan.intent}`
-    } else {
-      // Refuse-and-route. Out-of-scope gets the scope line; missing-data gets the
-      // "let me check with the coach" line. Either way DM the coach (best-effort)
-      // so the handoff is real, never a dead end. A notify failure must not stop
-      // the parent getting their group reply.
-      reply =
-        plan.reason === 'missing_data'
-          ? buildMissingDataMessage(coachName)
-          : buildHandoffMessage(coachName)
-      logCategory = `handoff_${plan.reason}`
+    } else if (plan.reason === 'missing_data') {
+      // In-scope question we don't have data for → genuine routing to the coach.
+      reply = buildMissingDataMessage(coachName)
+      logCategory = 'handoff_missing_data'
       try {
-        await notifyCoachHandoff({
-          programmeId: program.id,
-          parentName: senderName,
-          question: cleanedText,
-          reason: plan.reason,
+        await notifyCoachHandoff({ programmeId: program.id, parentName: senderName, question: cleanedText, reason: 'missing_data' })
+      } catch (e) { console.error('[HANDOFF notify] error:', e) }
+    } else {
+      // Out-of-scope. Only route genuine QUESTIONS/REQUESTS (or anything the
+      // keyword classifier flagged — injury/complaint/safeguarding). Plain group
+      // chatter and statements get NO reply — the bot must not answer everything.
+      const t = cleanedText.trim()
+      const looksActionable =
+        escalated ||
+        /\?/.test(t) ||
+        /^(can|could|do|does|did|is|are|am|was|were|what|whats|when|where|why|how|who|which|will|would|should|any|anyone|has|have|had|may|please|need|want|book|booking|join|pay|sign|tell|let|looking|after)\b/i.test(t)
+      if (!looksActionable) {
+        await safeLogConversation({
+          programmeId: program.id, groupJid, senderJid, senderName, messageText,
+          botResponse: null, category: 'ignored_out_of_scope', escalated,
         })
-      } catch (e) {
-        console.error('[HANDOFF notify] error (group reply still sent):', e)
+        return NextResponse.json({ ok: true })
       }
+      reply = buildHandoffMessage(coachName)
+      logCategory = 'handoff_out_of_scope'
+      try {
+        await notifyCoachHandoff({ programmeId: program.id, parentName: senderName, question: cleanedText, reason: 'out_of_scope' })
+      } catch (e) { console.error('[HANDOFF notify] error:', e) }
     }
 
     const { isDuplicate } = await trackBotReply(groupJid, logCategory, messageId)
