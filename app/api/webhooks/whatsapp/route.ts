@@ -12,8 +12,7 @@ import {
 import { notifyCoachHandoff } from '@/app/lib/notify'
 import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId, optOutMemberByJid } from '@/app/lib/control-centre-db'
 import { tryHandleFeedbackReply } from '@/app/lib/feedback'
-import { tryHandleCampBookingReply, startCampBookingFromPoll, tryHandleCoachCampConfirm, getActiveCampForProgramme, recordCampOffer, consumeRecentCampOffer, hasRecentCampOffer } from '@/app/lib/camp-booking'
-import { parseAffirmative } from '@/app/lib/ai-messages'
+import { tryHandleCampBookingReply, startCampBookingFromPoll, tryHandleCoachCampConfirm, getActiveCampForProgramme, answerGroupCampQuestion } from '@/app/lib/camp-booking'
 import { matchActiveFaq } from '@/app/lib/faq-learning'
 import { tryHandlePtBookingReply } from '@/app/lib/calendar'
 import { tryHandleCancellationReply } from '@/app/lib/cancellation'
@@ -638,24 +637,11 @@ export async function POST(request: NextRequest) {
     const cleanedText = messageText.replace(/@\d+/g, '').trim()
     const kb = program.knowledgebase as Knowledgebase
     const coachName = (program.coach_name as string) || ''
-    const firstName = (senderName || '').split(/\s+/)[0] || 'there'
 
-    // ─── Route 2: booking via a group enquiry ───
-    // If there's a live bookable camp for this group, a parent can book straight
-    // from the group — "yes" to a prior offer (below) starts it. Idempotent.
+    // Is there a live bookable camp for this group? (Used only to ANSWER camp
+    // questions — the bot never pitches a booking link in the group; booking is
+    // started by the poll vote.)
     const activeCamp = await getActiveCampForProgramme(program.id)
-    if (activeCamp && parseAffirmative(cleanedText)) {
-      const offered = await consumeRecentCampOffer(groupJid, senderJid)
-      if (offered) {
-        try { await startCampBookingFromPoll(offered, senderJid, senderName, program.id) } catch (e) { console.error('[ROUTE2 offer-yes] start failed:', e) }
-        const { isDuplicate: dupOffer } = await trackBotReply(groupJid, 'camp_offer_yes', messageId)
-        if (dupOffer) return NextResponse.json({ ok: true })
-        const ack = `Great ${firstName}! 🎉 I've sent you a DM to get booked in — check your messages with me.`
-        await sendWhatsAppMessage(groupJid, ack)
-        await safeLogConversation({ programmeId: program.id, groupJid, senderJid, senderName, messageText, botResponse: ack, category: 'camp_offer_yes', escalated })
-        return NextResponse.json({ ok: true })
-      }
-    }
 
     // ─── Closed-intent gate ───
     // Recognise the intent widely, then answer ONLY from this programme's data
@@ -680,18 +666,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // Booking intent ("how do I book", "can I book", "is there space") + a live
-    // camp → CONFIRM first (spec: the bot asks if they'd like the booking link,
-    // and only triggers the 1:1 payment bot once they say yes). The actual link
-    // is never posted in the group — it only ever goes out in the 1:1 DM.
-    if (intent === 'capacity_booking' && activeCamp) {
-      const { isDuplicate: dupCap } = await trackBotReply(groupJid, 'camp_offer', messageId)
-      if (dupCap) return NextResponse.json({ ok: true })
-      try { await recordCampOffer(groupJid, senderJid, activeCamp.id) } catch (e) { console.error('[ROUTE2 capacity offer] record failed:', e) }
-      const offer = `Great ${firstName}! 🎉 Would you like me to send you the booking link for ${activeCamp.title || 'the camp'}? Just reply *yes* and I'll DM you to get your child booked in. 👍`
-      await sendWhatsAppMessage(groupJid, offer)
-      await safeLogConversation({ programmeId: program.id, groupJid, senderJid, senderName, messageText, botResponse: offer, category: 'camp_offer', escalated })
-      return NextResponse.json({ ok: true })
+    // Camp-structure questions ("which days / can I pick days / do I have to book
+    // the whole week / what dates / how much per day") — answer from the camp's
+    // OWN data (the programme knowledgebase doesn't carry these). No pitching,
+    // just a straight answer. Gated to actual QUESTIONS (so a statement that
+    // merely mentions "days" gets no reply), and only when the camp facts can
+    // genuinely answer — otherwise it falls through to the normal gate.
+    const looksLikeQuestion =
+      /\?/.test(cleanedText) ||
+      /^(do|does|did|can|could|is|are|am|was|were|will|would|should|how|what|whats|which|when|where|why|who|have|has|any|anyone|need)\b/i.test(cleanedText.trim())
+    if (
+      activeCamp && looksLikeQuestion &&
+      /\b(days?|dates?|full week|whole week|which day|select|choose|how many|individual|per day|each day)\b/i.test(cleanedText)
+    ) {
+      const campAns = await answerGroupCampQuestion(activeCamp.id, cleanedText, program.program_name)
+      if (campAns) {
+        const { isDuplicate: dupCampQ } = await trackBotReply(groupJid, 'answer_camp', messageId)
+        if (dupCampQ) return NextResponse.json({ ok: true })
+        await sendWhatsAppMessage(groupJid, campAns)
+        await safeLogConversation({ programmeId: program.id, groupJid, senderJid, senderName, messageText, botResponse: campAns, category: 'answer_camp', escalated })
+        return NextResponse.json({ ok: true })
+      }
     }
 
     const availability =
@@ -706,24 +701,6 @@ export async function POST(request: NextRequest) {
     let reply: string
     let logCategory: string
 
-    // One-time, low-key booking nudge appended to a parent's FIRST camp-relevant
-    // answer (never repeated — gated by hasRecentCampOffer). This keeps the
-    // helpful "you can book" signal without the salesy repetition of offering on
-    // every reply. Records a camp_offer so a follow-up "yes" books them (handled
-    // by the affirmative path above). Returns '' when there's no live camp or the
-    // parent has already been offered/nudged.
-    const oneTimeCampNudge = async (): Promise<string> => {
-      if (!activeCamp) return ''
-      try {
-        if (await hasRecentCampOffer(groupJid, senderJid)) return ''
-        await recordCampOffer(groupJid, senderJid, activeCamp.id)
-      } catch (e) {
-        console.error('[NUDGE] gate/record failed:', e)
-        return ''
-      }
-      return `\n\n(Whenever you're ready, I can get you booked in for ${activeCamp.title || 'the camp'} — just let me know 👍)`
-    }
-
     // When the structured gate can't answer, see if a COACH-APPROVED FAQ does.
     // FAQs are this programme's own approved Q&A (kb.customFaqs) — never shared.
     const faqMatch =
@@ -734,15 +711,10 @@ export async function POST(request: NextRequest) {
     if (plan.action === 'answer') {
       reply = await phraseAnswer(cleanedText, plan.facts, program.program_name, { allowVenueGeo: plan.intent === 'location' })
       logCategory = `answer_${plan.intent}`
-      // Customer service first — we never pitch on every reply. At most a single
-      // one-time nudge (then never again). Direct booking asks still go via the
-      // `capacity_booking` path above.
-      reply += await oneTimeCampNudge()
     } else if (faqMatch) {
       // Answer from the coach's approved FAQ (phrased scoped to ONLY that answer).
       reply = await phraseAnswer(cleanedText, `Coach's approved answer: ${faqMatch.a}`, program.program_name)
       logCategory = 'answer_faq'
-      reply += await oneTimeCampNudge()
     } else if (plan.reason === 'missing_data') {
       // In-scope question we don't have data for → genuine routing to the coach.
       reply = buildMissingDataMessage(coachName)
