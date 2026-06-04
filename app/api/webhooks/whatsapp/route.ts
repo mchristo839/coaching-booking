@@ -6,8 +6,6 @@ import {
   classifyBotIntent,
   planBotResponse,
   phraseAnswer,
-  buildHandoffMessage,
-  buildMissingDataMessage,
 } from '@/app/lib/bot-intent'
 import { notifyCoachHandoff } from '@/app/lib/notify'
 import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId, optOutMemberByJid } from '@/app/lib/control-centre-db'
@@ -636,7 +634,6 @@ export async function POST(request: NextRequest) {
     // Strip @number mention tags before classifying.
     const cleanedText = messageText.replace(/@\d+/g, '').trim()
     const kb = program.knowledgebase as Knowledgebase
-    const coachName = (program.coach_name as string) || ''
 
     // Is there a live bookable camp for this group? (Used only to ANSWER camp
     // questions — the bot never pitches a booking link in the group; booking is
@@ -666,17 +663,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
+    // ─── Reply ONLY to a question the bot can answer ───
+    // The bot must not reply to statements / chit-chat — only to genuine
+    // questions, and only when it actually has the answer. Anything that isn't a
+    // question gets NO reply. (Escalations — injury / complaint / safeguarding —
+    // are DM'd to the coach so they're never missed, but nothing is posted in the
+    // group.)
+    const isQuestion =
+      /\?/.test(cleanedText) ||
+      /^(do|does|did|is|are|am|was|were|can|could|will|would|should|has|have|had|how|what|whats|which|when|where|why|who|whose|any|anyone|may|tell)\b/i.test(cleanedText.trim())
+    if (!isQuestion) {
+      if (escalated) {
+        try { await notifyCoachHandoff({ programmeId: program.id, parentName: senderName, question: cleanedText, reason: 'out_of_scope' }) } catch (e) { console.error('[HANDOFF notify] error:', e) }
+      }
+      await safeLogConversation({
+        programmeId: program.id, groupJid, senderJid, senderName, messageText,
+        botResponse: null, category: escalated ? 'silent_escalation' : 'ignored_statement', escalated,
+      })
+      return NextResponse.json({ ok: true })
+    }
+
     // Camp-structure questions ("which days / can I pick days / do I have to book
     // the whole week / what dates / how much per day") — answer from the camp's
-    // OWN data (the programme knowledgebase doesn't carry these). No pitching,
-    // just a straight answer. Gated to actual QUESTIONS (so a statement that
-    // merely mentions "days" gets no reply), and only when the camp facts can
-    // genuinely answer — otherwise it falls through to the normal gate.
-    const looksLikeQuestion =
-      /\?/.test(cleanedText) ||
-      /^(do|does|did|can|could|is|are|am|was|were|will|would|should|how|what|whats|which|when|where|why|who|have|has|any|anyone|need)\b/i.test(cleanedText.trim())
+    // OWN data (the programme knowledgebase doesn't carry these). Only fires when
+    // the camp facts can genuinely answer; otherwise falls through to the gate.
     if (
-      activeCamp && looksLikeQuestion &&
+      activeCamp &&
       /\b(days?|dates?|full week|whole week|which day|select|choose|how many|individual|per day|each day)\b/i.test(cleanedText)
     ) {
       const campAns = await answerGroupCampQuestion(activeCamp.id, cleanedText, program.program_name)
@@ -715,34 +727,20 @@ export async function POST(request: NextRequest) {
       // Answer from the coach's approved FAQ (phrased scoped to ONLY that answer).
       reply = await phraseAnswer(cleanedText, `Coach's approved answer: ${faqMatch.a}`, program.program_name)
       logCategory = 'answer_faq'
-    } else if (plan.reason === 'missing_data') {
-      // In-scope question we don't have data for → genuine routing to the coach.
-      reply = buildMissingDataMessage(coachName)
-      logCategory = 'handoff_missing_data'
-      try {
-        await notifyCoachHandoff({ programmeId: program.id, parentName: senderName, question: cleanedText, reason: 'missing_data' })
-      } catch (e) { console.error('[HANDOFF notify] error:', e) }
     } else {
-      // Out-of-scope. Only route genuine QUESTIONS/REQUESTS (or anything the
-      // keyword classifier flagged — injury/complaint/safeguarding). Plain group
-      // chatter and statements get NO reply — the bot must not answer everything.
-      const t = cleanedText.trim()
-      const looksActionable =
-        escalated ||
-        /\?/.test(t) ||
-        /^(can|could|do|does|did|is|are|am|was|were|what|whats|when|where|why|how|who|which|will|would|should|any|anyone|has|have|had|may|please|need|want|book|booking|join|pay|sign|tell|let|looking|after)\b/i.test(t)
-      if (!looksActionable) {
-        await safeLogConversation({
-          programmeId: program.id, groupJid, senderJid, senderName, messageText,
-          botResponse: null, category: 'ignored_out_of_scope', escalated,
-        })
-        return NextResponse.json({ ok: true })
+      // It's a question but the bot has no answer → stay SILENT in the group.
+      // DM the coach so they can answer: for in-scope gaps (missing data) and for
+      // anything the keyword classifier flagged as escalation.
+      if (plan.reason === 'missing_data' || escalated) {
+        try {
+          await notifyCoachHandoff({ programmeId: program.id, parentName: senderName, question: cleanedText, reason: plan.reason === 'missing_data' ? 'missing_data' : 'out_of_scope' })
+        } catch (e) { console.error('[HANDOFF notify] error:', e) }
       }
-      reply = buildHandoffMessage(coachName)
-      logCategory = 'handoff_out_of_scope'
-      try {
-        await notifyCoachHandoff({ programmeId: program.id, parentName: senderName, question: cleanedText, reason: 'out_of_scope' })
-      } catch (e) { console.error('[HANDOFF notify] error:', e) }
+      await safeLogConversation({
+        programmeId: program.id, groupJid, senderJid, senderName, messageText,
+        botResponse: null, category: plan.reason === 'missing_data' ? 'silent_missing_data' : 'silent_out_of_scope', escalated,
+      })
+      return NextResponse.json({ ok: true })
     }
 
     const { isDuplicate } = await trackBotReply(groupJid, logCategory, messageId)
