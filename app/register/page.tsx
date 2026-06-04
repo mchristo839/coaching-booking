@@ -630,8 +630,8 @@ export default function RegisterPage() {
     const cards: { label: string; enabled: boolean; description?: string }[] = [
       { label: 'Solo Coach / Instructor', enabled: true, description: 'Grassroots sport coach' },
       { label: 'Fitness Studio', enabled: true, description: 'Gym, PT, group classes' },
-      { label: 'Sports / Activity Provider', enabled: false },
-      { label: 'Sports Club', enabled: false },
+      { label: 'Sports / Activity Provider', enabled: true, description: 'Camps, courses, multi-sport' },
+      { label: 'Sports Club', enabled: true, description: 'Teams, members, fixtures' },
     ]
     return (
       <>
