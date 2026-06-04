@@ -157,6 +157,7 @@ webhook's 1:1 branch); message copy + pure parsers in `app/lib/ai-messages.ts`.
 - **Two ways to start it (both supported)**:
   1. **Cohort blast** — `send-camp-cohort` DMs every parent on the targeted programmes' member roll (details known → starts at day selection).
   2. **Poll YES** — a poll can be linked to a camp via `polls.promotion_id` (set from the poll builder's "Link to a holiday camp" dropdown). A YES vote calls `startCampBookingFromPoll` (idempotent), which opens a booking and sends Message 1 (asks for parent name first if unknown, else child name). Wired into both the native-poll and text-vote paths in the webhook.
+  3. **Group enquiry** (Route 2) — when a live camp exists for the group (`getActiveCampForProgramme`), the closed-intent bot offers a booking after answering an in-scope question ("reply *yes*", tracked in `camp_offers`); a `capacity_booking` intent ("can I book") starts it directly. Both call `startCampBookingFromPoll` and DM the parent.
 
 ## PLANNED (not yet implemented)
 

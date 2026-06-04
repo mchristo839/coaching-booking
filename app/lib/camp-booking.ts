@@ -1133,3 +1133,46 @@ export async function runCampCleanup(): Promise<CampCleanupResult> {
   if (rows.length) console.log(`[CAMP cleanup] expired ${rows.length} stuck booking(s)`)
   return { expired: rows.length }
 }
+
+// ─── Route 2: bot offers a booking link after answering an enquiry ───
+
+// The active bookable camp for a programme/group (most recent live holiday_camp
+// promotion with days + a payment link). Null when there's nothing to book.
+export async function getActiveCampForProgramme(programmeId: string): Promise<{ id: string; title: string | null } | null> {
+  const { rows } = await sql`
+    SELECT p.id, p.title
+    FROM promotions p
+    JOIN promotion_targets pt ON pt.promotion_id = p.id
+    WHERE pt.programme_id = ${programmeId}
+      AND p.promotion_type = 'holiday_camp'
+      AND p.status <> 'cancelled'
+      AND p.camp_days IS NOT NULL
+      AND p.payment_link IS NOT NULL
+    ORDER BY p.created_at DESC
+    LIMIT 1
+  `
+  return rows[0] ? { id: rows[0].id as string, title: (rows[0].title as string) ?? null } : null
+}
+
+export async function recordCampOffer(groupJid: string, senderJid: string, promotionId: string): Promise<void> {
+  await sql`
+    INSERT INTO camp_offers (group_jid, sender_jid, promotion_id)
+    VALUES (${groupJid}, ${senderJid}, ${promotionId})
+    ON CONFLICT (group_jid, sender_jid)
+      DO UPDATE SET promotion_id = EXCLUDED.promotion_id, offered_at = NOW()
+  `
+}
+
+// Returns the offered promotion id if there's a fresh (<60min) offer for this
+// sender, and clears it. Null otherwise.
+export async function consumeRecentCampOffer(groupJid: string, senderJid: string): Promise<string | null> {
+  const { rows } = await sql`
+    SELECT promotion_id FROM camp_offers
+    WHERE group_jid = ${groupJid} AND sender_jid = ${senderJid}
+      AND offered_at > NOW() - INTERVAL '60 minutes'
+    LIMIT 1
+  `
+  if (!rows[0]) return null
+  await sql`DELETE FROM camp_offers WHERE group_jid = ${groupJid} AND sender_jid = ${senderJid}`
+  return rows[0].promotion_id as string
+}

@@ -12,7 +12,8 @@ import {
 import { notifyCoachHandoff } from '@/app/lib/notify'
 import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId, optOutMemberByJid } from '@/app/lib/control-centre-db'
 import { tryHandleFeedbackReply } from '@/app/lib/feedback'
-import { tryHandleCampBookingReply, startCampBookingFromPoll, tryHandleCoachCampConfirm } from '@/app/lib/camp-booking'
+import { tryHandleCampBookingReply, startCampBookingFromPoll, tryHandleCoachCampConfirm, getActiveCampForProgramme, recordCampOffer, consumeRecentCampOffer } from '@/app/lib/camp-booking'
+import { parseAffirmative } from '@/app/lib/ai-messages'
 import { tryHandlePtBookingReply } from '@/app/lib/calendar'
 import { tryHandleCancellationReply } from '@/app/lib/cancellation'
 import { tryHandleEnquiryMessage } from '@/app/lib/enquiry-chase'
@@ -636,6 +637,24 @@ export async function POST(request: NextRequest) {
     const cleanedText = messageText.replace(/@\d+/g, '').trim()
     const kb = program.knowledgebase as Knowledgebase
     const coachName = (program.coach_name as string) || ''
+    const firstName = (senderName || '').split(/\s+/)[0] || 'there'
+
+    // ─── Route 2: booking via a group enquiry ───
+    // If there's a live bookable camp for this group, a parent can book straight
+    // from the group — "yes" to a prior offer (below) starts it. Idempotent.
+    const activeCamp = await getActiveCampForProgramme(program.id)
+    if (activeCamp && parseAffirmative(cleanedText)) {
+      const offered = await consumeRecentCampOffer(groupJid, senderJid)
+      if (offered) {
+        try { await startCampBookingFromPoll(offered, senderJid, senderName, program.id) } catch (e) { console.error('[ROUTE2 offer-yes] start failed:', e) }
+        const { isDuplicate: dupOffer } = await trackBotReply(groupJid, 'camp_offer_yes', messageId)
+        if (dupOffer) return NextResponse.json({ ok: true })
+        const ack = `Great ${firstName}! 🎉 I've sent you a DM to get booked in — check your messages with me.`
+        await sendWhatsAppMessage(groupJid, ack)
+        await safeLogConversation({ programmeId: program.id, groupJid, senderJid, senderName, messageText, botResponse: ack, category: 'camp_offer_yes', escalated })
+        return NextResponse.json({ ok: true })
+      }
+    }
 
     // ─── Closed-intent gate ───
     // Recognise the intent widely, then answer ONLY from this programme's data
@@ -660,6 +679,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
+    // Booking intent ("can I book", "is there space", "can my child join") +
+    // a live camp → start the booking conversation straight away (DM them).
+    if (intent === 'capacity_booking' && activeCamp) {
+      try { await startCampBookingFromPoll(activeCamp.id, senderJid, senderName, program.id) } catch (e) { console.error('[ROUTE2 capacity] start failed:', e) }
+      const { isDuplicate: dupCap } = await trackBotReply(groupJid, 'camp_booking_start', messageId)
+      if (dupCap) return NextResponse.json({ ok: true })
+      const ack = `Great ${firstName}! 🎉 I've sent you a DM to get booked in for ${activeCamp.title || 'the camp'} — check your messages.`
+      await sendWhatsAppMessage(groupJid, ack)
+      await safeLogConversation({ programmeId: program.id, groupJid, senderJid, senderName, messageText, botResponse: ack, category: 'camp_booking_start', escalated })
+      return NextResponse.json({ ok: true })
+    }
+
     const availability =
       intent === 'capacity_booking' ? await getProgrammeAvailability(program) : null
     const plan = planBotResponse(intent, kb, availability)
@@ -675,6 +706,11 @@ export async function POST(request: NextRequest) {
     if (plan.action === 'answer') {
       reply = await phraseAnswer(cleanedText, plan.facts, program.program_name)
       logCategory = `answer_${plan.intent}`
+      // Route 2: after answering, offer a booking link if there's a live camp.
+      if (activeCamp) {
+        reply += `\n\nWould you like me to get you booked in for ${activeCamp.title || 'the camp'}? Just reply *yes* 👍`
+        try { await recordCampOffer(groupJid, senderJid, activeCamp.id) } catch (e) { console.error('[ROUTE2 offer] record failed:', e) }
+      }
     } else if (plan.reason === 'missing_data') {
       // In-scope question we don't have data for → genuine routing to the coach.
       reply = buildMissingDataMessage(coachName)
