@@ -575,20 +575,24 @@ export function buildCampPaidAck(input: {
 
 // Richer WhatsApp "thank-you / payment received" follow-up sent the moment the
 // parent reports payment — itemised so it reads like a receipt. Replaces the email.
+// Carries the coach-will-confirm wording AND the GDPR notice (per the spec).
 export function buildCampPaymentReceived(input: {
   parentFirstName: string | null
   children: CampChildSummary[]
   campName: string
+  coachName?: string | null
 }): string {
   const total = input.children.reduce((s, c) => s + c.total, 0)
   const name = input.parentFirstName ? ` ${input.parentFirstName}` : ''
+  const who = input.coachName && input.coachName.trim() ? input.coachName.trim() : 'The coach'
   const lines = input.children.map(
     (c) => `• ${c.childName}${c.age != null ? ` (age ${c.age})` : ''} — ${c.dayLabels.join(', ')} — £${c.total.toFixed(2)}`
   )
   return (
     `Thank you${name}! 🙌 I've got your payment details for ${input.campName}:\n\n` +
     `${lines.join('\n')}\n\nTotal: £${total.toFixed(2)}\n\n` +
-    `The coach will confirm against the bank shortly and I'll send your final confirmation here. Any questions, just reply 👍`
+    `${who} will confirm your payment in due course. Thanks for your booking!\n\n` +
+    `🔒 We only use your details to manage this booking and contact you about the camp, in line with UK GDPR — we never share them with anyone else. Reply STOP to opt out of promotional messages at any time.`
   )
 }
 

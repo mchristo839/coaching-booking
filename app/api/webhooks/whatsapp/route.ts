@@ -680,15 +680,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // Booking intent ("can I book", "is there space", "can my child join") +
-    // a live camp → start the booking conversation straight away (DM them).
+    // Booking intent ("how do I book", "can I book", "is there space") + a live
+    // camp → CONFIRM first (spec: the bot asks if they'd like the booking link,
+    // and only triggers the 1:1 payment bot once they say yes). The actual link
+    // is never posted in the group — it only ever goes out in the 1:1 DM.
     if (intent === 'capacity_booking' && activeCamp) {
-      try { await startCampBookingFromPoll(activeCamp.id, senderJid, senderName, program.id) } catch (e) { console.error('[ROUTE2 capacity] start failed:', e) }
-      const { isDuplicate: dupCap } = await trackBotReply(groupJid, 'camp_booking_start', messageId)
+      const { isDuplicate: dupCap } = await trackBotReply(groupJid, 'camp_offer', messageId)
       if (dupCap) return NextResponse.json({ ok: true })
-      const ack = `Great ${firstName}! 🎉 I've sent you a DM to get booked in for ${activeCamp.title || 'the camp'} — check your messages.`
-      await sendWhatsAppMessage(groupJid, ack)
-      await safeLogConversation({ programmeId: program.id, groupJid, senderJid, senderName, messageText, botResponse: ack, category: 'camp_booking_start', escalated })
+      try { await recordCampOffer(groupJid, senderJid, activeCamp.id) } catch (e) { console.error('[ROUTE2 capacity offer] record failed:', e) }
+      const offer = `Great ${firstName}! 🎉 Would you like me to send you the booking link for ${activeCamp.title || 'the camp'}? Just reply *yes* and I'll DM you to get your child booked in. 👍`
+      await sendWhatsAppMessage(groupJid, offer)
+      await safeLogConversation({ programmeId: program.id, groupJid, senderJid, senderName, messageText, botResponse: offer, category: 'camp_offer', escalated })
       return NextResponse.json({ ok: true })
     }
 

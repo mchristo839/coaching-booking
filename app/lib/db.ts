@@ -433,19 +433,45 @@ export async function createMember(data: {
   return rows[0]
 }
 
+// Per-member camp aggregates for the clients database: child age (from their
+// camp bookings, since members store DOB not age) and how many camp sessions
+// (days) they have BOOKED vs PAID (confirmed). Left-joined so members with no
+// camp bookings simply show 0 / null.
+const MEMBER_CAMP_AGG = `
+  LEFT JOIN LATERAL (
+    SELECT
+      COALESCE(SUM(COALESCE(jsonb_array_length(cb.days_selected::jsonb), 0))
+        FILTER (WHERE cb.state NOT IN ('cancelled','expired')), 0)::int AS sessions_booked,
+      COALESCE(SUM(COALESCE(jsonb_array_length(cb.days_selected::jsonb), 0))
+        FILTER (WHERE cb.state = 'confirmed'), 0)::int AS sessions_paid,
+      MAX(cb.child_age) AS child_age
+    FROM camp_bookings cb
+    WHERE cb.member_id = m.id
+  ) camp ON true
+`
+
 export async function listMembersByProgramme(programmeId: string) {
-  const { rows } = await sql`SELECT * FROM members WHERE programme_id = ${programmeId} ORDER BY joined_at DESC`
+  const { rows } = await sql.query(
+    `SELECT m.*, camp.sessions_booked, camp.sessions_paid, camp.child_age
+     FROM members m
+     ${MEMBER_CAMP_AGG}
+     WHERE m.programme_id = $1
+     ORDER BY m.joined_at DESC`,
+    [programmeId]
+  )
   return rows
 }
 
 export async function listMembersByCoach(coachId: string) {
-  const { rows } = await sql`
-    SELECT m.*, p.programme_name
-    FROM members m
-    JOIN programmes p ON p.id = m.programme_id
-    WHERE p.coach_id = ${coachId}
-    ORDER BY m.joined_at DESC
-  `
+  const { rows } = await sql.query(
+    `SELECT m.*, p.programme_name, camp.sessions_booked, camp.sessions_paid, camp.child_age
+     FROM members m
+     JOIN programmes p ON p.id = m.programme_id
+     ${MEMBER_CAMP_AGG}
+     WHERE p.coach_id = $1
+     ORDER BY m.joined_at DESC`,
+    [coachId]
+  )
   return rows
 }
 
@@ -602,10 +628,27 @@ export interface Knowledgebase {
   customFaqs: { q: string; a: string }[]
 }
 
-export async function findProgramByWhatsAppGroup(whatsappGroupId: string) {
-  const result = await findProgrammeByWhatsAppGroup(whatsappGroupId)
-  if (!result) return null
+// Look up a programme directly by id, with the same coach/provider joins the
+// group lookup uses (so the result can be passed to attachKnowledgebase).
+export async function findProgrammeById(programmeId: string) {
+  const { rows } = await sql`
+    SELECT p.*, c.first_name as coach_first_name, c.last_name as coach_last_name, c.email as coach_email,
+      c.whatsapp_bot_status, c.id as coach_id,
+      pr.trading_name
+    FROM programmes p
+    JOIN coaches_v2 c ON c.id = p.coach_id
+    JOIN providers pr ON pr.id = c.provider_id
+    WHERE p.id = ${programmeId}
+    LIMIT 1
+  `
+  return rows[0] || null
+}
 
+// Build the bot-facing Knowledgebase (+ program meta) from a raw programmes row.
+// Shared by the group-JID lookup and the by-id lookup so the bot answers from
+// identical data regardless of how the programme was resolved.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function attachKnowledgebase(result: any) {
   // Build a knowledgebase object from V2 individual columns + FAQs
   const { rows: faqRows } = await sql`
     SELECT question, answer FROM faqs
@@ -640,6 +683,21 @@ export async function findProgramByWhatsAppGroup(whatsappGroupId: string) {
   mapped.coach_email = result.coach_email
   mapped.knowledgebase = knowledgebase
   return mapped
+}
+
+export async function findProgramByWhatsAppGroup(whatsappGroupId: string) {
+  const result = await findProgrammeByWhatsAppGroup(whatsappGroupId)
+  if (!result) return null
+  return attachKnowledgebase(result)
+}
+
+// Same shape as findProgramByWhatsAppGroup, resolved by programme id — used by
+// the 1:1 camp bot so it can answer camp questions from the SAME knowledgebase
+// (and approved FAQs) the group bot uses. Returns null when not found.
+export async function getProgramWithKbById(programmeId: string) {
+  const result = await findProgrammeById(programmeId)
+  if (!result) return null
+  return attachKnowledgebase(result)
 }
 
 // ─── Programme availability (live capacity check for the bot) ───

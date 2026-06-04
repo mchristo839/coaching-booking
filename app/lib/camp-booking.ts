@@ -23,7 +23,9 @@
 
 import { sql } from '@/app/lib/sql'
 import { sendWhatsAppMessage, sendWhatsAppButtons } from '@/app/lib/evolution'
-import { createMember } from '@/app/lib/db'
+import { createMember, getProgramWithKbById, getProgrammeAvailability, type Knowledgebase } from '@/app/lib/db'
+import { classifyBotIntent, planBotResponse, phraseAnswer } from '@/app/lib/bot-intent'
+import { matchActiveFaq } from '@/app/lib/faq-learning'
 import { getInternalRecipients } from '@/app/lib/notify'
 import {
   parseCampDaySelection,
@@ -657,6 +659,138 @@ export function parseCancelReply(text: string): boolean {
   return /\b(cancel|cancelled|forget it|never mind|nevermind|pull out|withdraw)\b/i.test(text.trim())
 }
 
+// ─── Mid-flow Q&A (spec: the payment bot also answers camp questions) ───
+// The 1:1 booking bot can field questions about the camp at any point — drawing
+// on the SAME programme knowledgebase + approved FAQs the group bot uses, plus
+// the camp's own details — then re-prompts the current step so the parent can
+// carry on where they left off.
+
+// Conservative "is this a question?" heuristic. Deliberately narrow so it never
+// mistakes a valid step answer (a name, an age, "Monday", "yes", "done") for a
+// question. Callers only invoke the answer path when the step's own parser has
+// already failed (or the step accepts free text, e.g. a name).
+function looksLikeCampQuestion(text: string): boolean {
+  const t = (text || '').trim().toLowerCase()
+  if (t.length < 3) return false
+  if (t.includes('?')) return true
+  const infoKeywords =
+    /\b(how much|cost|costs|price|prices|pay|payment|refund|when|what time|times?|where|location|address|venue|parking|bring|wear|kit|lunch|food|snack|drink|how old|age|how long|duration|start|starts|finish|finishes|end|ends|cancel)\b/
+  const words = t.split(/\s+/).length
+  if (infoKeywords.test(t) && words >= 2) return true
+  // Generic multi-word question opener.
+  if (/^(what|when|where|how|why|who|can|could|do|does|is|are|will|would|should)\b/.test(t) && words >= 3) return true
+  return false
+}
+
+// The "carry on where you left off" re-prompt for the current step.
+async function buildStepReprompt(
+  booking: CampBookingRow,
+  promo: CampPromotionRow,
+  dayList: CampDay[],
+  step: CampStep,
+): Promise<string> {
+  const childName = booking.child_name || 'your child'
+  const campName = promo.title || 'the camp'
+  switch (step) {
+    case 'awaiting_parent_name':
+      return `Now, back to your booking — what's your name?`
+    case 'awaiting_child_name':
+      return `Now, back to your booking — what's your child's first name?`
+    case 'awaiting_child_age':
+      return `Now, back to your booking — how old is ${childName}?`
+    case 'awaiting_day_selection': {
+      const avail = await getCampDayAvailability(booking.promotion_id)
+      return buildCampDaySelection(childName, campName, toAvailLite(avail))
+    }
+    case 'awaiting_checkout_confirm': {
+      const group = await getGroupRows(booking.booking_group_id || booking.id)
+      return buildCampCheckoutRecap(groupChildSummaries(group, dayList))
+    }
+    case 'awaiting_reg_name':
+      return buildCampAskRegName(childName)
+    case 'awaiting_reg_email':
+      return buildCampAskRegEmail()
+    case 'awaiting_reg_phone':
+      return buildCampAskRegPhone()
+    case 'awaiting_payment': {
+      const link = promo.payment_link ? `\n${promo.payment_link}` : ''
+      return `Whenever you're ready, here's your payment link again:${link}\n\nReply "done" once you've paid and I'll let the coach know.`
+    }
+    case 'awaiting_coach_confirm':
+      return buildCampWaitingOnCoach(await getCoachName(promo.created_by))
+    default:
+      return `Shall we carry on with your booking?`
+  }
+}
+
+// Answer a question asked mid-booking, then re-prompt the current step. Returns
+// true only when it could GENUINELY answer (the closed-intent gate answered, an
+// approved FAQ matched, or the camp's own details cover it) — otherwise false,
+// so the caller falls back to the normal step handling and nothing is hijacked.
+async function answerCampQuestionMidFlow(
+  booking: CampBookingRow,
+  promo: CampPromotionRow,
+  dayList: CampDay[],
+  question: string,
+  senderJid: string,
+  step: CampStep,
+): Promise<boolean> {
+  try {
+    const programmeId = await resolveProgrammeId(booking.promotion_id, booking.programme_id)
+    if (!programmeId) return false
+    const program = await getProgramWithKbById(programmeId)
+    if (!program) return false
+    const kb = program.knowledgebase as Knowledgebase
+
+    const { intent } = await classifyBotIntent(question)
+    if (intent === 'social') return false // greetings/chatter — let the step handle it
+
+    // The camp's own specifics, so price/day/venue questions can be answered even
+    // when the programme knowledgebase doesn't carry them.
+    const campFactParts: string[] = []
+    if (promo.detail) campFactParts.push(`Camp: ${promo.detail}`)
+    if (promo.venue) campFactParts.push(`Venue: ${promo.venue}`)
+    if (Array.isArray(promo.camp_days) && promo.camp_days.length) {
+      campFactParts.push(
+        'Days & prices: ' +
+          promo.camp_days.map((d) => `${d.label} — £${Number(d.price_gbp || 0).toFixed(2)}`).join('; ')
+      )
+    }
+    const campFacts = campFactParts.join('\n')
+
+    const availability = intent === 'capacity_booking' ? await getProgrammeAvailability(program) : null
+    const plan = planBotResponse(intent, kb, availability)
+
+    let facts: string | null = null
+    if (plan.action === 'answer') {
+      facts = campFacts ? `${plan.facts}\n${campFacts}` : plan.facts
+    } else {
+      const faq =
+        Array.isArray(kb.customFaqs) && kb.customFaqs.length ? await matchActiveFaq(question, kb.customFaqs) : null
+      if (faq) {
+        facts = campFacts ? `Coach's approved answer: ${faq.a}\n${campFacts}` : `Coach's approved answer: ${faq.a}`
+      } else if (
+        campFacts &&
+        /\b(how much|cost|price|pay|when|what time|time|day|date|where|venue|location|address|how long|duration|start|finish|end|bring|wear|kit|age|old)\b/i.test(
+          question
+        )
+      ) {
+        // A camp-specific question we can answer straight from the camp details.
+        facts = campFacts
+      }
+    }
+    if (!facts) return false
+
+    const answer = await phraseAnswer(question, facts, promo.title || program.program_name || 'the camp')
+    const reprompt = await buildStepReprompt(booking, promo, dayList, step)
+    await sendWhatsAppMessage(senderJid, `${answer}\n\n${reprompt}`)
+    return true
+  } catch (e) {
+    console.error('[CAMP qna] failed for booking', booking.id, e)
+    return false
+  }
+}
+
 // ─── Webhook entry point ───
 // Returns true when this message was consumed by the camp flow.
 
@@ -693,6 +827,7 @@ export async function tryHandleCampBookingReply(
 
     switch (step) {
       case 'awaiting_parent_name': {
+        if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
         const name = messageText.trim()
         if (!name) { await sendWhatsAppMessage(senderJid, `Sorry, what's your name?`); return true }
         await setParentNameForGroup(groupId, name)
@@ -702,6 +837,7 @@ export async function tryHandleCampBookingReply(
       }
 
       case 'awaiting_child_name': {
+        if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
         const name = messageText.trim()
         if (!name) { await sendWhatsAppMessage(senderJid, `What's your child's first name?`); return true }
         await setChildName(booking.id, name)
@@ -715,7 +851,10 @@ export async function tryHandleCampBookingReply(
 
       case 'awaiting_child_age': {
         const age = parseCampAge(messageText)
-        if (age == null) { await sendWhatsAppMessage(senderJid, buildCampAgeRetry(childName)); return true }
+        if (age == null) {
+          if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
+          await sendWhatsAppMessage(senderJid, buildCampAgeRetry(childName)); return true
+        }
         await setChildAge(booking.id, age)
         const avail = await getCampDayAvailability(booking.promotion_id)
         const open = toAvailLite(avail)
@@ -752,6 +891,7 @@ export async function tryHandleCampBookingReply(
           indices = null
         }
         if (!indices || indices.length === 0) {
+          if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
           await sendWhatsAppMessage(senderJid, buildCampDayUnparseableNudge(childName, dayList))
           return true
         }
@@ -816,11 +956,13 @@ export async function tryHandleCampBookingReply(
           await sendWhatsAppMessage(senderJid, buildCampAskRegName(childName))
           return true
         }
+        if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
         await sendWhatsAppMessage(senderJid, `Reply "yes" to get the payment link, "add" to book another child, or "change" to update the days.`)
         return true
       }
 
       case 'awaiting_reg_name': {
+        if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
         const name = messageText.trim()
         if (name.length < 2) { await sendWhatsAppMessage(senderJid, `Sorry, what's the parent/guardian's full name?`); return true }
         await setParentNameForGroup(groupId, name)
@@ -831,7 +973,10 @@ export async function tryHandleCampBookingReply(
 
       case 'awaiting_reg_email': {
         const email = isValidEmail(messageText)
-        if (!email) { await sendWhatsAppMessage(senderJid, buildCampRegEmailRetry()); return true }
+        if (!email) {
+          if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
+          await sendWhatsAppMessage(senderJid, buildCampRegEmailRetry()); return true
+        }
         await setParentEmailForGroup(groupId, email)
         await setStep(booking.id, 'awaiting_reg_phone')
         await sendWhatsAppMessage(senderJid, buildCampAskRegPhone())
@@ -840,7 +985,10 @@ export async function tryHandleCampBookingReply(
 
       case 'awaiting_reg_phone': {
         const phone = parsePhoneNumber(messageText)
-        if (!phone) { await sendWhatsAppMessage(senderJid, buildCampRegPhoneRetry()); return true }
+        if (!phone) {
+          if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
+          await sendWhatsAppMessage(senderJid, buildCampRegPhoneRetry()); return true
+        }
         await setParentPhoneForGroup(groupId, phone)
         // Register the family on the Members page, then send the payment link.
         const group = await getGroupRows(groupId)
@@ -862,6 +1010,7 @@ export async function tryHandleCampBookingReply(
 
       case 'awaiting_payment': {
         if (!parsePaidReply(messageText)) {
+          if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
           await sendWhatsAppMessage(
             senderJid,
             `No rush ${parentFirst || 'there'} — once you've sent the payment, just reply "done" and I'll let the coach know.`
@@ -870,13 +1019,16 @@ export async function tryHandleCampBookingReply(
         }
         await setStepForGroup(groupId, 'awaiting_coach_confirm', { paymentStatus: 'awaiting_confirmation' })
         const group = await getGroupRows(groupId)
-        // Richer WhatsApp thank-you/receipt the moment they report payment.
+        // Richer WhatsApp thank-you/receipt the moment they report payment — with
+        // the coach-will-confirm wording and the GDPR notice (per the spec).
+        const payCoachName = await getCoachName(promo.created_by)
         await sendWhatsAppMessage(
           senderJid,
           buildCampPaymentReceived({
             parentFirstName: parentFirst || null,
             children: groupChildSummaries(group, dayList),
             campName,
+            coachName: payCoachName,
           })
         )
         await sql`UPDATE camp_bookings SET thankyou_sent_at = NOW() WHERE booking_group_id = ${groupId}`
@@ -890,6 +1042,7 @@ export async function tryHandleCampBookingReply(
       }
 
       case 'awaiting_coach_confirm': {
+        if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
         const coachName = await getCoachName(promo.created_by)
         await sendWhatsAppMessage(senderJid, buildCampWaitingOnCoach(coachName))
         return true
