@@ -1334,6 +1334,23 @@ export async function recordCampOffer(groupJid: string, senderJid: string, promo
   `
 }
 
+// Non-consuming check: has this parent already been offered/nudged in this group
+// within the window? Used to keep the soft booking nudge ONE-TIME per parent
+// (so it never reads as repetitive). Default window ~24h ≈ one conversation.
+export async function hasRecentCampOffer(
+  groupJid: string,
+  senderJid: string,
+  withinMinutes = 1440
+): Promise<boolean> {
+  const { rows } = await sql`
+    SELECT 1 FROM camp_offers
+    WHERE group_jid = ${groupJid} AND sender_jid = ${senderJid}
+      AND offered_at > NOW() - (${withinMinutes}::int * INTERVAL '1 minute')
+    LIMIT 1
+  `
+  return rows.length > 0
+}
+
 // Returns the offered promotion id if there's a fresh (<60min) offer for this
 // sender, and clears it. Null otherwise.
 export async function consumeRecentCampOffer(groupJid: string, senderJid: string): Promise<string | null> {
