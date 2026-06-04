@@ -157,8 +157,11 @@ const CAMP_SELECT = `
 
 // ─── Lookups ───
 
-// The active conversation row for a parent = the most recent row in an open
-// group (any step except confirmed/cancelled), within its TTL.
+// The active conversation row for a parent = the most recently UPDATED open row
+// (any step except confirmed/cancelled), within its TTL. Ordering by updated_at
+// (not created_at) means the booking the parent is actively progressing — e.g.
+// the one we just sent the payment link for — is the one their next reply lands
+// on, never a stale row.
 export async function findOpenCampBooking(parentJid: string): Promise<CampBookingRow | null> {
   const { rows } = await sql.query(
     `SELECT ${CAMP_SELECT} FROM camp_bookings
@@ -166,7 +169,7 @@ export async function findOpenCampBooking(parentJid: string): Promise<CampBookin
        AND (conversation_step IS NULL OR conversation_step NOT IN ('confirmed','cancelled'))
        AND state NOT IN ('confirmed','cancelled','expired')
        AND expires_at > NOW()
-     ORDER BY created_at DESC
+     ORDER BY updated_at DESC
      LIMIT 1`,
     [parentJid]
   )
@@ -201,18 +204,9 @@ async function adoptBooking(row: CampBookingRow, senderJid: string, why: string)
 //      reply we adopt a recent open lid-keyed booking and re-key it. We prefer a
 //      unique WhatsApp-name match; failing that, if there's exactly one open
 //      lid booking we adopt it. Ambiguous (multiple, no name match) → skip.
-// Lower rank = preferred. A fresh booking mid-conversation (collecting details)
-// should always win over one stuck at payment/coach-confirm, so a stale booking
-// can never shadow a new one the parent is actively answering.
-function stepRank(s: CampStep | null): number {
-  switch (s) {
-    case 'awaiting_payment': return 2
-    case 'awaiting_coach_confirm': return 3
-    case 'confirmed':
-    case 'cancelled': return 9
-    default: return 1 // active collection / checkout / reg / waitlist
-  }
-}
+// Selection across candidates is by most-recent ACTIVITY (updated_at): the
+// booking the parent is actually progressing wins, so neither a stale
+// collection row nor a stuck payment row can shadow the live conversation.
 
 // Choose which open @lid booking to adopt for a phone reply (name match, or a
 // single lid = same person, or a sole open lid booking). Returns null when
@@ -281,7 +275,7 @@ export async function findOrAdoptOpenCampBooking(
          AND (conversation_step IS NULL OR conversation_step NOT IN ('confirmed','cancelled'))
          AND state NOT IN ('confirmed','cancelled','expired')
          AND expires_at > NOW()
-       ORDER BY created_at DESC LIMIT 1`,
+       ORDER BY updated_at DESC LIMIT 1`,
       [digits]
     )
     const r = rows[0] as CampBookingRow | undefined
@@ -300,13 +294,12 @@ export async function findOrAdoptOpenCampBooking(
 
   if (candidates.length === 0) return null
 
-  // Prefer the actively-progressing booking (collection stage) over a stale one,
-  // then the most recent. Stops a stuck awaiting_payment booking intercepting a
-  // fresh conversation the parent is mid-way through.
+  // Pick the booking with the most recent activity (updated_at) — i.e. the one
+  // the parent is genuinely mid-conversation on. This stops a stale collection
+  // row from eating a "done" meant for the active payment booking, and equally
+  // stops a stuck payment row from shadowing a fresh conversation.
   candidates.sort(
-    (a, b) =>
-      stepRank(a.row.conversation_step) - stepRank(b.row.conversation_step) ||
-      new Date(b.row.created_at).getTime() - new Date(a.row.created_at).getTime()
+    (a, b) => new Date(b.row.updated_at).getTime() - new Date(a.row.updated_at).getTime()
   )
   const best = candidates[0]
   return best.needsAdopt ? adoptBooking(best.row, senderJid, 'best active booking') : best.row
