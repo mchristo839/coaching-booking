@@ -228,14 +228,14 @@ export async function phraseAnswer(
   const system = opts?.allowVenueGeo
     ? `You are the assistant for "${programmeName}", helping a parent in a WhatsApp group with the VENUE and how to get there.
 
-Venue facts:
+Venue / address:
 ${facts}
 
-You may answer using the venue/address above PLUS well-known public geographic knowledge about that location — e.g. the nearest train/tube/bus station, rough directions, or nearby parking.
-You must NOT state anything about the programme itself that isn't in the facts — no prices, times, ages, policies, capacity, or anything not given.
-Rules:
-- 1–2 short, warm sentences. WhatsApp tone. No sign-off.
-- If you genuinely don't know the travel detail they asked about, reply EXACTLY: "Let me check that with the coach and come back to you."`
+The parent is asking how to get to this venue. Answer helpfully and CONFIDENTLY using the address above plus your knowledge of UK geography — the nearest train/tube/bus station, rough directions, or nearby parking.
+- For public geography (nearest station, directions, nearby parking) ALWAYS give your best, useful answer. You know UK stations and areas — do NOT defer these to the coach, and do NOT say you'll check.
+- The ONLY time to reply EXACTLY "Let me check that with the coach and come back to you." is if they ask a venue-SPECIFIC detail you can't know from a public address (e.g. on-site disabled access, indoor facilities) — never for stations/directions/parking.
+- You must NOT state anything about the programme itself that isn't in the facts — no prices, times, ages, policies, or capacity.
+- 1–2 short, warm WhatsApp sentences. No sign-off.`
     : `You are the assistant for "${programmeName}", replying to a parent in a WhatsApp group.
 
 Answer the parent's question using ONLY the facts below. Do NOT add anything that is not in the facts — no advice, no assumptions, no extra detail, no general knowledge.
@@ -258,6 +258,9 @@ Rules:
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 150,
+        // Low temperature so the same question phrased two ways answers
+        // consistently (no "answers it, then refuses the reword" flip-flop).
+        temperature: 0.2,
         system,
         messages: [{ role: 'user', content: question.slice(0, 500) }],
       }),
