@@ -12,7 +12,7 @@ import {
 import { notifyCoachHandoff } from '@/app/lib/notify'
 import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId, optOutMemberByJid } from '@/app/lib/control-centre-db'
 import { tryHandleFeedbackReply } from '@/app/lib/feedback'
-import { tryHandleCampBookingReply, startCampBookingFromPoll, tryHandleCoachCampConfirm, getActiveCampForProgramme, recordCampOffer, consumeRecentCampOffer } from '@/app/lib/camp-booking'
+import { tryHandleCampBookingReply, startCampBookingFromPoll, tryHandleCoachCampConfirm, getActiveCampForProgramme, recordCampOffer, consumeRecentCampOffer, hasRecentCampOffer } from '@/app/lib/camp-booking'
 import { parseAffirmative } from '@/app/lib/ai-messages'
 import { matchActiveFaq } from '@/app/lib/faq-learning'
 import { tryHandlePtBookingReply } from '@/app/lib/calendar'
@@ -706,6 +706,24 @@ export async function POST(request: NextRequest) {
     let reply: string
     let logCategory: string
 
+    // One-time, low-key booking nudge appended to a parent's FIRST camp-relevant
+    // answer (never repeated — gated by hasRecentCampOffer). This keeps the
+    // helpful "you can book" signal without the salesy repetition of offering on
+    // every reply. Records a camp_offer so a follow-up "yes" books them (handled
+    // by the affirmative path above). Returns '' when there's no live camp or the
+    // parent has already been offered/nudged.
+    const oneTimeCampNudge = async (): Promise<string> => {
+      if (!activeCamp) return ''
+      try {
+        if (await hasRecentCampOffer(groupJid, senderJid)) return ''
+        await recordCampOffer(groupJid, senderJid, activeCamp.id)
+      } catch (e) {
+        console.error('[NUDGE] gate/record failed:', e)
+        return ''
+      }
+      return `\n\n(Whenever you're ready, I can get you booked in for ${activeCamp.title || 'the camp'} — just let me know 👍)`
+    }
+
     // When the structured gate can't answer, see if a COACH-APPROVED FAQ does.
     // FAQs are this programme's own approved Q&A (kb.customFaqs) — never shared.
     const faqMatch =
@@ -716,15 +734,15 @@ export async function POST(request: NextRequest) {
     if (plan.action === 'answer') {
       reply = await phraseAnswer(cleanedText, plan.facts, program.program_name)
       logCategory = `answer_${plan.intent}`
-      // NB: we deliberately do NOT tack a booking offer onto every answer — it
-      // read as repetitive/salesy (e.g. after "what do I wear" / "nearest
-      // station"). The booking link is only ever offered when a parent directly
-      // asks to book (the `capacity_booking` path above). This is customer
-      // service first.
+      // Customer service first — we never pitch on every reply. At most a single
+      // one-time nudge (then never again). Direct booking asks still go via the
+      // `capacity_booking` path above.
+      reply += await oneTimeCampNudge()
     } else if (faqMatch) {
       // Answer from the coach's approved FAQ (phrased scoped to ONLY that answer).
       reply = await phraseAnswer(cleanedText, `Coach's approved answer: ${faqMatch.a}`, program.program_name)
       logCategory = 'answer_faq'
+      reply += await oneTimeCampNudge()
     } else if (plan.reason === 'missing_data') {
       // In-scope question we don't have data for → genuine routing to the coach.
       reply = buildMissingDataMessage(coachName)
