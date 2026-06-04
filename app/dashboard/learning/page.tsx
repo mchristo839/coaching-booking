@@ -332,6 +332,8 @@ export default function LearningPage() {
   const [loading, setLoading] = useState(true)
   const [coachId, setCoachId] = useState('')
   const [selectedProgrammeId, setSelectedProgrammeId] = useState<string>('all')
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestNote, setSuggestNote] = useState('')
 
   /* ---------- data fetching ---------- */
 
@@ -376,6 +378,34 @@ export default function LearningPage() {
       setLoading(false)
     }
   }, [])
+
+  async function handleSuggest() {
+    if (!coachId) return
+    setSuggesting(true)
+    setSuggestNote('')
+    try {
+      const res = await fetch('/api/faqs/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coachId }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setSuggestNote(
+          d.added > 0
+            ? `Found ${d.added} new suggestion${d.added === 1 ? '' : 's'} — review them below.`
+            : 'No new suggestions from recent chats yet.'
+        )
+        await fetchData(coachId)
+      } else {
+        setSuggestNote(d.error || 'Could not generate suggestions.')
+      }
+    } catch {
+      setSuggestNote('Could not generate suggestions.')
+    } finally {
+      setSuggesting(false)
+    }
+  }
 
   useEffect(() => {
     const id = localStorage.getItem('coachId')
@@ -527,9 +557,15 @@ export default function LearningPage() {
         </Link>
 
         {/* Header */}
-        <div className="reveal reveal-1 mb-6">
-          <h1 className="font-display text-2xl md:text-3xl font-bold text-ink">Learning Log</h1>
-          <p className="text-ink-muted text-sm mt-0.5">Review questions your bot couldn&apos;t answer and manage your FAQ library.</p>
+        <div className="reveal reveal-1 mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="font-display text-2xl md:text-3xl font-bold text-ink">Learning Log</h1>
+            <p className="text-ink-muted text-sm mt-0.5">Review questions your bot couldn&apos;t answer and manage your FAQ library.</p>
+            {suggestNote && <p className="text-xs text-brand-700 mt-1">{suggestNote}</p>}
+          </div>
+          <button onClick={handleSuggest} disabled={suggesting} className="btn-secondary text-sm shrink-0">
+            {suggesting ? 'Scanning chats…' : '✨ Suggest from recent chats'}
+          </button>
         </div>
 
         {/* Programme filter tabs */}
