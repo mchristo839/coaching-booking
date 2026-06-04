@@ -673,7 +673,7 @@ export default function PromotionDetailPage() {
                           <StateBadge state={b.state} />
                         </td>
                         <td className="px-6 py-2 text-right">
-                          {b.state === 'paid_self_reported' ? (
+                          {(b.state === 'paid_self_reported' || b.state === 'awaiting_payment_confirmation') ? (
                             <div className="flex items-center justify-end gap-2">
                               <button
                                 onClick={() => handleConfirmBooking(b.id)}
