@@ -1306,6 +1306,43 @@ export async function runCampCleanup(): Promise<CampCleanupResult> {
   return { expired: rows.length }
 }
 
+// ─── Group camp Q&A (answer camp-structure questions from the camp's own data) ───
+
+// Answer a CAMP question in the GROUP from the camp's own details — days,
+// per-day prices, day-selection flexibility, venue. Returns the answer, or null
+// when the camp facts don't actually answer it (so the caller can route to the
+// coach). No pitching — it just answers. Used so the group bot can reply to
+// "which days / can I pick days / do I have to book the full week / what dates"
+// instead of pushing a booking link.
+export async function answerGroupCampQuestion(
+  promotionId: string,
+  question: string,
+  programmeName: string,
+): Promise<string | null> {
+  try {
+    const promo = await getCampPromotion(promotionId)
+    if (!promo || !Array.isArray(promo.camp_days) || promo.camp_days.length === 0) return null
+    const days = promo.camp_days
+      .map((d) => `${d.label} — £${Number(d.price_gbp || 0).toFixed(2)}`)
+      .join('; ')
+    const facts = [
+      `This is the ${promo.title || 'holiday camp'}.`,
+      promo.detail ? `Details: ${promo.detail}` : '',
+      promo.venue ? `Venue: ${promo.venue}` : '',
+      `Available days and prices: ${days}.`,
+      `Parents can book ANY combination of these days — they do NOT have to book the whole week. Each day is booked and priced individually.`,
+    ].filter(Boolean).join('\n')
+    const answer = await phraseAnswer(question, facts, programmeName)
+    // phraseAnswer returns this exact line when the facts don't answer the
+    // question — treat that as "can't answer" so the caller routes to the coach.
+    if (/let me check that with the coach/i.test(answer)) return null
+    return answer
+  } catch (e) {
+    console.error('[CAMP group-enquiry] failed:', e)
+    return null
+  }
+}
+
 // ─── Route 2: bot offers a booking link after answering an enquiry ───
 
 // The active bookable camp for a programme/group (most recent live holiday_camp
