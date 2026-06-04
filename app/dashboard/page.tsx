@@ -279,6 +279,7 @@ export default function DashboardPage() {
   })
   const [escalations, setEscalations] = useState<Escalation[]>([])
   const [ackingId, setAckingId] = useState<string | null>(null)
+  const [camps, setCamps] = useState<{ id: string; title: string | null; status: string | null }[]>([])
 
   /* ---------- handlers ---------- */
 
@@ -294,13 +295,23 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(async (coachId: string) => {
     try {
-      const [statsRes, progsRes, authProgsRes, meRes, escRes] = await Promise.all([
+      const [statsRes, progsRes, authProgsRes, meRes, escRes, promosRes] = await Promise.all([
         fetch(`/api/dashboard/stats?coachId=${encodeURIComponent(coachId)}`),
         fetch('/api/programmes/list'),
         fetch('/api/auth/authorised-programmes', { credentials: 'include' }),
         fetch('/api/auth/me', { credentials: 'include' }),
         fetch('/api/escalations', { credentials: 'include' }),
+        fetch('/api/promotions', { credentials: 'include' }),
       ])
+
+      if (promosRes.ok) {
+        const d = await promosRes.json()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const holidayCamps = (d.promotions || [])
+          .filter((p: any) => p.promotion_type === 'holiday_camp')
+          .map((p: any) => ({ id: p.id, title: p.title, status: p.status }))
+        setCamps(holidayCamps)
+      }
 
       if (escRes.ok) {
         const d = await escRes.json()
@@ -530,6 +541,41 @@ export default function DashboardPage() {
             </p>
             <p className="text-xs text-ink-muted mt-1">this week</p>
           </div>
+        </div>
+
+        {/* ===== Holiday Camps ===== */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-display text-lg font-semibold text-ink">
+              Holiday Camps ({camps.length})
+            </h2>
+            <Link href="/dashboard/camps/new" className="btn-primary text-sm">
+              + New Camp
+            </Link>
+          </div>
+          {camps.length === 0 ? (
+            <div className="card shadow-card text-sm text-ink-muted">
+              No camps yet. Create one to post a poll and take bookings.
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {camps.map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/dashboard/promotions/${c.id}`}
+                  className="card shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-ink">{c.title || 'Untitled camp'}</span>
+                    {c.status && (
+                      <span className="text-xs px-2 py-0.5 rounded bg-brand-50 text-brand-700 capitalize shrink-0">{c.status}</span>
+                    )}
+                  </div>
+                  <span className="block text-xs text-ink-muted mt-1">Manage bookings &amp; confirm payments →</span>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ===== Programme Cards ===== */}
