@@ -697,6 +697,32 @@ function looksLikeCampQuestion(text: string): boolean {
   return false
 }
 
+// Does this group message read as a request to BOOK / get the booking link?
+// Used by the group bot (Route 2): when there's a live bookable camp, ANY of
+// these phrasings kicks off the 1:1 booking and DMs the parent the link —
+// rather than answering with availability or routing to the coach. Deliberately
+// inclusive (the coach asked for "anything that sounds like how do I book / send
+// a booking link"), and it must match NON-questions too ("Booking link",
+// "Send me the link") since those never reach the question gate.
+export function looksLikeBookingRequest(text: string): boolean {
+  const t = (text || '').trim().toLowerCase()
+  if (t.length < 3) return false
+  return (
+    // "how do I book", "where do I book", "can I book", "want/like to book",
+    // "book a place/spot", "book on", "book us in", "i'll book", "book me"
+    /\bbook(ing)?\b/.test(t) ||
+    // "sign up", "sign me up", "signup"
+    /\bsign\s*(me\s*|us\s*|my\s*\w+\s*)?up\b/.test(t) ||
+    /\bsign\s*up\b|\bsignup\b/.test(t) ||
+    // "register", "enrol/enroll", "reserve"
+    /\b(register|enroll?|enrol|reserve)\b/.test(t) ||
+    // "send (me) the (booking) link", "can you send the link", "booking link"
+    /\b(booking\s+)?link\b/.test(t) ||
+    // "secure / grab / get a place/spot", "save a spot"
+    /\b(secure|grab|save|get|want)\b.*\b(place|spot|space)\b/.test(t)
+  )
+}
+
 // The "carry on where you left off" re-prompt for the current step.
 async function buildStepReprompt(
   booking: CampBookingRow,
