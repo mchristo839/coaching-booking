@@ -25,29 +25,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
 
-  const [promotions, programmes, notif, votes, convos] = await Promise.all([
-    dump(sql`
-      SELECT pr.id, pr.promotion_type, pr.title, pr.status, pr.created_at,
-             trim(coalesce(c.first_name,'')||' '||coalesce(c.last_name,'')) AS coach
-      FROM promotions pr LEFT JOIN coaches_v2 c ON c.id = pr.created_by
-      ORDER BY pr.created_at DESC NULLS LAST LIMIT 6`),
-    dump(sql`SELECT p.id, p.programme_name, p.whatsapp_group_id FROM programmes p ORDER BY p.programme_name`),
-    dump(sql`
-      SELECT n.event_type, n.status, n.error, n.recipient_jid, n.sent_at, p.programme_name
-      FROM notifications_log n LEFT JOIN programmes p ON p.id = n.programme_id
-      ORDER BY n.sent_at DESC NULLS LAST LIMIT 12`),
-    dump(sql`
-      SELECT pr.created_at, pr.sender_name, pr.sender_jid, pr.chosen_option, po.question, p.programme_name
-      FROM poll_responses pr
-      LEFT JOIN polls po ON po.id = pr.poll_id
-      LEFT JOIN programmes p ON p.id = pr.programme_id
-      ORDER BY pr.created_at DESC NULLS LAST LIMIT 20`),
+  const [programmes, faqs, convos] = await Promise.all([
+    dump(sql`SELECT p.id, p.programme_name, p.whatsapp_group_id, p.camp_schedule, p.holiday_schedule, p.season_type
+             FROM programmes p ORDER BY p.programme_name`),
+    dump(sql`SELECT f.programme_id, f.question, f.answer, f.status, f.source, f.created_at, p.programme_name
+             FROM faqs f LEFT JOIN programmes p ON p.id = f.programme_id
+             WHERE f.status = 'active'
+             ORDER BY f.created_at DESC NULLS LAST LIMIT 40`),
     dump(sql`
       SELECT created_at, sender_name, category, escalated,
-             left(message_text, 90) AS message_text, left(bot_response, 120) AS bot_response
+             left(message_text, 90) AS message_text, left(bot_response, 160) AS bot_response
       FROM conversations
       ORDER BY created_at DESC NULLS LAST LIMIT 25`),
   ])
 
-  return NextResponse.json({ promotions, programmes, notifications_recent: notif, poll_votes: votes, conversations: convos })
+  return NextResponse.json({ programmes, active_faqs: faqs, conversations: convos })
 }
