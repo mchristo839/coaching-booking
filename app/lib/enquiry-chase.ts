@@ -120,7 +120,7 @@ function buildStepMessage(step: number, name: string | null): string {
 // Should be wired AT THE END of the 1:1 branches (after camp / pt / cancellation
 // / feedback) — only matches when the sender is NOT a known member or coach.
 
-export async function tryHandleEnquiryMessage(jid: string, text: string): Promise<boolean> {
+export async function tryHandleEnquiryMessage(jid: string, text: string, senderName?: string | null): Promise<boolean> {
   // Check if sender is already a known prospect
   let prospect = await findProspectByJid(jid)
 
@@ -142,6 +142,23 @@ export async function tryHandleEnquiryMessage(jid: string, text: string): Promis
       WHERE regexp_replace(COALESCE(mobile, ''), '\\D', '', 'g') = ${digits} LIMIT 1
     `
     if (coachRows[0]) return false  // known coach
+
+    // Don't hijack a camp parent: if they have a recent camp booking — matched by
+    // phone digits OR by a name match on a group-@lid booking (the case the camp
+    // flow couldn't re-link) — never enrol them as a studio prospect / send the
+    // generic menu. Stay out and let the (silent) standard fallback handle it.
+    const first = (senderName || '').trim().split(/\s+/)[0].toLowerCase()
+    const { rows: campRows } = await sql`
+      SELECT 1 FROM camp_bookings
+      WHERE state NOT IN ('cancelled','expired')
+        AND created_at > NOW() - INTERVAL '72 hours'
+        AND (
+          regexp_replace(split_part(split_part(parent_jid,'@',1),':',1),'\\D','','g') = ${digits}
+          OR (${first} <> '' AND lower(split_part(COALESCE(parent_name,''),' ',1)) = ${first})
+        )
+      LIMIT 1
+    `
+    if (campRows[0]) return false  // camp parent — not a studio enquiry
   }
 
   // Opt-out at any point stops the ladder

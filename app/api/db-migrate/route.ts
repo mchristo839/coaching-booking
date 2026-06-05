@@ -783,6 +783,9 @@ export async function POST() {
     await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS thankyou_sent_at TIMESTAMPTZ`
     await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS parent_chase_step VARCHAR(20)`
     await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS coach_chase_step VARCHAR(20)`
+    // Set when we've flagged the coach that a poll-YES voter is stranded at the
+    // opening step on a group @lid (so we can't reach them to continue).
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS voter_flagged_at TIMESTAMPTZ`
     // Backfill conversation_step for any rows created by the older cohort-send path.
     await sql`UPDATE camp_bookings SET conversation_step = 'awaiting_day_selection' WHERE conversation_step IS NULL AND state = 'awaiting_day_selection'`
     await sql`UPDATE camp_bookings SET booking_group_id = id WHERE booking_group_id IS NULL`

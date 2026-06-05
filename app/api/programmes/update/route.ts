@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/app/lib/sql'
 import { getAuthFromRequest } from '@/app/lib/auth'
-import { findCoachByProviderId } from '@/app/lib/db'
+import { findCoachByProviderId, validateWhatsappGroupId } from '@/app/lib/db'
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -27,6 +27,14 @@ export async function PATCH(request: NextRequest) {
     const { rows: ownerCheck } = await sql`SELECT id FROM programmes WHERE id = ${programmeId} AND coach_id = ${coachId}`
     if (ownerCheck.length === 0) {
       return NextResponse.json({ error: 'Programme not found or access denied' }, { status: 403 })
+    }
+
+    // Validate the WhatsApp group id up front so a mistyped one is rejected with
+    // a clear message instead of being saved and silently 400-ing every send.
+    if (fields.whatsappGroupId !== undefined) {
+      const g = validateWhatsappGroupId(fields.whatsappGroupId)
+      if (!g.ok) return NextResponse.json({ error: g.error }, { status: 400 })
+      fields.whatsappGroupId = g.value
     }
 
     // Build SET clauses dynamically — direct SQL to avoid any abstraction issues
