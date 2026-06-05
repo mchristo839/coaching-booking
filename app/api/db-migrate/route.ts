@@ -786,6 +786,9 @@ export async function POST() {
     // Set when we've flagged the coach that a poll-YES voter is stranded at the
     // opening step on a group @lid (so we can't reach them to continue).
     await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS voter_flagged_at TIMESTAMPTZ`
+    // "Remind me in a few days" — when the parent isn't ready to pay yet. The
+    // chase cron sends the reminder once this is due, then clears it.
+    await sql`ALTER TABLE camp_bookings ADD COLUMN IF NOT EXISTS reminder_due_at TIMESTAMPTZ`
     // Backfill conversation_step for any rows created by the older cohort-send path.
     await sql`UPDATE camp_bookings SET conversation_step = 'awaiting_day_selection' WHERE conversation_step IS NULL AND state = 'awaiting_day_selection'`
     await sql`UPDATE camp_bookings SET booking_group_id = id WHERE booking_group_id IS NULL`

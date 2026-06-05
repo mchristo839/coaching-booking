@@ -33,6 +33,8 @@ import {
   parseCampAge,
   parseCheckoutReply,
   parseAffirmative,
+  parseNegative,
+  parseReminderReply,
   isValidEmail,
   parsePhoneNumber,
   buildCampOpening,
@@ -54,6 +56,11 @@ import {
   buildCampConfirmed,
   buildCampRejected,
   buildCampDayUnparseableNudge,
+  buildCampAskPaymentReady,
+  buildCampAskRemindConsent,
+  buildCampRemindSetAck,
+  buildCampSnoozeAck,
+  buildCampReminder,
   type CampDayAvailLite,
   type CampChildSummary,
 } from '@/app/lib/ai-messages'
@@ -82,6 +89,10 @@ export type CampStep =
   | 'awaiting_day_selection'
   | 'awaiting_waitlist_confirm'
   | 'awaiting_checkout_confirm'
+  | 'awaiting_payment_ready'
+  | 'awaiting_remind_consent'
+  | 'snoozed'
+  | 'awaiting_reminder_response'
   | 'awaiting_reg_name'
   | 'awaiting_reg_email'
   | 'awaiting_reg_phone'
@@ -541,6 +552,16 @@ async function setStepForGroup(
   `
 }
 
+// Snooze the group with a reminder due in `hours` (the chase cron sends it).
+async function setReminderForGroup(bookingGroupId: string, hours: number) {
+  await sql`
+    UPDATE camp_bookings
+    SET conversation_step = 'snoozed', state = ${stepToState('snoozed')},
+        reminder_due_at = NOW() + (${hours}::int * INTERVAL '1 hour'), updated_at = NOW()
+    WHERE booking_group_id = ${bookingGroupId} AND conversation_step NOT IN ('confirmed','cancelled')
+  `
+}
+
 async function setParentNameForGroup(bookingGroupId: string, parentName: string) {
   await sql`UPDATE camp_bookings SET parent_name = ${parentName}, updated_at = NOW() WHERE booking_group_id = ${bookingGroupId}`
 }
@@ -712,6 +733,12 @@ async function buildStepReprompt(
     }
     case 'awaiting_coach_confirm':
       return buildCampWaitingOnCoach(await getCoachName(promo.created_by))
+    case 'awaiting_payment_ready':
+      return `Are you ready to make payment now to confirm the spot? (Yes / No)`
+    case 'awaiting_remind_consent':
+      return `Shall I give you a nudge in a few days? (Yes / No)`
+    case 'awaiting_reminder_response':
+      return `Ready to confirm? Reply *Yes* to go ahead, *No* if not yet, or *Amend* to change the days.`
     default:
       return `Shall we carry on with your booking?`
   }
@@ -958,13 +985,82 @@ export async function tryHandleCampBookingReply(
               return true
             }
           }
-          // Days are locked in — collect the sign-up details before payment.
+          // Days are locked in — ask if they're ready to pay now (before we
+          // collect details / send the link).
+          await setStep(booking.id, 'awaiting_payment_ready')
+          await sendWhatsAppMessage(senderJid, buildCampAskPaymentReady())
+          return true
+        }
+        if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
+        await sendWhatsAppMessage(senderJid, `Reply "yes" to go ahead, "add" to book another child, or "change" to update the days.`)
+        return true
+      }
+
+      // ── "Are you ready to make payment now? (Yes / No)" ──
+      case 'awaiting_payment_ready': {
+        if (parseAffirmative(messageText)) {
           await setStep(booking.id, 'awaiting_reg_name')
           await sendWhatsAppMessage(senderJid, buildCampAskRegName(childName))
           return true
         }
+        if (parseNegative(messageText)) {
+          await setStep(booking.id, 'awaiting_remind_consent')
+          await sendWhatsAppMessage(senderJid, buildCampAskRemindConsent())
+          return true
+        }
         if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
-        await sendWhatsAppMessage(senderJid, `Reply "yes" to get the payment link, "add" to book another child, or "change" to update the days.`)
+        await sendWhatsAppMessage(senderJid, `Just let me know — are you ready to make payment now? (Yes / No)`)
+        return true
+      }
+
+      // ── "Shall I remind you in a few days? (Yes / No)" ──
+      case 'awaiting_remind_consent': {
+        if (parseAffirmative(messageText)) {
+          await setReminderForGroup(groupId, 72)
+          await sendWhatsAppMessage(senderJid, buildCampRemindSetAck())
+          return true
+        }
+        if (parseNegative(messageText)) {
+          await setStepForGroup(groupId, 'snoozed')
+          await sendWhatsAppMessage(senderJid, buildCampSnoozeAck())
+          return true
+        }
+        if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
+        await sendWhatsAppMessage(senderJid, `No problem — shall I give you a nudge in a few days? (Yes / No)`)
+        return true
+      }
+
+      // ── Snoozed: they're not paying yet. Any message (other than a question)
+      //    re-engages the flow from "are you ready to pay now?". ──
+      case 'snoozed': {
+        if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
+        await setStep(booking.id, 'awaiting_payment_ready')
+        await sendWhatsAppMessage(senderJid, `Welcome back! ${buildCampAskPaymentReady()}`)
+        return true
+      }
+
+      // ── Reply to the 72h reminder: Yes / No / Amend ──
+      case 'awaiting_reminder_response': {
+        const r = parseReminderReply(messageText)
+        if (r === 'yes') {
+          await setStep(booking.id, 'awaiting_reg_name')
+          await sendWhatsAppMessage(senderJid, buildCampAskRegName(childName))
+          return true
+        }
+        if (r === 'amend') {
+          await clearBookingDays(booking.id)
+          await setStep(booking.id, 'awaiting_day_selection')
+          const avail = await getCampDayAvailability(booking.promotion_id)
+          await sendWhatsAppMessage(senderJid, buildCampDaySelection(childName, campName, toAvailLite(avail)))
+          return true
+        }
+        if (r === 'no') {
+          await setStepForGroup(groupId, 'snoozed')
+          await sendWhatsAppMessage(senderJid, buildCampSnoozeAck())
+          return true
+        }
+        if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
+        await sendWhatsAppMessage(senderJid, `Ready to confirm? Reply *Yes* to go ahead, *No* if not yet, or *Amend* to change the days.`)
         return true
       }
 
@@ -1017,6 +1113,13 @@ export async function tryHandleCampBookingReply(
 
       case 'awaiting_payment': {
         if (!parsePaidReply(messageText)) {
+          // Payment trouble → hand off to the coach (spec: if they can't pay or
+          // ask something we can't answer, point them to the coach).
+          if (/\b(can'?t pay|cant pay|won'?t (work|go through)|not working|doesn'?t work|link.*(broken|not work|dead)|problem|issue|trouble|error|declin|fail|stuck)\b/i.test(messageText)) {
+            const who = (await getCoachName(promo.created_by)) || 'the coach'
+            await sendWhatsAppMessage(senderJid, `Sorry you're having trouble with that! Please drop ${who} a message directly and they'll get you sorted. 🙏`)
+            return true
+          }
           if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
           await sendWhatsAppMessage(
             senderJid,
@@ -1117,10 +1220,40 @@ export async function getCampBookingForCoach(bookingId: string, coachId: string)
 //  • Parent reported payment but the coach hasn't confirmed → remind the coach
 //    at +24h, +48h, and reassure the parent once.
 
-export interface CampChaseResult { parentNudged: number; coachReminded: number; voterFlagged: number; errors: string[] }
+export interface CampChaseResult { parentNudged: number; coachReminded: number; voterFlagged: number; remindersSent: number; errors: string[] }
 
 export async function runCampChase(): Promise<CampChaseResult> {
-  const result: CampChaseResult = { parentNudged: 0, coachReminded: 0, voterFlagged: 0, errors: [] }
+  const result: CampChaseResult = { parentNudged: 0, coachReminded: 0, voterFlagged: 0, remindersSent: 0, errors: [] }
+
+  // ── Due "remind me in a few days" nudges ──
+  // The parent said "not ready to pay, remind me". Once the reminder is due, ask
+  // them to confirm + pay (Yes / No / Amend) on the same thread.
+  try {
+    const { rows } = await sql`
+      SELECT DISTINCT ON (booking_group_id) booking_group_id, parent_jid, promotion_id
+      FROM camp_bookings
+      WHERE conversation_step = 'snoozed' AND reminder_due_at IS NOT NULL AND reminder_due_at < NOW()
+        AND state NOT IN ('confirmed','cancelled','expired')
+      ORDER BY booking_group_id, created_at ASC`
+    for (const r of rows) {
+      try {
+        const promo = await getCampPromotion(r.promotion_id)
+        const group = await getGroupRows(r.booking_group_id)
+        const children = groupChildSummaries(group, promo?.camp_days || [])
+        if (!promo || children.length === 0) {
+          await sql`UPDATE camp_bookings SET reminder_due_at = NULL, updated_at = NOW() WHERE booking_group_id = ${r.booking_group_id}`
+          continue
+        }
+        await sendWhatsAppMessage(r.parent_jid, buildCampReminder({ children, campName: promo.title || 'the camp' }))
+        await sql`
+          UPDATE camp_bookings
+          SET conversation_step = 'awaiting_reminder_response', state = ${stepToState('awaiting_reminder_response')},
+              reminder_due_at = NULL, updated_at = NOW()
+          WHERE booking_group_id = ${r.booking_group_id} AND conversation_step = 'snoozed'`
+        result.remindersSent++
+      } catch (e) { result.errors.push(`reminder ${r.booking_group_id}: ${e instanceof Error ? e.message : String(e)}`) }
+    }
+  } catch (e) { result.errors.push(`reminder query: ${e instanceof Error ? e.message : String(e)}`) }
 
   // ── Stranded Yes voters ──
   // A poll-YES opens a booking keyed to the voter's group @lid; the bot can't
@@ -1337,7 +1470,9 @@ export async function runCampCleanup(): Promise<CampCleanupResult> {
     UPDATE camp_bookings
     SET state = 'expired', conversation_step = 'cancelled', updated_at = NOW()
     WHERE state NOT IN ('confirmed','cancelled','expired')
-      AND COALESCE(conversation_step, 'awaiting_day_selection') <> 'awaiting_coach_confirm'
+      -- never auto-expire coach-pending, or intentionally-dormant ones (snoozed /
+      -- awaiting a reminder reply) — those are handled elsewhere / by the parent.
+      AND COALESCE(conversation_step, 'awaiting_day_selection') NOT IN ('awaiting_coach_confirm','snoozed','awaiting_reminder_response')
       AND (
         (COALESCE(conversation_step, 'collecting') <> 'awaiting_payment' AND updated_at < NOW() - INTERVAL '48 hours')
         OR (conversation_step = 'awaiting_payment' AND updated_at < NOW() - INTERVAL '72 hours')
