@@ -407,7 +407,7 @@ export async function POST(request: NextRequest) {
         // tryHandleEnquiryMessage so the standard fallback below still runs.
         if (!consumedBy) {
           try {
-            if (await tryHandleEnquiryMessage(remoteJid, inboundText)) {
+            if (await tryHandleEnquiryMessage(remoteJid, inboundText, data?.pushName)) {
               consumedBy = 'enquiry_chase'
             }
           } catch (e) {

@@ -194,10 +194,37 @@ export interface SessionScheduleEntry {
 // rendered string into the dashboard field, leaving stray asterisks/spaces
 // that prevent the equality check in findProgrammeByWhatsAppGroup from ever
 // matching. Trim them defensively at both create and update boundaries.
+// Validate + normalise a WhatsApp group id, so a mistyped one can never go live
+// (this is what let Al's "129363…" typo through and silently 400 every send).
+// - empty → cleared (ok).
+// - bare digits → assume a group id and append "@g.us".
+// - real group ids look like 120363…@g.us (or the legacy creator-timestamp form).
+// Returns { ok:false, error } for anything that isn't a plausible group id so the
+// API can reject it with a helpful message instead of saving a dud.
+export function validateWhatsappGroupId(
+  input: string | null | undefined
+): { ok: boolean; value: string | null; error?: string } {
+  if (input == null) return { ok: true, value: null }
+  let s = String(input).replace(/[*\s]+/g, '')
+  if (s === '') return { ok: true, value: null }
+  if (/^\d{15,25}$/.test(s)) s = `${s}@g.us`           // bare digits → group jid
+  s = s.replace(/@g\.us$/i, '@g.us')                    // normalise domain case
+  if (/@(s\.whatsapp\.net|c\.us)$/i.test(s)) {
+    return { ok: false, value: null, error: 'That looks like a personal number, not a WhatsApp group. A group ID ends in @g.us and starts 120363…' }
+  }
+  if (/^120363\d{6,}@g\.us$/i.test(s)) return { ok: true, value: s }   // modern
+  if (/^\d{5,}-\d{5,}@g\.us$/i.test(s)) return { ok: true, value: s }  // legacy
+  return {
+    ok: false,
+    value: null,
+    error: "That doesn't look like a valid WhatsApp group ID — they normally start 120363…@g.us. Re-copy it from the group, or send any message in the group and the bot will reply with the correct ID.",
+  }
+}
+
 function normaliseWhatsappGroupId(input: string | null | undefined): string | null {
-  if (!input) return null
-  const cleaned = input.replace(/^[*\s]+|[*\s]+$/g, '')
-  return cleaned.length > 0 ? cleaned : null
+  // Safety net for internal callers: drop anything that isn't a valid group id
+  // rather than persist a dud. Routes should validate first for a clear message.
+  return validateWhatsappGroupId(input).value
 }
 
 export async function createProgramme(data: ProgrammeData) {

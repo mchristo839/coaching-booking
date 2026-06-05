@@ -1117,10 +1117,43 @@ export async function getCampBookingForCoach(bookingId: string, coachId: string)
 //  • Parent reported payment but the coach hasn't confirmed → remind the coach
 //    at +24h, +48h, and reassure the parent once.
 
-export interface CampChaseResult { parentNudged: number; coachReminded: number; errors: string[] }
+export interface CampChaseResult { parentNudged: number; coachReminded: number; voterFlagged: number; errors: string[] }
 
 export async function runCampChase(): Promise<CampChaseResult> {
-  const result: CampChaseResult = { parentNudged: 0, coachReminded: 0, errors: [] }
+  const result: CampChaseResult = { parentNudged: 0, coachReminded: 0, voterFlagged: 0, errors: [] }
+
+  // ── Stranded Yes voters ──
+  // A poll-YES opens a booking keyed to the voter's group @lid; the bot can't
+  // reliably DM a @lid, so some voters never get taken through booking (they sit
+  // at the opening step with no reply). Auto-flag the coach so a human reaches
+  // out — a Yes is never silently dropped. One flag per booking.
+  try {
+    const { rows } = await sql`
+      SELECT cb.id, cb.parent_name, cb.promotion_id, cb.programme_id, p.title AS camp_title
+      FROM camp_bookings cb
+      JOIN promotions p ON p.id = cb.promotion_id
+      WHERE cb.parent_jid LIKE '%@lid'
+        AND cb.conversation_step IN ('awaiting_parent_name','awaiting_child_name')
+        AND cb.state NOT IN ('confirmed','cancelled','expired')
+        AND cb.child_name IS NULL
+        AND cb.voter_flagged_at IS NULL
+        AND cb.created_at < NOW() - INTERVAL '2 hours'
+        AND cb.created_at > NOW() - INTERVAL '7 days'`
+    for (const r of rows) {
+      const programmeId = await resolveProgrammeId(r.promotion_id, r.programme_id)
+      if (!programmeId) continue
+      try {
+        const recipients = await getInternalRecipients(programmeId)
+        const msg = `🙋 ${r.parent_name || 'A parent'} voted YES for ${r.camp_title || 'the camp'} but I haven't been able to take them through booking (their reply isn't reaching me). Could you message them directly to get them booked in? Thanks!`
+        let dmd = false
+        for (const rec of recipients) {
+          if (rec.whatsappJid) { try { await sendWhatsAppMessage(rec.whatsappJid, msg); dmd = true } catch { /* logged via errors below */ } }
+        }
+        await sql`UPDATE camp_bookings SET voter_flagged_at = NOW(), updated_at = NOW() WHERE id = ${r.id}`
+        if (dmd) result.voterFlagged++
+      } catch (e) { result.errors.push(`voter flag ${r.id}: ${e instanceof Error ? e.message : String(e)}`) }
+    }
+  } catch (e) { result.errors.push(`voter query: ${e instanceof Error ? e.message : String(e)}`) }
 
   // ── Parent unpaid ──
   try {

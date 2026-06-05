@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createProgramme, createFaqsBulk, updateProvider, findCoachById, findCoachByProviderId, type ProgrammeData } from '@/app/lib/db'
+import { createProgramme, createFaqsBulk, updateProvider, findCoachById, findCoachByProviderId, validateWhatsappGroupId, type ProgrammeData } from '@/app/lib/db'
 import { getAuthFromRequest, signJwt, setAuthCookie } from '@/app/lib/auth'
 
 export async function POST(request: NextRequest) {
@@ -33,6 +33,14 @@ export async function POST(request: NextRequest) {
     const programmeName = rest.programmeName || rest.name
     if (!programmeName) {
       return NextResponse.json({ error: 'Programme name is required' }, { status: 400 })
+    }
+
+    // Reject a mistyped WhatsApp group id at entry (with a clear message) so it
+    // can never go live and silently fail every send.
+    if (rest.whatsappGroupId) {
+      const g = validateWhatsappGroupId(rest.whatsappGroupId)
+      if (!g.ok) return NextResponse.json({ error: g.error }, { status: 400 })
+      rest.whatsappGroupId = g.value
     }
 
     // Map registration form field names → db field names
