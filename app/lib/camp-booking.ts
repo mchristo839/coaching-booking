@@ -233,7 +233,7 @@ async function pickAdoptableLidBooking(senderName?: string | null): Promise<Camp
        AND cb.conversation_step IN ('awaiting_parent_name','awaiting_child_name')
        AND cb.state NOT IN ('confirmed','cancelled','expired')
        AND cb.expires_at > NOW()
-       AND cb.created_at > NOW() - INTERVAL '6 hours'
+       AND cb.created_at > NOW() - INTERVAL '48 hours'
      ORDER BY cb.created_at DESC`,
     []
   )
@@ -836,6 +836,12 @@ export async function tryHandleCampBookingReply(
         if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
         const name = messageText.trim()
         if (!name) { await sendWhatsAppMessage(senderJid, `What's your child's first name?`); return true }
+        // "I have 2 children" / "two kids" — don't store that as a name. We book
+        // siblings one at a time (add more at checkout), so ask for the first.
+        if (/\b(\d+|two|three|four|a couple|multiple|several)\s+(children|kids|boys|girls|of them)\b/i.test(name) || /\bi have\b.*\b(children|kids)\b/i.test(name)) {
+          await sendWhatsAppMessage(senderJid, `No problem — we'll add them one at a time (you can book the others right after). What's your *first* child's first name?`)
+          return true
+        }
         await setChildName(booking.id, name)
         // Store the client the moment we have a child name (enriched later).
         booking.child_name = name
@@ -1286,8 +1292,10 @@ export async function tryHandleCoachCampConfirm(senderJid: string, messageText: 
 
 // ─── Automatic cleanup of stuck bookings (run by the daily cron) ───
 // Abandoned mid-sign-up (pre-payment) → expire after 12h of inactivity.
-// Unpaid after the chase ladder → expire after 72h. Coach-pending bookings are
-// left alone (the coach chase reminds them), and confirmed are never touched.
+// Unpaid after the chase ladder → expire after 72h. Pre-payment collection is
+// given 48h (covers an overnight gap — parents often vote in the evening and
+// reply next morning). Coach-pending bookings are left alone (the coach chase
+// reminds them), and confirmed are never touched.
 // This stops abandoned conversations piling up and interfering with new ones.
 export interface CampCleanupResult { expired: number }
 
@@ -1298,7 +1306,7 @@ export async function runCampCleanup(): Promise<CampCleanupResult> {
     WHERE state NOT IN ('confirmed','cancelled','expired')
       AND COALESCE(conversation_step, 'awaiting_day_selection') <> 'awaiting_coach_confirm'
       AND (
-        (COALESCE(conversation_step, 'collecting') <> 'awaiting_payment' AND updated_at < NOW() - INTERVAL '12 hours')
+        (COALESCE(conversation_step, 'collecting') <> 'awaiting_payment' AND updated_at < NOW() - INTERVAL '48 hours')
         OR (conversation_step = 'awaiting_payment' AND updated_at < NOW() - INTERVAL '72 hours')
       )
     RETURNING id`
