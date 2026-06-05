@@ -825,6 +825,51 @@ export function parseAffirmative(text: string): boolean {
   return /^(y|yes|yep|yeah|yes please|ok|okay|sure|go on|please|👍|✅)\b/.test(t) || t === '👍' || t === '✅'
 }
 
+// Explicit "no / not yet".
+export function parseNegative(text: string): boolean {
+  const t = text.trim().toLowerCase()
+  return /^(n|no|nope|not yet|not now|later|maybe later|not right now|nah)\b/.test(t) || t === '❌'
+}
+
+// Reply to the "ready to pay & confirm? (Yes / No / Amend)" reminder.
+export type ReminderReply = 'yes' | 'no' | 'amend' | 'unknown'
+export function parseReminderReply(text: string): ReminderReply {
+  const t = text.trim().toLowerCase()
+  if (!t) return 'unknown'
+  if (/\b(amend|change|edit|update|different|swap|adjust)\b/.test(t)) return 'amend'
+  if (parseAffirmative(t)) return 'yes'
+  if (parseNegative(t)) return 'no'
+  return 'unknown'
+}
+
+// ─── "Ready to pay now?" gate + remind-in-a-few-days flow ───
+
+export function buildCampAskPaymentReady(): string {
+  return `Brilliant — that's everything I need! 🙌\n\nAre you ready to make payment now to confirm the spot? (Yes / No)`
+}
+export function buildCampAskRemindConsent(): string {
+  return `No problem at all! Shall I give you a nudge in a few days? (Yes / No)`
+}
+export function buildCampRemindSetAck(): string {
+  return `Great — I'll check back in with you in a few days. 👍\n\nIf you'd like to go ahead sooner, just message me here anytime.`
+}
+export function buildCampSnoozeAck(): string {
+  return `No worries — just message me here whenever you're ready and I'll get you booked in. 👍`
+}
+
+// The 72h reminder (sent by the chase cron). Itemised so they know what they're confirming.
+export function buildCampReminder(input: { children: CampChildSummary[]; campName: string }): string {
+  const total = input.children.reduce((s, c) => s + c.total, 0)
+  const lines = input.children.map(
+    (c) => `• ${c.childName}${c.age != null ? ` (age ${c.age})` : ''} — ${c.dayLabels.join(', ')} — £${c.total.toFixed(2)}`
+  )
+  return (
+    `Hi! Just checking back in 👋 Are you ready to make payment and confirm your spot for ${input.campName}?\n\n` +
+    `${lines.join('\n')}\nTotal: £${total.toFixed(2)}\n\n` +
+    `Reply *Yes* to go ahead, *No* if not yet, or *Amend* to change the days.`
+  )
+}
+
 // ─── Sign-up details collected before payment ───
 
 export function buildCampAskRegName(childName: string): string {
