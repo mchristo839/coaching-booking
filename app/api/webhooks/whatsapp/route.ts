@@ -10,7 +10,7 @@ import {
 import { notifyCoachHandoff } from '@/app/lib/notify'
 import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId, optOutMemberByJid } from '@/app/lib/control-centre-db'
 import { tryHandleFeedbackReply } from '@/app/lib/feedback'
-import { tryHandleCampBookingReply, startCampBookingFromPoll, tryHandleCoachCampConfirm, getActiveCampForProgramme, answerGroupCampQuestion } from '@/app/lib/camp-booking'
+import { tryHandleCampBookingReply, startCampBookingFromPoll, tryHandleCoachCampConfirm, getActiveCampForProgramme, answerGroupCampQuestion, looksLikeBookingRequest } from '@/app/lib/camp-booking'
 import { matchActiveFaq } from '@/app/lib/faq-learning'
 import { tryHandlePtBookingReply } from '@/app/lib/calendar'
 import { tryHandleCancellationReply } from '@/app/lib/cancellation'
@@ -661,6 +661,33 @@ export async function POST(request: NextRequest) {
         escalated,
       })
       return NextResponse.json({ ok: true })
+    }
+
+    // ─── Group → booking-link request → start the 1:1 booking (Route 2) ───
+    // When there's a live bookable camp, ANY message that reads as "how do I
+    // book / send me the booking link / can I sign up / book a place" kicks off
+    // the 1:1 booking conversation and DMs the parent the link. This runs BEFORE
+    // the question gate so non-questions ("Booking link", "Send me the link")
+    // trigger it too — and ahead of the availability answer so the bot actually
+    // delivers the link instead of routing the parent to the coach. The booking
+    // link itself is NEVER posted in the group — it only ever goes out in the DM.
+    if (activeCamp && looksLikeBookingRequest(cleanedText)) {
+      let started = false
+      try {
+        started = await startCampBookingFromPoll(activeCamp.id, senderJid, senderName, program.id)
+      } catch (e) {
+        console.error('[group booking-request] start failed:', e)
+      }
+      if (started) {
+        const ack = "Great — I've just sent you a DM to get you booked in 👍"
+        const { isDuplicate: dupBook } = await trackBotReply(groupJid, 'booking_request', messageId)
+        if (!dupBook) await sendWhatsAppMessage(groupJid, ack)
+        await safeLogConversation({
+          programmeId: program.id, groupJid, senderJid, senderName, messageText,
+          botResponse: ack, category: 'booking_request', escalated,
+        })
+        return NextResponse.json({ ok: true })
+      }
     }
 
     // ─── Reply ONLY to a question the bot can answer ───
