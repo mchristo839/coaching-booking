@@ -123,6 +123,17 @@ function isBotMentioned(messageText: string, mentionedJids: string[]): boolean {
   return false
 }
 
+// Dedup key for the 10s duplicate-reply guard on ANSWER paths. Keyed on the
+// INBOUND message text (normalised), not the answer category — so two different
+// questions (or two parents) that need the same kind of answer each get a reply,
+// while a genuine re-delivery of the exact same message is still collapsed.
+// (True webhook redelivery by message-ID is already caught upstream by
+// processed_messages; this is the secondary guard.)
+function replyDedupKey(text: string): string {
+  const norm = (text || '').toLowerCase().replace(/\s+/g, ' ').trim()
+  return 'ans:' + createHash('sha256').update(norm).digest('hex').slice(0, 16)
+}
+
 /** Simple category classification based on message content */
 function classifyMessage(text: string): { category: string; escalated: boolean } {
   const lower = text.toLowerCase()
@@ -720,7 +731,7 @@ export async function POST(request: NextRequest) {
     ) {
       const campAns = await answerGroupCampQuestion(activeCamp.id, cleanedText, program.program_name)
       if (campAns) {
-        const { isDuplicate: dupCampQ } = await trackBotReply(groupJid, 'answer_camp', messageId)
+        const { isDuplicate: dupCampQ } = await trackBotReply(groupJid, replyDedupKey(cleanedText), messageId)
         if (dupCampQ) return NextResponse.json({ ok: true })
         await sendWhatsAppMessage(groupJid, campAns)
         await safeLogConversation({ programmeId: program.id, groupJid, senderJid, senderName, messageText, botResponse: campAns, category: 'answer_camp', escalated })
@@ -789,7 +800,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const { isDuplicate } = await trackBotReply(groupJid, logCategory, messageId)
+    const { isDuplicate } = await trackBotReply(groupJid, replyDedupKey(cleanedText), messageId)
     if (isDuplicate) return NextResponse.json({ ok: true })
 
     await sendWhatsAppMessage(groupJid, reply)
