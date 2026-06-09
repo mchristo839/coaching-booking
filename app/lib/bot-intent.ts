@@ -148,12 +148,16 @@ function intentFacts(intent: AllowedIntent, kb: Knowledgebase): string | null {
       return kb.priceCents > 0 ? `Price: £${(kb.priceCents / 100).toFixed(2)} per session` : null
     case 'payment':
       return clean(kb.paymentMethod) ? `How to pay: ${clean(kb.paymentMethod)}` : null
-    case 'duration':
-      return clean(kb.duration)
-        ? `Session length: ${clean(kb.duration)}`
-        : clean(kb.schedule)
-          ? `Schedule (includes duration): ${clean(kb.schedule)}`
-          : null
+    case 'duration': {
+      // Both "how long is a session" AND "what time does it start" classify as
+      // duration. Surface the schedule (days + start time) alongside the length
+      // so the start time isn't hidden behind the duration value.
+      const parts = [
+        clean(kb.schedule) ? `Schedule: ${clean(kb.schedule)}` : '',
+        clean(kb.duration) ? `Session length: ${clean(kb.duration)}` : '',
+      ].filter(Boolean)
+      return parts.length ? parts.join('. ') : null
+    }
     case 'session_type':
       return clean(kb.sessionType) ? `What a session is: ${clean(kb.sessionType)}` : null
     case 'holiday_camps':
