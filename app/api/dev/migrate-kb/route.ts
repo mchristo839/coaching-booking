@@ -110,6 +110,35 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
+
+    // ── Direct set mode: write explicit {column: value} pairs onto a target ──
+    // Used to fix data-entry errors (e.g. a corrupted venue_address) and fill
+    // genuinely-empty bot fields (camp_schedule, payment_method) that aren't
+    // present in any source record. Allowlisted columns only. dryRun by default.
+    if (body.set && typeof body.set === 'object') {
+      const targetId = String(body.targetId || '')
+      const dryRun = body.dryRun !== false
+      if (!targetId) return NextResponse.json({ error: 'targetId required' }, { status: 400 })
+      const tgt = await sql.query(`SELECT * FROM programmes WHERE id = $1`, [targetId])
+      if (tgt.rows.length === 0) return NextResponse.json({ error: 'target not found' }, { status: 404 })
+      const target = tgt.rows[0]
+
+      const setObj = body.set as Record<string, unknown>
+      const cols = Object.keys(setObj).filter((c) => V2_KB_COLUMNS.includes(c))
+      const rejected = Object.keys(setObj).filter((c) => !V2_KB_COLUMNS.includes(c))
+      const changes: Record<string, { from: unknown; to: unknown }> = {}
+      for (const c of cols) changes[c] = { from: target[c], to: setObj[c] }
+
+      if (dryRun) {
+        return NextResponse.json({ dryRun: true, mode: 'set', targetId, changes, rejectedColumns: rejected, note: 'Nothing written. Re-POST with "dryRun": false to apply.' })
+      }
+      if (cols.length > 0) {
+        const sets = cols.map((c, i) => `${c} = $${i + 1}`).join(', ')
+        await sql.query(`UPDATE programmes SET ${sets}, updated_at = NOW() WHERE id = $${cols.length + 1}`, [...cols.map((c) => setObj[c]), targetId])
+      }
+      return NextResponse.json({ applied: true, mode: 'set', targetId, updatedColumns: cols, rejectedColumns: rejected })
+    }
+
     const sourceTable: 'programmes' | 'programs' = body.sourceTable === 'programs' ? 'programs' : 'programmes'
     const sourceId = String(body.sourceId || '')
     const targetId = String(body.targetId || '')
