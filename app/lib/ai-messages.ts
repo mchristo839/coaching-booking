@@ -686,16 +686,33 @@ export function buildCampOpening(campName: string, parentFirstName: string | nul
 
 // Message 1b — when a group has more than one bookable camp (e.g. a July and an
 // August week), the parent picks which one before we collect any details.
-export function buildCampChoice(camps: { title: string | null }[], parentFirstName: string | null): string {
+export function buildCampChoice(
+  camps: { title: string | null; dateLabel?: string | null }[],
+  parentFirstName: string | null
+): string {
   const greeting = parentFirstName ? `Hi ${parentFirstName}! 👋` : 'Hi! 👋'
-  const lines = camps.map((c, i) => `${i + 1}️⃣ ${c.title || `Camp ${i + 1}`}`)
+  // If two camps share a title, append their dates so they're distinguishable.
+  const titleCounts = new Map<string, number>()
+  for (const c of camps) {
+    const k = (c.title || '').trim().toLowerCase()
+    titleCounts.set(k, (titleCounts.get(k) || 0) + 1)
+  }
+  const lines = camps.map((c, i) => {
+    const title = c.title || `Camp ${i + 1}`
+    const dupTitle = (titleCounts.get((c.title || '').trim().toLowerCase()) || 0) > 1
+    const suffix = dupTitle && c.dateLabel ? ` — ${c.dateLabel}` : ''
+    return `${i + 1}️⃣ ${title}${suffix}`
+  })
   return `${greeting} We've got more than one camp coming up — which would you like to book?\n\n${lines.join('\n')}\n\nJust reply with the number.`
 }
 
 // Parse a camp-choice reply: a 1-based number ("1", "2)", "option 2"), a letter
 // ("a"/"b"), or a clear match on the camp's title / month name. Returns the index
 // into `camps`, or null when it can't tell confidently.
-export function parseCampChoice(text: string, camps: { title: string | null }[]): number | null {
+export function parseCampChoice(
+  text: string,
+  camps: { title: string | null; dateLabel?: string | null }[]
+): number | null {
   const t = (text || '').trim().toLowerCase()
   if (!t || camps.length === 0) return null
 
@@ -711,13 +728,15 @@ export function parseCampChoice(text: string, camps: { title: string | null }[])
     const idx = letter[1].charCodeAt(0) - 97
     if (idx >= 0 && idx < camps.length) return idx
   }
-  // Title / month substring match — only accept when EXACTLY one camp matches.
+  // Title / month substring match — match against the title AND the date label
+  // (months often live in the dates), and only accept when EXACTLY one matches.
   const matches: number[] = []
   camps.forEach((c, i) => {
+    const hay = `${c.title || ''} ${c.dateLabel || ''}`.toLowerCase().trim()
+    if (!hay) return
     const title = (c.title || '').toLowerCase()
-    if (!title) return
-    if (t.includes(title) || (t.length >= 3 && title.includes(t))) { matches.push(i); return }
-    const months = title.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/g) || []
+    if ((title && t.includes(title)) || (t.length >= 3 && hay.includes(t))) { matches.push(i); return }
+    const months = hay.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/g) || []
     if (months.some((m) => t.includes(m))) matches.push(i)
   })
   return matches.length === 1 ? matches[0] : null

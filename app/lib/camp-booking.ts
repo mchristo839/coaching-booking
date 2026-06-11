@@ -1672,12 +1672,18 @@ export async function getActiveCampForProgramme(programmeId: string): Promise<{ 
 // ALL live bookable camps for a programme/group, oldest first (so an earlier
 // camp — e.g. July — is option 1 ahead of a later one — e.g. August). Used to
 // offer the parent a choice when a group is running more than one camp at once.
+//
+// Deduped two ways so a parent NEVER sees the same camp listed twice:
+//  • DISTINCT ON (p.id) — a promotion with more than one promotion_targets row
+//    for this programme would otherwise join to multiple rows.
+//  • By content signature (title + days) — accidental duplicate promotions
+//    (e.g. a triple-submit of the camp builder) collapse to a single choice.
 export async function getActiveCampsForProgramme(
   programmeId: string
-): Promise<{ id: string; title: string | null }[]> {
+): Promise<{ id: string; title: string | null; dateLabel: string | null }[]> {
   if (!programmeId) return []
   const { rows } = await sql`
-    SELECT p.id, p.title
+    SELECT DISTINCT ON (p.id) p.id, p.title, p.camp_days, p.created_at
     FROM promotions p
     JOIN promotion_targets pt ON pt.promotion_id = p.id
     WHERE pt.programme_id = ${programmeId}
@@ -1685,9 +1691,29 @@ export async function getActiveCampsForProgramme(
       AND p.status <> 'cancelled'
       AND p.camp_days IS NOT NULL
       AND p.payment_link IS NOT NULL
-    ORDER BY p.created_at ASC
+    ORDER BY p.id, p.created_at ASC
   `
-  return rows.map((r) => ({ id: r.id as string, title: (r.title as string) ?? null }))
+  type Row = { id: string; title: string | null; camp_days: CampDay[] | null; created_at: string }
+  const seen = new Set<string>()
+  const out: Row[] = []
+  for (const r of rows as Row[]) {
+    const sig = `${(r.title || '').trim().toLowerCase()}|${JSON.stringify(r.camp_days || [])}`
+    if (seen.has(sig)) continue
+    seen.add(sig)
+    out.push(r)
+  }
+  out.sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
+  return out.map((r) => ({ id: r.id, title: r.title ?? null, dateLabel: campDateLabel(r.camp_days) }))
+}
+
+// A compact "first day – last day" label from a camp's days, used to tell two
+// same-titled camps apart in the choice prompt.
+function campDateLabel(days: CampDay[] | null): string | null {
+  if (!Array.isArray(days) || days.length === 0) return null
+  const first = days[0]?.label || days[0]?.date || null
+  const last = days[days.length - 1]?.label || days[days.length - 1]?.date || null
+  if (!first) return null
+  return last && last !== first ? `${first} – ${last}` : first
 }
 
 export async function recordCampOffer(groupJid: string, senderJid: string, promotionId: string): Promise<void> {
