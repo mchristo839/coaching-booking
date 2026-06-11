@@ -56,6 +56,30 @@ export async function GET(request: NextRequest) {
   if (!isAuthorised(request)) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
+
+  // ?camps=1 → also dump every holiday-camp promotion (title, dates, status,
+  // payment link, which programmes it targets) + the programme→group mapping, so
+  // we can see why a parent is/isn't offered a given camp.
+  if (new URL(request.url).searchParams.get('camps')) {
+    const camps = (
+      await sql.query(`
+        SELECT p.id, p.title, p.status, p.payment_link IS NOT NULL AS has_payment_link,
+               p.camp_days, p.created_at::text AS created_at,
+               COALESCE(array_agg(pt.programme_id) FILTER (WHERE pt.programme_id IS NOT NULL), '{}') AS programme_ids
+          FROM promotions p
+          LEFT JOIN promotion_targets pt ON pt.promotion_id = p.id
+         WHERE p.promotion_type = 'holiday_camp'
+         GROUP BY p.id
+         ORDER BY p.created_at`)
+    ).rows
+    const programmes = (
+      await sql.query(
+        `SELECT id, programme_name, whatsapp_group_id, is_active FROM programmes ORDER BY programme_name`
+      )
+    ).rows
+    return NextResponse.json({ camps, programmes })
+  }
+
   const { rows } = await sql.query(
     `SELECT ${COLS}
        FROM camp_bookings cb
