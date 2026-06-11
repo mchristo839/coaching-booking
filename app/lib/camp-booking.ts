@@ -38,6 +38,8 @@ import {
   isValidEmail,
   parsePhoneNumber,
   buildCampOpening,
+  buildCampChoice,
+  parseCampChoice,
   buildCampAskChildName,
   buildCampAskAge,
   buildCampAgeRetry,
@@ -83,6 +85,11 @@ export type CampBookingState =
 
 // Fine-grained conversation position (the new state machine driver).
 export type CampStep =
+  // Privacy-LID primer: we couldn't DM the parent in the group, so the booking
+  // waits here until their first 1:1 DM (adopted by name) triggers the opening.
+  | 'awaiting_dm_start'
+  // More than one bookable camp for the group — parent picks which one first.
+  | 'awaiting_camp_selection'
   | 'awaiting_parent_name'
   | 'awaiting_child_name'
   | 'awaiting_child_age'
@@ -241,7 +248,7 @@ async function pickAdoptableLidBooking(senderName?: string | null): Promise<Camp
      FROM camp_bookings cb
      JOIN promotions p ON p.id = cb.promotion_id
      WHERE cb.parent_jid LIKE '%@lid'
-       AND cb.conversation_step IN ('awaiting_parent_name','awaiting_child_name')
+       AND cb.conversation_step IN ('awaiting_dm_start','awaiting_camp_selection','awaiting_parent_name','awaiting_child_name')
        AND cb.state NOT IN ('confirmed','cancelled','expired')
        AND cb.expires_at > NOW()
        AND cb.created_at > NOW() - INTERVAL '48 hours'
@@ -476,6 +483,61 @@ export async function startCampBookingFromPoll(
   })
   await sendWhatsAppMessage(voterJid, buildCampOpening(promo.title || 'the camp', parentFirst))
   return true
+}
+
+// Start a 1:1 booking from a GROUP booking-request (Route 2), resolving which
+// camp(s) the group has live. Idempotent per parent. Behaviour:
+//  • 0 live camps → returns false (nothing to book).
+//  • Privacy @lid sender → opens a primer booking only (we can't DM them); the
+//    caller posts a "DM me first" nudge in the group. Their first DM is adopted
+//    by name and the opening is sent then.
+//  • 1 live camp → opens the booking and DMs the opening.
+//  • >1 live camps → opens the booking at the camp-selection step and DMs the
+//    "which camp?" choice first.
+// Returns true when a booking exists/was created (so the caller can ack).
+export async function startCampBooking(
+  programmeId: string,
+  senderJid: string,
+  senderName?: string | null
+): Promise<boolean> {
+  const camps = await getActiveCampsForProgramme(programmeId)
+  if (camps.length === 0) return false
+
+  // Idempotency — don't open a second booking if one's already in flight.
+  const existing = await findOpenCampBooking(senderJid)
+  if (existing) return true
+
+  const isLid = senderJid.endsWith('@lid')
+  const member = await findMemberByJid(senderJid)
+  const parentName = member?.parent_name || (senderName && senderName !== 'there' ? senderName : null)
+  const parentFirst = parentName ? parentName.split(/\s+/)[0] : null
+  const base = {
+    promotionId: camps[0].id,
+    programmeId,
+    parentJid: senderJid,
+    parentName,
+    memberId: member?.id || null,
+  }
+
+  if (isLid) {
+    await createCampBooking({ ...base, startStep: 'awaiting_dm_start' })
+    return true
+  }
+
+  if (camps.length === 1) {
+    await createCampBooking({ ...base, startStep: parentName ? 'awaiting_child_name' : 'awaiting_parent_name' })
+    const promo = await getCampPromotion(camps[0].id)
+    await sendWhatsAppMessage(senderJid, buildCampOpening(promo?.title || 'the camp', parentFirst))
+    return true
+  }
+
+  await createCampBooking({ ...base, startStep: 'awaiting_camp_selection' })
+  await sendWhatsAppMessage(senderJid, buildCampChoice(camps, parentFirst))
+  return true
+}
+
+async function setBookingPromotion(id: string, promotionId: string) {
+  await sql`UPDATE camp_bookings SET promotion_id = ${promotionId}, updated_at = NOW() WHERE id = ${id}`
 }
 
 // Resolve the programme to register a member under: the booking's own
@@ -875,6 +937,48 @@ export async function tryHandleCampBookingReply(
     }
 
     switch (step) {
+      case 'awaiting_dm_start': {
+        // The parent we couldn't DM in the group has now messaged us first (this
+        // booking was just adopted onto their phone JID). Re-resolve the live
+        // camps and send the proper opening — never treat this first DM as data.
+        const camps = await getActiveCampsForProgramme(booking.programme_id || '')
+        if (camps.length === 0) {
+          await setStep(booking.id, 'cancelled')
+          await sendWhatsAppMessage(senderJid, `Thanks for messaging! Those camps aren't open for booking anymore, but I'll let the coach know you were interested. 🙏`)
+          return true
+        }
+        if (camps.length > 1) {
+          await setStep(booking.id, 'awaiting_camp_selection')
+          await sendWhatsAppMessage(senderJid, buildCampChoice(camps, parentFirst || null))
+          return true
+        }
+        await setBookingPromotion(booking.id, camps[0].id)
+        await setStep(booking.id, booking.parent_name ? 'awaiting_child_name' : 'awaiting_parent_name')
+        const onlyPromo = await getCampPromotion(camps[0].id)
+        await sendWhatsAppMessage(senderJid, buildCampOpening(onlyPromo?.title || 'the camp', parentFirst || null))
+        return true
+      }
+
+      case 'awaiting_camp_selection': {
+        const camps = await getActiveCampsForProgramme(booking.programme_id || '')
+        if (camps.length === 0) {
+          await setStep(booking.id, 'cancelled')
+          await sendWhatsAppMessage(senderJid, `Sorry — those camps aren't open for booking anymore. I'll let the coach know you were interested. 🙏`)
+          return true
+        }
+        // Collapsed to one (the other filled/closed) — just proceed with it.
+        const pick = camps.length === 1 ? 0 : parseCampChoice(messageText, camps)
+        if (pick == null) {
+          await sendWhatsAppMessage(senderJid, buildCampChoice(camps, parentFirst || null))
+          return true
+        }
+        await setBookingPromotion(booking.id, camps[pick].id)
+        await setStep(booking.id, booking.parent_name ? 'awaiting_child_name' : 'awaiting_parent_name')
+        const chosenPromo = await getCampPromotion(camps[pick].id)
+        await sendWhatsAppMessage(senderJid, buildCampOpening(chosenPromo?.title || 'the camp', parentFirst || null))
+        return true
+      }
+
       case 'awaiting_parent_name': {
         if (looksLikeCampQuestion(messageText) && await answerCampQuestionMidFlow(booking, promo, dayList, messageText, senderJid, step)) return true
         const name = messageText.trim()
@@ -1563,6 +1667,27 @@ export async function getActiveCampForProgramme(programmeId: string): Promise<{ 
     LIMIT 1
   `
   return rows[0] ? { id: rows[0].id as string, title: (rows[0].title as string) ?? null } : null
+}
+
+// ALL live bookable camps for a programme/group, oldest first (so an earlier
+// camp — e.g. July — is option 1 ahead of a later one — e.g. August). Used to
+// offer the parent a choice when a group is running more than one camp at once.
+export async function getActiveCampsForProgramme(
+  programmeId: string
+): Promise<{ id: string; title: string | null }[]> {
+  if (!programmeId) return []
+  const { rows } = await sql`
+    SELECT p.id, p.title
+    FROM promotions p
+    JOIN promotion_targets pt ON pt.promotion_id = p.id
+    WHERE pt.programme_id = ${programmeId}
+      AND p.promotion_type = 'holiday_camp'
+      AND p.status <> 'cancelled'
+      AND p.camp_days IS NOT NULL
+      AND p.payment_link IS NOT NULL
+    ORDER BY p.created_at ASC
+  `
+  return rows.map((r) => ({ id: r.id as string, title: (r.title as string) ?? null }))
 }
 
 export async function recordCampOffer(groupJid: string, senderJid: string, promotionId: string): Promise<void> {

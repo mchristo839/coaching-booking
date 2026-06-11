@@ -684,6 +684,45 @@ export function buildCampOpening(campName: string, parentFirstName: string | nul
   return `Hey ${parentFirstName}! 👋 Great that you're interested in ${campName}.\n\nLet me get your child booked in — takes about a minute.\n\nWhat's your child's first name?`
 }
 
+// Message 1b — when a group has more than one bookable camp (e.g. a July and an
+// August week), the parent picks which one before we collect any details.
+export function buildCampChoice(camps: { title: string | null }[], parentFirstName: string | null): string {
+  const greeting = parentFirstName ? `Hi ${parentFirstName}! 👋` : 'Hi! 👋'
+  const lines = camps.map((c, i) => `${i + 1}️⃣ ${c.title || `Camp ${i + 1}`}`)
+  return `${greeting} We've got more than one camp coming up — which would you like to book?\n\n${lines.join('\n')}\n\nJust reply with the number.`
+}
+
+// Parse a camp-choice reply: a 1-based number ("1", "2)", "option 2"), a letter
+// ("a"/"b"), or a clear match on the camp's title / month name. Returns the index
+// into `camps`, or null when it can't tell confidently.
+export function parseCampChoice(text: string, camps: { title: string | null }[]): number | null {
+  const t = (text || '').trim().toLowerCase()
+  if (!t || camps.length === 0) return null
+
+  // Numeric pick (1..N).
+  const num = t.match(/\b([1-9])\b/)
+  if (num) {
+    const idx = parseInt(num[1], 10) - 1
+    if (idx >= 0 && idx < camps.length) return idx
+  }
+  // Letter pick (a/b/c…), only as a bare leading token.
+  const letter = t.match(/^([a-z])\b/)
+  if (letter) {
+    const idx = letter[1].charCodeAt(0) - 97
+    if (idx >= 0 && idx < camps.length) return idx
+  }
+  // Title / month substring match — only accept when EXACTLY one camp matches.
+  const matches: number[] = []
+  camps.forEach((c, i) => {
+    const title = (c.title || '').toLowerCase()
+    if (!title) return
+    if (t.includes(title) || (t.length >= 3 && title.includes(t))) { matches.push(i); return }
+    const months = title.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/g) || []
+    if (months.some((m) => t.includes(m))) matches.push(i)
+  })
+  return matches.length === 1 ? matches[0] : null
+}
+
 export function buildCampAskChildName(parentFirstName: string | null): string {
   const name = parentFirstName ? ` ${parentFirstName}` : ''
   return `Lovely to meet you${name}! And what's your child's first name?`
