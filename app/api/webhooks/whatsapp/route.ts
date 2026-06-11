@@ -10,7 +10,7 @@ import {
 import { notifyCoachHandoff } from '@/app/lib/notify'
 import { getActivePollForGroup, recordPollResponse, getPollByWaMessageId, optOutMemberByJid } from '@/app/lib/control-centre-db'
 import { tryHandleFeedbackReply } from '@/app/lib/feedback'
-import { tryHandleCampBookingReply, startCampBookingFromPoll, tryHandleCoachCampConfirm, getActiveCampForProgramme, answerGroupCampQuestion, looksLikeBookingRequest } from '@/app/lib/camp-booking'
+import { tryHandleCampBookingReply, startCampBookingFromPoll, startCampBooking, tryHandleCoachCampConfirm, getActiveCampForProgramme, answerGroupCampQuestion, looksLikeBookingRequest } from '@/app/lib/camp-booking'
 import { matchActiveFaq } from '@/app/lib/faq-learning'
 import { tryHandlePtBookingReply } from '@/app/lib/calendar'
 import { tryHandleCancellationReply } from '@/app/lib/cancellation'
@@ -132,6 +132,16 @@ function isBotMentioned(messageText: string, mentionedJids: string[]): boolean {
 function replyDedupKey(text: string): string {
   const norm = (text || '').toLowerCase().replace(/\s+/g, ' ').trim()
   return 'ans:' + createHash('sha256').update(norm).digest('hex').slice(0, 16)
+}
+
+// First name to greet a group member by — but only when pushName looks like a
+// real name. WhatsApp sometimes sends a bare LID number or nothing ("there"),
+// which we must not echo back as a name. Returns null when it's not usable.
+function displayFirstName(name: string | null | undefined): string | null {
+  const first = (name || '').trim().split(/\s+/)[0]
+  if (!first || first.toLowerCase() === 'there') return null
+  if (/^\d+$/.test(first)) return null
+  return first
 }
 
 /** Simple category classification based on message content */
@@ -685,17 +695,28 @@ export async function POST(request: NextRequest) {
     if (activeCamp && looksLikeBookingRequest(cleanedText)) {
       let started = false
       try {
-        started = await startCampBookingFromPoll(activeCamp.id, senderJid, senderName, program.id)
+        // Resolves the group's live camp(s): DMs the opening (or a "which camp?"
+        // choice when there's more than one), or — for a privacy @lid we can't DM
+        // — opens a primer booking we adopt when they message us first.
+        started = await startCampBooking(program.id, senderJid, senderName)
       } catch (e) {
         console.error('[group booking-request] start failed:', e)
       }
       if (started) {
-        const ack = "Great — I've just sent you a DM to get you booked in 👍"
-        const { isDuplicate: dupBook } = await trackBotReply(groupJid, 'booking_request', messageId)
+        // If we only know this parent by their privacy @lid, WhatsApp won't let us
+        // open a DM (the message silently goes nowhere). Ask them to message the
+        // bot first instead of falsely claiming we DM'd them.
+        const cannotDm = senderJid.endsWith('@lid')
+        const first = displayFirstName(senderName)
+        const ack = cannotDm
+          ? `${first ? `Hi ${first} —` : 'Hi —'} sorry, I can't message you directly right now (your WhatsApp privacy settings stop me starting a chat). If you send me a quick DM first (just tap my name and say hi), I'll get you booked straight in 👍`
+          : "Great — I've just sent you a DM to get you booked in 👍"
+        const category = cannotDm ? 'booking_request_lid' : 'booking_request'
+        const { isDuplicate: dupBook } = await trackBotReply(groupJid, category, messageId)
         if (!dupBook) await sendWhatsAppMessage(groupJid, ack)
         await safeLogConversation({
           programmeId: program.id, groupJid, senderJid, senderName, messageText,
-          botResponse: ack, category: 'booking_request', escalated,
+          botResponse: ack, category, escalated,
         })
         return NextResponse.json({ ok: true })
       }
