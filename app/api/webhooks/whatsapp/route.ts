@@ -123,6 +123,17 @@ function isBotMentioned(messageText: string, mentionedJids: string[]): boolean {
   return false
 }
 
+// Dedup key for the 10s duplicate-reply guard on ANSWER paths. Keyed on the
+// INBOUND message text (normalised), not the answer category — so two different
+// questions (or two parents) that need the same kind of answer each get a reply,
+// while a genuine re-delivery of the exact same message is still collapsed.
+// (True webhook redelivery by message-ID is already caught upstream by
+// processed_messages; this is the secondary guard.)
+function replyDedupKey(text: string): string {
+  const norm = (text || '').toLowerCase().replace(/\s+/g, ' ').trim()
+  return 'ans:' + createHash('sha256').update(norm).digest('hex').slice(0, 16)
+}
+
 /** Simple category classification based on message content */
 function classifyMessage(text: string): { category: string; escalated: boolean } {
   const lower = text.toLowerCase()
@@ -720,7 +731,7 @@ export async function POST(request: NextRequest) {
     ) {
       const campAns = await answerGroupCampQuestion(activeCamp.id, cleanedText, program.program_name)
       if (campAns) {
-        const { isDuplicate: dupCampQ } = await trackBotReply(groupJid, 'answer_camp', messageId)
+        const { isDuplicate: dupCampQ } = await trackBotReply(groupJid, replyDedupKey(cleanedText), messageId)
         if (dupCampQ) return NextResponse.json({ ok: true })
         await sendWhatsAppMessage(groupJid, campAns)
         await safeLogConversation({ programmeId: program.id, groupJid, senderJid, senderName, messageText, botResponse: campAns, category: 'answer_camp', escalated })
@@ -750,27 +761,46 @@ export async function POST(request: NextRequest) {
     if (plan.action === 'answer') {
       reply = await phraseAnswer(cleanedText, plan.facts, program.program_name, { allowVenueGeo: plan.intent === 'location' })
       logCategory = `answer_${plan.intent}`
+      // If the phrasing model judged the facts don't actually answer it, it
+      // returns the standard defer line. That's still an in-domain question, so
+      // we keep the defer reply — but DM the coach so it doesn't fall through.
+      if (/let me check that with the coach/i.test(reply)) {
+        logCategory = 'route_missing_data'
+        try {
+          await notifyCoachHandoff({ programmeId: program.id, parentName: senderName, question: cleanedText, reason: 'missing_data' })
+        } catch (e) { console.error('[HANDOFF notify] error:', e) }
+      }
     } else if (faqMatch) {
       // Answer from the coach's approved FAQ (phrased scoped to ONLY that answer).
       reply = await phraseAnswer(cleanedText, `Coach's approved answer: ${faqMatch.a}`, program.program_name)
       logCategory = 'answer_faq'
+    } else if (plan.reason === 'missing_data') {
+      // In-domain question (something the coach handles) but we have no data for
+      // it. Per the coach's rule: DON'T guess and DON'T go silent — reply that
+      // we'll check with the coach, and DM the coach so they can answer.
+      reply = 'Let me check that with the coach and come back to you.'
+      logCategory = 'route_missing_data'
+      try {
+        await notifyCoachHandoff({ programmeId: program.id, parentName: senderName, question: cleanedText, reason: 'missing_data' })
+      } catch (e) { console.error('[HANDOFF notify] error:', e) }
     } else {
-      // It's a question but the bot has no answer → stay SILENT in the group.
-      // DM the coach so they can answer: for in-scope gaps (missing data) and for
-      // anything the keyword classifier flagged as escalation.
-      if (plan.reason === 'missing_data' || escalated) {
+      // out_of_scope — off-topic, not something the coach assistant answers, or
+      // members just chatting amongst themselves → stay SILENT in the group.
+      // Still DM the coach if the keyword classifier flagged an escalation
+      // (injury / complaint / safeguarding) so it's never missed.
+      if (escalated) {
         try {
-          await notifyCoachHandoff({ programmeId: program.id, parentName: senderName, question: cleanedText, reason: plan.reason === 'missing_data' ? 'missing_data' : 'out_of_scope' })
+          await notifyCoachHandoff({ programmeId: program.id, parentName: senderName, question: cleanedText, reason: 'out_of_scope' })
         } catch (e) { console.error('[HANDOFF notify] error:', e) }
       }
       await safeLogConversation({
         programmeId: program.id, groupJid, senderJid, senderName, messageText,
-        botResponse: null, category: plan.reason === 'missing_data' ? 'silent_missing_data' : 'silent_out_of_scope', escalated,
+        botResponse: null, category: 'silent_out_of_scope', escalated,
       })
       return NextResponse.json({ ok: true })
     }
 
-    const { isDuplicate } = await trackBotReply(groupJid, logCategory, messageId)
+    const { isDuplicate } = await trackBotReply(groupJid, replyDedupKey(cleanedText), messageId)
     if (isDuplicate) return NextResponse.json({ ok: true })
 
     await sendWhatsAppMessage(groupJid, reply)
