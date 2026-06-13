@@ -1696,7 +1696,10 @@ export async function getActiveCampsForProgramme(
   type Row = { id: string; title: string | null; camp_days: CampDay[] | null; created_at: string }
   const seen = new Set<string>()
   const out: Row[] = []
+  const todayIso = new Date().toISOString().slice(0, 10)
   for (const r of rows as Row[]) {
+    // Skip camps that have already finished — never offer a past-dated camp.
+    if (campLastDateIso(r.camp_days) && campLastDateIso(r.camp_days)! < todayIso) continue
     const sig = `${(r.title || '').trim().toLowerCase()}|${JSON.stringify(r.camp_days || [])}`
     if (seen.has(sig)) continue
     seen.add(sig)
@@ -1704,6 +1707,16 @@ export async function getActiveCampsForProgramme(
   }
   out.sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
   return out.map((r) => ({ id: r.id, title: r.title ?? null, dateLabel: campDateLabel(r.camp_days) }))
+}
+
+// Latest valid ISO (YYYY-MM-DD) date across a camp's days, or null if none of
+// the days carry a real date (some legacy/test camps used labels like "Legs").
+function campLastDateIso(days: CampDay[] | null): string | null {
+  if (!Array.isArray(days)) return null
+  const isos = days
+    .map((d) => (typeof d?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : null))
+    .filter((x): x is string => x !== null)
+  return isos.length ? isos.sort().at(-1)! : null
 }
 
 // A compact "first day – last day" label from a camp's days, used to tell two
