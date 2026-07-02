@@ -1125,6 +1125,39 @@ export async function POST() {
     await sql`CREATE INDEX IF NOT EXISTS idx_prospects_status ON prospects(status, created_at DESC)`
 
     // ═══════════════════════════════════════════════════════════
+    // Leads pipeline — sales-funnel tracking for clients whose model is a
+    // lead funnel rather than a WhatsApp coaching programme (e.g. gyms).
+    // Source of Lead -> Lead -> Free Trial Booked -> 21-Day Sign-Up ->
+    // Joined -> Ex-Member, plus the off-ramp/no-show branches from the
+    // funnel diagram. Scoped per coach_id (coaches_v2), same tenancy model
+    // as programmes/promotions. Manual/form intake for now — no automated
+    // messaging or lead-source integrations yet.
+    // ═══════════════════════════════════════════════════════════
+    await sql`
+      CREATE TABLE IF NOT EXISTS leads (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        coach_id UUID NOT NULL REFERENCES coaches_v2(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        phone TEXT,
+        email TEXT,
+        source VARCHAR(20) NOT NULL DEFAULT 'other'
+          CHECK (source IN ('website','email_phone','calendly','meta','other')),
+        stage VARCHAR(30) NOT NULL DEFAULT 'lead'
+          CHECK (stage IN (
+            'lead','no_interest','free_trial_booked','no_show_cancel',
+            'free_trial_not_joined','signup_21day','not_joined_21day',
+            'joined','ex_member'
+          )),
+        trial_date DATE,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        stage_changed_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_leads_coach_stage ON leads(coach_id, stage, created_at DESC)`
+
+    // ═══════════════════════════════════════════════════════════
     // Phase 5 — Flow 9 post-trial conversion + Flow 7 payment chase
     // ═══════════════════════════════════════════════════════════
 
