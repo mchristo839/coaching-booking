@@ -812,6 +812,18 @@ export default function DashboardPage() {
             </Link>
 
             <Link
+              href="/dashboard/leads"
+              className="group flex flex-col items-center gap-2 card shadow-card p-4 hover:border-brand-300 hover:-translate-y-1 hover:shadow-card-hover transition-all text-center"
+            >
+              <div className="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center transition-colors group-hover:bg-brand-100">
+                <svg className="w-5 h-5 text-brand-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </div>
+              <span className="text-sm font-medium text-ink">Leads Pipeline</span>
+            </Link>
+
+            <Link
               href="/dashboard/learning"
               className="group relative flex flex-col items-center gap-2 card shadow-card p-4 hover:border-brand-300 hover:-translate-y-1 hover:shadow-card-hover transition-all text-center"
             >
