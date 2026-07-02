@@ -1,7 +1,10 @@
 // app/api/health/route.ts
 // Health check endpoint — protected by HEALTH_CHECK_SECRET bearer token.
 // Runs all checks, tracks state transitions, and sends Telegram alerts
-// when status changes (with 2-consecutive-failure flap protection).
+// when status changes (with 2-consecutive-failure flap protection), then
+// keeps nudging every ~30min for as long as it stays unhealthy (throttled
+// by sendTelegramAlert's own per-alert-key dedup window) instead of firing
+// once and going silent for the rest of the outage.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/app/lib/sql'
@@ -91,12 +94,20 @@ export async function GET(request: NextRequest) {
 
     await updateStoredState(currentStatus, consecutiveFailures)
 
-    // Alert on transition to degraded/down after 2 consecutive failures
-    if (currentStatus !== 'ok' && consecutiveFailures >= 2 && previousStatus === 'ok') {
+    // Alert once unhealthy for 2+ consecutive checks (flap protection), then
+    // keep re-sending on every subsequent unhealthy check — NOT just the
+    // initial transition. sendTelegramAlert dedups by alert_key within a
+    // 30-minute window, so this naturally becomes a "still down" reminder
+    // every ~30min rather than a single alert that's easy to miss on a
+    // multi-day outage.
+    if (currentStatus !== 'ok' && consecutiveFailures >= 2) {
       const severity = currentStatus === 'down' ? 'critical' : 'warn'
-      const message = buildAlertMessage(
+      const downSince = stored?.consecutive_failures
+        ? `down for ${consecutiveFailures} consecutive check(s)`
+        : 'just went down'
+      const message = `${buildAlertMessage(
         health.checks as Record<string, { ok: boolean; [key: string]: unknown }>
-      )
+      )}\n\n(${downSince} — this repeats every ~30min until resolved)`
       await sendTelegramAlert(`health-${currentStatus}`, message, severity)
     }
 
