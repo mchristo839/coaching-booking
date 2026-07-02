@@ -43,7 +43,17 @@ async function checkEvolutionApi(): Promise<CheckResult> {
     const data = await res.json()
     const state = data?.instance?.state || data?.state || 'unknown'
 
-    return { ok: state === 'open', state, latencyMs }
+    if (state === 'open') return { ok: true, state, latencyMs }
+
+    // Not open — most common cause is WhatsApp revoking the linked device
+    // (device_removed), which needs a human to re-scan a QR/pairing code.
+    // No API call can fix that automatically, so make the alert say so.
+    return {
+      ok: false,
+      state,
+      latencyMs,
+      hint: `Bot likely needs re-linking. Manager: ${url}/manager (instance: ${instance})`,
+    }
   } catch (error) {
     return { ok: false, state: 'unreachable', error: String(error) }
   }
