@@ -1,0 +1,117 @@
+name: Deploy Production (Vercel)
+
+# Auto-deploys main to the live Vercel project on every push.
+#
+# Why this exists instead of Vercel's native Git integration:
+# the project lives on a FREE Hobby account (mario-8407) whose owner differs
+# from the GitHub commit author (mchristo839). Hobby blocks Git-triggered
+# production deploys when author != account owner ("commit email could not be
+# matched to a GitHub account"). A token-based CLI deploy is attributed to the
+# token's owner (mario-8407 = the project owner), so it sidesteps that block.
+#
+# Required GitHub repo secrets (Settings > Secrets and variables > Actions):
+#   VERCEL_TOKEN       - a token created on the mario-8407 account, scoped to
+#                        the "Mario's projects" team (marios-projects-d32e3019)
+#   VERCEL_ORG_ID      - orgId from `.vercel/project.json` after `vercel link`
+#   VERCEL_PROJECT_ID  - projectId from `.vercel/project.json`
+# Optional (enables the failure alert step):
+#   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID - same values as the app's env vars
+#
+# Node version is pinned in .nvmrc so CI matches local dev. Set the Vercel
+# project's Node.js Version (Settings > General) to the SAME major so the build
+# and the serverless runtime agree.
+#
+# After this is live, DISCONNECT Vercel's native Git integration on the
+# coaching-booking-v3 project (Settings > Git) so it stops creating duplicate
+# "Blocked" deployments on every push.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege: this workflow only reads the repo.
+permissions:
+  contents: read
+
+# Serialise prod deploys. cancel-in-progress is deliberately FALSE: cancelling
+# a job mid-`vercel deploy --prod` can still let Vercel finish that deployment
+# server-side, which could land the live alias on an older commit. Letting each
+# run finish keeps "what Actions says" and "what's live" in sync.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://www.mycoachingassistant.com
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Pin the CLI — a surprise major bump must not be able to break prod.
+      # Bump this deliberately after testing a new CLI version.
+      - name: Install Vercel CLI
+        run: npm install --global vercel@54.14.0
+
+      - name: Pull Vercel project settings & env
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to production
+        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      # Confirm the site actually serves after the alias promotes (with a short
+      # retry to allow for propagation). Fails the job if it never returns 200.
+      - name: Smoke-check production
+        run: |
+          url="https://www.mycoachingassistant.com"
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$url" || echo 000)
+            echo "attempt $i: $url -> $code"
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 10
+          done
+          echo "::error::Production did not return 200 after deploy"
+          exit 1
+
+      # Ping Telegram if any step above failed (deploy or smoke-check). Skips
+      # silently if the Telegram secrets aren't configured.
+      - name: Alert on failure (Telegram)
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram secrets not set — skipping alert."
+            exit 0
+          fi
+          text="[MCA] ❌ Production deploy failed on main (${GITHUB_SHA:0:7}). Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          curl -s --max-time 20 -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${text}" >/dev/null \
+            || echo "Telegram alert failed to send"
