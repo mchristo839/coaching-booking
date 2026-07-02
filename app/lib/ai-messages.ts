@@ -803,8 +803,9 @@ export function buildCampPaymentMessage(input: {
 }): string {
   const total = input.children.reduce((s, c) => s + c.total, 0)
   const names = input.children.map((c) => c.childName).join(' & ')
+  const isUrl = !!input.paymentLink && /^https?:\/\//i.test(input.paymentLink.trim())
   const lines: string[] = []
-  lines.push(`Here's your payment link:`)
+  lines.push(isUrl ? `Here's your payment link:` : `Here's how to pay:`)
   lines.push('')
   lines.push(`£${total.toFixed(2)} for ${names} — ${input.campName}`)
   if (input.paymentLink) {
