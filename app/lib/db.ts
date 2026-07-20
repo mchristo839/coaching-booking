@@ -126,6 +126,13 @@ export async function updateCoachBotStatus(coachId: string, status: string) {
   await sql`UPDATE coaches_v2 SET whatsapp_bot_status = ${status}, updated_at = NOW() WHERE id = ${coachId}`
 }
 
+// Coach has switched their bot off from Settings — the webhook checks this
+// before running any group or 1:1 flow for that coach's parents.
+export async function isCoachBotPaused(coachId: string): Promise<boolean> {
+  const { rows } = await sql`SELECT whatsapp_bot_status FROM coaches_v2 WHERE id = ${coachId} LIMIT 1`
+  return rows[0]?.whatsapp_bot_status === 'paused'
+}
+
 // ─── Programmes ───
 
 export interface ProgrammeData {

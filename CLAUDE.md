@@ -124,6 +124,7 @@ docs/                           # Audit reports and task specs
 - Duplicate webhook calls deduped via `processed_messages` table
 - Duplicate bot replies prevented via `bot_replies` 10-second window check
 - **STOP/UNSUBSCRIBE** in a 1:1 sets `members.marketing_opt_out` (highest-priority 1:1 branch) — member is then excluded from referral DMs
+- **Bot pause** — a coach can switch their bot Live/Paused from `/dashboard/settings` ("Bot Behaviour" card, `PATCH /api/coaches/me` with `whatsappBotStatus`, backed by `coaches_v2.whatsapp_bot_status`). Paused silences EVERYTHING for that coach: the group Q&A/routing/poll bot (checked via `program.whatsapp_bot_status` right after the group is resolved) AND every 1:1 flow — camp booking, PT booking, cancellation, feedback, coach payment-confirm (checked via `isCoachBotPaused(sender.coach_id)` in `db.ts`, resolved through `resolveSender` before any 1:1 branch runs). STOP/UNSUBSCRIBE opt-out is exempt (always honoured, it's compliance not bot behaviour). Every paused message is still logged (`category: 'bot_paused'` / inbox `actionTaken: 'bot_paused'`) for observability.
 
 ## Referral DMs to individual members
 
@@ -181,7 +182,6 @@ webhook's 1:1 branch); message copy + pure parsers in `app/lib/ai-messages.ts`.
 - DM signup flow (`signup_sessions` table)
 - JWT/cookie auth (replacing localStorage)
 - Observation mode (bot watches but doesn't reply)
-- `whatsapp_bot_status` on coaches (live/observation/paused)
 
 ## Known quirks (read before debugging)
 

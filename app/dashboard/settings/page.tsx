@@ -14,6 +14,9 @@ export default function SettingsPage() {
   const [vertical, setVertical] = useState<Vertical>('sport')
   const [savingVertical, setSavingVertical] = useState(false)
   const [verticalMsg, setVerticalMsg] = useState('')
+  const [botStatus, setBotStatus] = useState('not_yet_registered')
+  const [savingBotStatus, setSavingBotStatus] = useState(false)
+  const [botStatusMsg, setBotStatusMsg] = useState('')
 
   useEffect(() => {
     const id = localStorage.getItem('coachId')
@@ -31,6 +34,9 @@ export default function SettingsPage() {
         if (data?.vertical === 'fitness' || data?.vertical === 'sport') {
           setVertical(data.vertical)
           window.localStorage.setItem('coachVertical', data.vertical)
+        }
+        if (data?.whatsappBotStatus) {
+          setBotStatus(data.whatsappBotStatus)
         }
       })
       .catch(() => { /* silent */ })
@@ -57,6 +63,33 @@ export default function SettingsPage() {
       setVerticalMsg('Saved. Reload pages to see new labels everywhere.')
     } finally {
       setSavingVertical(false)
+    }
+  }
+
+  async function saveBotStatus(next: 'live' | 'paused') {
+    if (next === botStatus) return
+    setSavingBotStatus(true)
+    setBotStatusMsg('')
+    try {
+      const res = await fetch('/api/coaches/me', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ whatsappBotStatus: next }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setBotStatusMsg(data.error || 'Failed to save')
+        return
+      }
+      setBotStatus(next)
+      setBotStatusMsg(
+        next === 'paused'
+          ? "Bot paused. It won't reply in your group or to parents in DM until you switch it back on."
+          : "Bot is live again."
+      )
+    } finally {
+      setSavingBotStatus(false)
     }
   }
 
@@ -181,14 +214,45 @@ export default function SettingsPage() {
       <div className="card shadow-card">
         <h2 className="font-display text-lg font-semibold text-ink mb-1">Bot Behaviour</h2>
         <p className="text-sm text-ink-muted mb-4">
-          When the bot first joins your group, it enters observation mode. It watches how you communicate and learns your style before going live.
+          Pause the bot to stop it replying in your group and to parents in DM —
+          useful if you'd rather answer everything yourself for a while. You can
+          switch it back on any time.
         </p>
 
-        <div className="bg-brand-50 border border-brand-100 rounded-lg p-4 mb-4">
-          <p className="text-sm text-ink">
-            Your bot learns from your conversations and gets smarter over time. The longer it observes, the better it matches your tone and approach.
-          </p>
+        <div className="flex gap-2 mb-2">
+          <button
+            type="button"
+            onClick={() => saveBotStatus('live')}
+            disabled={savingBotStatus || botStatus === 'not_yet_registered'}
+            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors disabled:opacity-50 ${
+              botStatus === 'live'
+                ? 'bg-brand-600 text-white border-brand-600'
+                : 'bg-surface text-ink border-line hover:border-brand-600'
+            }`}
+          >
+            Live
+          </button>
+          <button
+            type="button"
+            onClick={() => saveBotStatus('paused')}
+            disabled={savingBotStatus || botStatus === 'not_yet_registered'}
+            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors disabled:opacity-50 ${
+              botStatus === 'paused'
+                ? 'bg-brand-600 text-white border-brand-600'
+                : 'bg-surface text-ink border-line hover:border-brand-600'
+            }`}
+          >
+            Paused
+          </button>
         </div>
+        {botStatus === 'not_yet_registered' && (
+          <p className="text-xs text-ink-muted mb-2">
+            Connect your WhatsApp group first (see Bot Setup above) before you can pause or resume the bot.
+          </p>
+        )}
+        {botStatusMsg && (
+          <p className="text-xs text-ink-muted mb-4">{botStatusMsg}</p>
+        )}
 
         <Link
           href="/dashboard/learning"
