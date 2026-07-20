@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
-import { findProgramByWhatsAppGroup, getProgrammeAvailability, safeLogConversation, isMessageProcessed, trackBotReply, type Knowledgebase } from '@/app/lib/db'
+import { findProgramByWhatsAppGroup, getProgrammeAvailability, safeLogConversation, isMessageProcessed, trackBotReply, isCoachBotPaused, type Knowledgebase } from '@/app/lib/db'
 import { sendWhatsAppMessage } from '@/app/lib/evolution'
 import {
   classifyBotIntent,
@@ -343,12 +343,42 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ ok: true })
         }
 
-        // ─── Inbox Agent — identity + intent classification (observability) ───
-        // Runs in parallel with routing so a slow LLM classify never blocks
-        // the bot's reply path. We capture the promise + log when it resolves
-        // (after the branch runs, so we can record action_taken too).
+        // ─── Identity resolution ───
+        // Resolved up front (rather than in parallel with routing) because the
+        // bot-paused gate below needs the sender's coach before any 1:1 flow runs.
         const inboxStart = Date.now()
-        const senderPromise = resolveSender(remoteJid).catch(() => null)
+        const sender = (await resolveSender(remoteJid).catch(() => null)) || {
+          type: 'unknown' as const,
+          jid: remoteJid,
+          record_id: null,
+          display_name: null,
+          coach_id: null,
+          programme_id: null,
+        }
+
+        // ─── Coach has paused the bot — skip every 1:1 flow for their parents ───
+        // STOP/opt-out above always runs regardless, since that's compliance,
+        // not bot behaviour.
+        if (sender.coach_id && (await isCoachBotPaused(sender.coach_id))) {
+          try {
+            const classification = await classifyIntent(inboundText, sender)
+            await logInboxInteraction({
+              sender,
+              messageText: inboundText,
+              isGroup: false,
+              groupJid: null,
+              classification,
+              actionTaken: 'bot_paused',
+              resolvedBy: 'unresolved',
+              escalated: classification.sentiment === 'negative',
+              responseTimeMs: Date.now() - inboxStart,
+              messageId: messageId || null,
+            })
+          } catch (e) {
+            console.error('[PAUSE-GATE] log error:', e)
+          }
+          return NextResponse.json({ ok: true })
+        }
 
         let consumedBy: string | null = null
 
@@ -441,14 +471,6 @@ export async function POST(request: NextRequest) {
         // returning the webhook response.
         ;(async () => {
           try {
-            const sender = (await senderPromise) || {
-              type: 'unknown' as const,
-              jid: remoteJid,
-              record_id: null,
-              display_name: null,
-              coach_id: null,
-              programme_id: null,
-            }
             const classification = await classifyIntent(inboundText, sender)
             await logInboxInteraction({
               sender,
@@ -560,6 +582,15 @@ export async function POST(request: NextRequest) {
         escalated: false,
       })
 
+      return NextResponse.json({ ok: true })
+    }
+
+    // ─── Coach has paused the bot — skip all group bot activity ───
+    if (program.whatsapp_bot_status === 'paused') {
+      await safeLogConversation({
+        programmeId: program.id, groupJid, senderJid, senderName, messageText,
+        botResponse: null, category: 'bot_paused', escalated: false,
+      })
       return NextResponse.json({ ok: true })
     }
 

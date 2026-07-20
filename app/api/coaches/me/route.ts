@@ -1,12 +1,13 @@
 // app/api/coaches/me/route.ts
-// PATCH the logged-in coach's own record. Currently only the vertical
-// flag, but the shape is open so future per-coach prefs can land here.
+// PATCH the logged-in coach's own record — vertical and WhatsApp bot
+// live/paused status, with the shape open for future per-coach prefs.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/app/lib/sql'
 import { getAuthFromRequest } from '@/app/lib/auth'
 
 const VALID_VERTICALS = new Set(['sport', 'fitness'])
+const VALID_BOT_STATUSES = new Set(['live', 'paused'])
 
 export async function PATCH(request: NextRequest) {
   const auth = await getAuthFromRequest(request)
@@ -14,16 +15,27 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
-  let body: { vertical?: string }
+  let body: { vertical?: string; whatsappBotStatus?: string }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  if (typeof body.vertical !== 'string' || !VALID_VERTICALS.has(body.vertical)) {
+  if (body.vertical === undefined && body.whatsappBotStatus === undefined) {
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
+  }
+
+  if (body.vertical !== undefined && !VALID_VERTICALS.has(body.vertical)) {
     return NextResponse.json(
       { error: 'vertical must be "sport" or "fitness"' },
+      { status: 400 }
+    )
+  }
+
+  if (body.whatsappBotStatus !== undefined && !VALID_BOT_STATUSES.has(body.whatsappBotStatus)) {
+    return NextResponse.json(
+      { error: 'whatsappBotStatus must be "live" or "paused"' },
       { status: 400 }
     )
   }
@@ -31,14 +43,21 @@ export async function PATCH(request: NextRequest) {
   try {
     const { rows } = await sql`
       UPDATE coaches_v2
-      SET vertical = ${body.vertical}, updated_at = NOW()
+      SET
+        vertical = COALESCE(${body.vertical ?? null}, vertical),
+        whatsapp_bot_status = COALESCE(${body.whatsappBotStatus ?? null}, whatsapp_bot_status),
+        updated_at = NOW()
       WHERE id = ${auth.coachId}
-      RETURNING vertical
+      RETURNING vertical, whatsapp_bot_status
     `
     if (rows.length === 0) {
       return NextResponse.json({ error: 'Coach not found' }, { status: 404 })
     }
-    return NextResponse.json({ success: true, vertical: rows[0].vertical })
+    return NextResponse.json({
+      success: true,
+      vertical: rows[0].vertical,
+      whatsappBotStatus: rows[0].whatsapp_bot_status,
+    })
   } catch (error) {
     console.error('[COACHES ME PATCH] error:', error)
     return NextResponse.json({ error: 'Failed to update coach' }, { status: 500 })
